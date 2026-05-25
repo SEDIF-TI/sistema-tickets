@@ -4,6 +4,8 @@ import com.sedif.sistema_tickets.core.usuarios.Usuario;
 import com.sedif.sistema_tickets.util.audit.Auditable;
 import jakarta.persistence.*;
 
+
+
 @Entity
 @Table(name = "areas")
 public class Area extends Auditable {
