@@ -10,7 +10,6 @@ import lombok.NoArgsConstructor;
 
 /**
  * Entidad que representa a los usuarios del sistema.
- * Utiliza Lombok para la generación automática de métodos de acceso y constructores.
  */
 @Entity
 @Table(name = "usuarios")
