@@ -33,7 +33,6 @@ public class UsuarioService {
         Usuario nuevoUsuario = new Usuario();
         nuevoUsuario.setNombre(request.nombre());
         nuevoUsuario.setCorreo(request.correo());
-        // TODO: En el futuro aquí deberíamos encriptar la contraseña (ej. PasswordEncoder de Spring Security)
         nuevoUsuario.setPassword(request.password());
         nuevoUsuario.setRol(request.rol());
 

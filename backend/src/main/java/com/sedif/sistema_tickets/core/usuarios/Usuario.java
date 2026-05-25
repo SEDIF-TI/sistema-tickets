@@ -1,14 +1,22 @@
-package com.sedif.sistema_tickets.core.usuarios; // <-- Cambiado a sedif y a usuarios
+package com.sedif.sistema_tickets.core.usuarios;
 
 import com.sedif.sistema_tickets.core.area.Area;
 import com.sedif.sistema_tickets.util.audit.Auditable;
 import com.sedif.sistema_tickets.util.enums.RolUsuario;
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.NoArgsConstructor;
 
-// ... el resto de tu código hacia abajo queda igual ...
-
+/**
+ * Entidad que representa a los usuarios del sistema.
+ * Utiliza Lombok para la generación automática de métodos de acceso y constructores.
+ */
 @Entity
 @Table(name = "usuarios")
+@Getter
+@Setter
+@NoArgsConstructor
 public class Usuario extends Auditable {
 
     @Id
@@ -40,32 +48,4 @@ public class Usuario extends Auditable {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "fn_area_id")
     private Area area;
-
-    // --- Constructor ---
-    public Usuario() {}
-
-    // --- Getters y Setters ---
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-
-    public String getNombre() { return nombre; }
-    public void setNombre(String nombre) { this.nombre = nombre; }
-
-    public String getCorreo() { return correo; }
-    public void setCorreo(String correo) { this.correo = correo; }
-
-    public String getPassword() { return password; }
-    public void setPassword(String password) { this.password = password; }
-
-    public RolUsuario getRol() { return rol; }
-    public void setRol(RolUsuario rol) { this.rol = rol; }
-
-    public Boolean getActivo() { return activo; }
-    public void setActivo(Boolean activo) { this.activo = activo; }
-
-    public Boolean getDisponibleSoporte() { return disponibleSoporte; }
-    public void setDisponibleSoporte(Boolean disponibleSoporte) { this.disponibleSoporte = disponibleSoporte; }
-
-    public Area getArea() { return area; }
-    public void setArea(Area area) { this.area = area; }
 }
