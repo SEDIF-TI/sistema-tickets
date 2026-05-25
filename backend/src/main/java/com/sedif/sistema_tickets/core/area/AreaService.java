@@ -1,19 +1,24 @@
 package com.sedif.sistema_tickets.core.area;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+
 import java.util.List;
 
+/**
+ * Servicio que contiene la lógica de negocio para la gestión de áreas.
+ */
 @Service
+@RequiredArgsConstructor // Lombok: Genera automáticamente el constructor para inyectar AreaRepository
 public class AreaService {
 
     private final AreaRepository areaRepository;
 
-    // Inyección de dependencias
-    public AreaService(AreaRepository areaRepository) {
-        this.areaRepository = areaRepository;
-    }
+    // Se eliminó el constructor manual public AreaService(...)
 
-    // Método para crear una nueva área
+    /**
+     * Crea una nueva área en el sistema.
+     */
     public Area crearArea(AreaRecord record) {
         Area nuevaArea = new Area();
         nuevaArea.setNombre(record.nombre());
@@ -28,7 +33,9 @@ public class AreaService {
         return areaRepository.save(nuevaArea);
     }
 
-    // Método para listar todas las áreas
+    /**
+     * Obtiene la lista de todas las áreas registradas.
+     */
     public List<Area> listarAreas() {
         return areaRepository.findAll();
     }
