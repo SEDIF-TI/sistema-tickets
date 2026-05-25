@@ -3,22 +3,21 @@ package com.sedif.sistema_tickets.core.usuarios;
 import com.sedif.sistema_tickets.core.area.Area;
 import com.sedif.sistema_tickets.core.area.AreaRepository;
 import com.sedif.sistema_tickets.util.enums.RolUsuario;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
+/**
+ * Servicio que contiene la lógica de negocio para la gestión de usuarios.
+ */
 @Service
+@RequiredArgsConstructor // Lombok: Genera automáticamente el constructor para los repositorios declarados como 'final'
 public class UsuarioService {
 
     private final UsuarioRepository usuarioRepository;
     private final AreaRepository areaRepository;
-
-    // Inyección de dependencias mediante el constructor
-    public UsuarioService(UsuarioRepository usuarioRepository, AreaRepository areaRepository) {
-        this.usuarioRepository = usuarioRepository;
-        this.areaRepository = areaRepository;
-    }
 
     /**
      * Crea un nuevo usuario en el sistema aplicando reglas de validación.
