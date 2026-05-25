@@ -1,20 +1,21 @@
 package com.sedif.sistema_tickets.core.usuarios;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+/**
+ * Controlador REST que expone los endpoints para la gestión de usuarios.
+ */
 @RestController
 @RequestMapping("/api/usuarios")
+@RequiredArgsConstructor // Lombok: Genera automáticamente el constructor para inyectar UsuarioService
 public class UsuarioResource {
 
     private final UsuarioService usuarioService;
-
-    public UsuarioResource(UsuarioService usuarioService) {
-        this.usuarioService = usuarioService;
-    }
 
     /**
      * Endpoint para crear un usuario.

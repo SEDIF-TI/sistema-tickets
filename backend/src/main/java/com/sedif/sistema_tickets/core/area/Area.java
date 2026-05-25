@@ -5,7 +5,7 @@ import com.sedif.sistema_tickets.util.audit.Auditable;
 import jakarta.persistence.*;
 
 @Entity
-@Table(name = "areas")
+@Table(name = "area")
 public class Area extends Auditable {
 
     @Id

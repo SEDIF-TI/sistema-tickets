@@ -8,7 +8,7 @@ import jakarta.persistence.*;
 // ... el resto de tu código hacia abajo queda igual ...
 
 @Entity
-@Table(name = "usuarios")
+@Table(name = "usuario")
 public class Usuario extends Auditable {
 
     @Id
