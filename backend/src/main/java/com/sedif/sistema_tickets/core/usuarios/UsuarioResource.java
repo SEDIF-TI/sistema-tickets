@@ -1,47 +1,22 @@
 package com.sedif.sistema_tickets.core.usuarios;
 
-<<<<<<< HEAD
-=======
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
->>>>>>> modulo_areas
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-<<<<<<< HEAD
-@RestController
-@RequestMapping("/api/usuarios")
-=======
 /**
  * Controlador REST que expone los endpoints para la gestión de usuarios.
  */
 @RestController
 @RequestMapping("/api/usuarios")
 @RequiredArgsConstructor // Lombok: Genera automáticamente el constructor para inyectar UsuarioService
->>>>>>> modulo_areas
 public class UsuarioResource {
 
     private final UsuarioService usuarioService;
 
-<<<<<<< HEAD
-    // Inyección de dependencias
-    public UsuarioResource(UsuarioService usuarioService) {
-        this.usuarioService = usuarioService;
-    }
-
-    // Endpoint para CREAR un usuario (El que estás probando en Postman)
-    @PostMapping
-    public ResponseEntity<UsuarioResponse> registrarUsuario(@RequestBody UsuarioRequest request) {
-        UsuarioResponse usuarioCreado = usuarioService.crearUsuario(request);
-        return ResponseEntity.ok(usuarioCreado);
-    }
-
-    // Endpoint para LISTAR los usuarios
-    @GetMapping
-    public ResponseEntity<List<UsuarioResponse>> obtenerUsuarios() {
-=======
     /**
      * Endpoint para crear un usuario.
      * Método HTTP: POST
@@ -65,7 +40,24 @@ public class UsuarioResource {
      */
     @GetMapping
     public ResponseEntity<List<UsuarioResponse>> listarUsuarios() {
->>>>>>> modulo_areas
         return ResponseEntity.ok(usuarioService.listarUsuarios());
     }
+
+
+    /**
+     * Endpoint para cambiar la disponibilidad de un usuario de soporte.
+     * Método HTTP: PATCH
+     */
+    @PatchMapping("/{id}/disponibilidad")
+    public ResponseEntity<?> actualizarDisponibilidad(
+            @PathVariable Long id, 
+            @RequestBody DisponibilidadRequest request) {
+        try {
+            UsuarioResponse response = usuarioService.actualizarDisponibilidad(id, request);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
 }
