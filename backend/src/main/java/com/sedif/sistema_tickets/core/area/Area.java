@@ -7,6 +7,8 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.NoArgsConstructor;
 
+
+
 @Entity
 @Table(name = "area") // Tabla en singular, correctamente aplicada.
 @Getter
