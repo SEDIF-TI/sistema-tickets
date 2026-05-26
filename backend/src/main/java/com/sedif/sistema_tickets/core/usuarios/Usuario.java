@@ -12,7 +12,10 @@ import lombok.NoArgsConstructor;
  * Entidad que representa a los usuarios del sistema.
  */
 @Entity
-@Table(name = "usuario")
+@Table(name = "usuarios")
+@Getter
+@Setter
+@NoArgsConstructor
 public class Usuario extends Auditable {
 
     @Id
