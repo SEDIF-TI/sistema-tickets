@@ -83,4 +83,34 @@ public class UsuarioService {
         // 4. Devolvemos el usuario actualizado
         return UsuarioResponse.desdeEntidad(usuarioActualizado);
     }
+
+    /**
+     * Realiza la baja lógica de un usuario, cambiando su estado de acceso a inactivo.
+     * Si el usuario es de soporte, también revoca su disponibilidad operativa.
+     * * @param id Identificador del usuario a inactivar.
+     * @return UsuarioResponse con los datos actualizados del usuario.
+     * @throws IllegalArgumentException Si el usuario no existe o ya está inactivo.
+     */
+    @Transactional
+    public UsuarioResponse inactivarUsuario(Long id) {
+        Usuario usuario = usuarioRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado con el ID: " + id));
+
+        // Validación: Prevenir redundancia en la base de datos
+        if (!usuario.getActivo()) {
+            throw new IllegalArgumentException("La operación no es válida. El usuario ya se encuentra inactivo en el sistema.");
+        }
+
+        // Se aplica la baja lógica
+        usuario.setActivo(false);
+
+        // Regla de negocio de seguridad: Si es soporte, se le retira la disponibilidad
+        if (usuario.getRol() == RolUsuario.SOPORTE) {
+            usuario.setDisponibleSoporte(false);
+        }
+
+        Usuario usuarioActualizado = usuarioRepository.save(usuario);
+        return UsuarioResponse.desdeEntidad(usuarioActualizado);
+    }
+
 }
