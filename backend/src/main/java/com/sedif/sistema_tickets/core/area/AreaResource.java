@@ -6,17 +6,12 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-/**
- * Controlador REST que expone los endpoints para la gestión de áreas.
- */
 @RestController
 @RequestMapping("/api/areas")
-@RequiredArgsConstructor // Lombok: Genera automáticamente el constructor para inyectar AreaService
+@RequiredArgsConstructor
 public class AreaResource {
 
     private final AreaService areaService;
-
-    // Se eliminó el constructor manual public AreaResource(...)
 
     /**
      * Endpoint para registrar una nueva área.
@@ -37,5 +32,27 @@ public class AreaResource {
     @GetMapping
     public ResponseEntity<List<Area>> obtenerAreas() {
         return ResponseEntity.ok(areaService.listarAreas());
+    }
+
+    /**
+     * Endpoint para actualizar un área existente.
+     * Método HTTP: PUT
+     * URL: http://localhost:8080/api/areas/{id}
+     */
+    @PutMapping("/{id}")
+    public ResponseEntity<Area> actualizarArea(@PathVariable Long id, @RequestBody AreaRecord record) {
+        Area areaActualizada = areaService.actualizarArea(id, record);
+        return ResponseEntity.ok(areaActualizada);
+    }
+
+    /**
+     * Endpoint para realizar el borrado lógico de un área.
+     * Método HTTP: DELETE
+     * URL: http://localhost:8080/api/areas/{id}
+     */
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> eliminarArea(@PathVariable Long id) {
+        areaService.eliminarArea(id);
+        return ResponseEntity.noContent().build();
     }
 }
