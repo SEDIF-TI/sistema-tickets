@@ -42,4 +42,22 @@ public class UsuarioResource {
     public ResponseEntity<List<UsuarioResponse>> listarUsuarios() {
         return ResponseEntity.ok(usuarioService.listarUsuarios());
     }
+
+
+    /**
+     * Endpoint para cambiar la disponibilidad de un usuario de soporte.
+     * Método HTTP: PATCH
+     */
+    @PatchMapping("/{id}/disponibilidad")
+    public ResponseEntity<?> actualizarDisponibilidad(
+            @PathVariable Long id, 
+            @RequestBody DisponibilidadRequest request) {
+        try {
+            UsuarioResponse response = usuarioService.actualizarDisponibilidad(id, request);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
 }

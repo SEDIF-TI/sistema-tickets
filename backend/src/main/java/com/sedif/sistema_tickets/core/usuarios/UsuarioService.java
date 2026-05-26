@@ -60,4 +60,27 @@ public class UsuarioService {
                 .map(UsuarioResponse::desdeEntidad)
                 .toList();
     }
+
+    /*
+     * Cambia la disponibilidad de un usuario de soporte.
+     */
+    
+    @Transactional
+    public UsuarioResponse actualizarDisponibilidad(Long id, DisponibilidadRequest request) {
+        // 1. Buscamos al usuario por su ID
+        Usuario usuario = usuarioRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado con el ID: " + id));
+
+        // 2. Validamos que el usuario realmente sea de SOPORTE
+        if (usuario.getRol() != RolUsuario.SOPORTE) {
+            throw new IllegalArgumentException("Solo los usuarios con rol de SOPORTE pueden modificar su disponibilidad.");
+        }
+
+        // 3. Actualizamos el estatus y guardamos
+        usuario.setDisponibleSoporte(request.disponible());
+        Usuario usuarioActualizado = usuarioRepository.save(usuario);
+
+        // 4. Devolvemos el usuario actualizado
+        return UsuarioResponse.desdeEntidad(usuarioActualizado);
+    }
 }
