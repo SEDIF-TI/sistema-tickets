@@ -60,4 +60,19 @@ public class UsuarioResource {
         }
     }
 
+    /**
+     * Endpoint para realizar la baja lógica (inactivación) de un usuario.
+     * Método HTTP: DELETE
+     * URL: http://localhost:8080/api/usuarios/{id}
+     */
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> inactivarUsuario(@PathVariable Long id) {
+        try {
+            UsuarioResponse response = usuarioService.inactivarUsuario(id);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
 }
