@@ -5,16 +5,11 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 
-/**
- * Servicio que contiene la lógica de negocio para la gestión de áreas.
- */
 @Service
-@RequiredArgsConstructor // Lombok: Genera automáticamente el constructor para inyectar AreaRepository
+@RequiredArgsConstructor
 public class AreaService {
 
     private final AreaRepository areaRepository;
-
-    // Se eliminó el constructor manual public AreaService(...)
 
     /**
      * Crea una nueva área en el sistema.
@@ -23,7 +18,6 @@ public class AreaService {
         Area nuevaArea = new Area();
         nuevaArea.setNombre(record.nombre());
         
-        // Si no mandan el estatus activo, por defecto es true
         if (record.activo() != null) {
             nuevaArea.setActivo(record.activo());
         } else {
@@ -38,5 +32,32 @@ public class AreaService {
      */
     public List<Area> listarAreas() {
         return areaRepository.findAll();
+    }
+
+    /**
+     * Actualiza los datos de un área existente.
+     */
+    public Area actualizarArea(Long id, AreaRecord record) {
+        Area areaExistente = areaRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("El área con ID " + id + " no existe."));
+
+        areaExistente.setNombre(record.nombre());
+        
+        if (record.activo() != null) {
+            areaExistente.setActivo(record.activo());
+        }
+
+        return areaRepository.save(areaExistente);
+    }
+
+    /**
+     * Realiza un borrado lógico del área (cambia b_activo a false).
+     */
+    public void eliminarArea(Long id) {
+        Area areaExistente = areaRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("El área con ID " + id + " no existe."));
+
+        areaExistente.setActivo(false);
+        areaRepository.save(areaExistente);
     }
 }
