@@ -83,4 +83,83 @@ public class UsuarioService {
         // 4. Devolvemos el usuario actualizado
         return UsuarioResponse.desdeEntidad(usuarioActualizado);
     }
+
+    /**
+     * Realiza la baja lógica de un usuario, cambiando su estado de acceso a inactivo.
+     * Si el usuario es de soporte, también revoca su disponibilidad operativa.
+     * * @param id Identificador del usuario a inactivar.
+     * @return UsuarioResponse con los datos actualizados del usuario.
+     * @throws IllegalArgumentException Si el usuario no existe o ya está inactivo.
+     */
+    @Transactional
+    public UsuarioResponse inactivarUsuario(Long id) {
+        Usuario usuario = usuarioRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado con el ID: " + id));
+
+        // Validación: Prevenir redundancia en la base de datos
+        if (!usuario.getActivo()) {
+            throw new IllegalArgumentException("La operación no es válida. El usuario ya se encuentra inactivo en el sistema.");
+        }
+
+        // Se aplica la baja lógica
+        usuario.setActivo(false);
+
+        // Regla de negocio de seguridad: Si es soporte, se le retira la disponibilidad
+        if (usuario.getRol() == RolUsuario.SOPORTE) {
+            usuario.setDisponibleSoporte(false);
+        }
+
+        Usuario usuarioActualizado = usuarioRepository.save(usuario);
+        return UsuarioResponse.desdeEntidad(usuarioActualizado);
+    }
+
+    /**
+     * Actualiza la información general de un usuario existente.
+     * @param id Identificador del usuario a modificar.
+     * @param request DTO con los nuevos datos de actualización.
+     * @return UsuarioResponse con los datos actualizados del usuario.
+     * @throws IllegalArgumentException Si el usuario o el área no existen, o si hay conflicto de correos.
+     */
+    @Transactional
+    public UsuarioResponse actualizarUsuario(Long id, ActualizarUsuarioRequest request) {
+        Usuario usuario = usuarioRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado con el ID: " + id));
+
+        // 1. Validación de nombre
+        if (request.nombre() != null && !request.nombre().trim().isEmpty()) {
+            usuario.setNombre(request.nombre());
+        }
+
+        // 2. Validación de correo (Evita colisión con correos de otros usuarios)
+        if (request.correo() != null && !request.correo().trim().isEmpty()) {
+            // Solo verificamos si el correo entrante es diferente al que ya tiene
+            if (!request.correo().equalsIgnoreCase(usuario.getCorreo())) {
+                if (usuarioRepository.existsByCorreoAndIdNot(request.correo(), id)) {
+                    throw new IllegalArgumentException("El correo electrónico ya está registrado a nombre de otro usuario.");
+                }
+                usuario.setCorreo(request.correo());
+            }
+        }
+
+        // 3. Validación de Rol y asignación de Área
+        if (request.rol() != null) {
+            usuario.setRol(request.rol());
+            
+            if (request.rol() == RolUsuario.AREA) {
+                if (request.areaId() == null) {
+                    throw new IllegalArgumentException("Un usuario con rol AREA debe tener un departamento asignado.");
+                }
+                Area area = areaRepository.findById(request.areaId())
+                        .orElseThrow(() -> new IllegalArgumentException("El área especificada no existe con el ID: " + request.areaId()));
+                usuario.setArea(area);
+            } else {
+                // Regla de negocio: Los roles ADMINISTRADOR y SOPORTE no pertenecen a un área regular
+                usuario.setArea(null);
+            }
+        }
+
+        Usuario usuarioActualizado = usuarioRepository.save(usuario);
+        return UsuarioResponse.desdeEntidad(usuarioActualizado);
+    }
+
 }

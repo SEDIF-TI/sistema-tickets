@@ -60,4 +60,36 @@ public class UsuarioResource {
         }
     }
 
+    /**
+     * Endpoint para realizar la baja lógica (inactivación) de un usuario.
+     * Método HTTP: DELETE
+     * URL: http://localhost:8080/api/usuarios/{id}
+     */
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> inactivarUsuario(@PathVariable Long id) {
+        try {
+            UsuarioResponse response = usuarioService.inactivarUsuario(id);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    /**
+     * Endpoint para actualizar la información de un usuario.
+     * Método HTTP: PUT
+     * URL: http://localhost:8080/api/usuarios/{id}
+     */
+    @PutMapping("/{id}")
+    public ResponseEntity<?> actualizarUsuario(
+            @PathVariable Long id, 
+            @RequestBody ActualizarUsuarioRequest request) {
+        try {
+            UsuarioResponse response = usuarioService.actualizarUsuario(id, request);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
 }
