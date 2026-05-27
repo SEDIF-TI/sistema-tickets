@@ -8,4 +8,7 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
     
     // Spring Data crea automáticamente la consulta SQL para verificar si un correo ya existe
     boolean existsByCorreo(String correo);
+
+    // Verifica si existe un correo específico, excluyendo el ID del usuario actual
+    boolean existsByCorreoAndIdNot(String correo, Long id);
 }
