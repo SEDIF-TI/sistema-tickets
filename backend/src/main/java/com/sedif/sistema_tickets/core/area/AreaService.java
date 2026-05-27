@@ -2,41 +2,61 @@ package com.sedif.sistema_tickets.core.area;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
-/**
- * Servicio que contiene la lógica de negocio para la gestión de áreas.
- */
 @Service
-@RequiredArgsConstructor // Lombok: Genera automáticamente el constructor para inyectar AreaRepository
+@RequiredArgsConstructor
 public class AreaService {
 
     private final AreaRepository areaRepository;
 
-    // Se eliminó el constructor manual public AreaService(...)
-
-    /**
-     * Crea una nueva área en el sistema.
-     */
-    public Area crearArea(AreaRecord record) {
+    @Transactional
+    public AreaResponse crearArea(AreaRecord record) {
         Area nuevaArea = new Area();
         nuevaArea.setNombre(record.nombre());
         
-        // Si no mandan el estatus activo, por defecto es true
         if (record.activo() != null) {
             nuevaArea.setActivo(record.activo());
         } else {
             nuevaArea.setActivo(true);
         }
 
-        return areaRepository.save(nuevaArea);
+        Area areaGuardada = areaRepository.save(nuevaArea);
+        return AreaResponse.desdeEntidad(areaGuardada);
     }
 
-    /**
-     * Obtiene la lista de todas las áreas registradas.
-     */
-    public List<Area> listarAreas() {
-        return areaRepository.findAll();
+    @Transactional(readOnly = true)
+    public List<AreaResponse> listarAreas() {
+        return areaRepository.findAll()
+                .stream()
+                .map(AreaResponse::desdeEntidad)
+                .toList();
+    }
+
+    @Transactional
+    public AreaResponse actualizarArea(Long id, AreaRecord record) {
+        Area areaExistente = areaRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("El área con ID " + id + " no existe."));
+
+        areaExistente.setNombre(record.nombre());
+        
+        if (record.activo() != null) {
+            areaExistente.setActivo(record.activo());
+        }
+
+        Area areaActualizada = areaRepository.save(areaExistente);
+        return AreaResponse.desdeEntidad(areaActualizada);
+    }
+
+    @Transactional
+    public void eliminarArea(Long id) {
+        Area areaExistente = areaRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("El área con ID " + id + " no existe."));
+
+        // Borrado lógico
+        areaExistente.setActivo(false);
+        areaRepository.save(areaExistente);
     }
 }
