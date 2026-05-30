@@ -7,7 +7,6 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface TicketRepository extends JpaRepository<Ticket, Long> {
     
-    // IMPORTANTE: 'usuarioSoporte' debe coincidir exactamente con el nombre del atributo 
-    // en la clase Ticket.java.
-    long countByUsuarioSoporteAndEstatus(Usuario usuarioSoporte, String estatus);
+    // Spring Data JPA sigue resolviendo esto navegando de Ticket -> Estatus -> nombre automáticamente
+    long countByUsuarioSoporteAndEstatusNombre(Usuario usuarioSoporte, String nombreEstatus);
 }

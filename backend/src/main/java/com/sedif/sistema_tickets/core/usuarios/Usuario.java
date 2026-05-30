@@ -12,7 +12,7 @@ import lombok.NoArgsConstructor;
  * Entidad que representa a los usuarios del sistema.
  */
 @Entity
-@Table(name = "usuarios")
+@Table(name = "usuario")
 @Getter
 @Setter
 @NoArgsConstructor
