@@ -12,7 +12,7 @@ public class TicketResource {
     private final TicketService ticketService;
 
     @PostMapping
-    public ResponseEntity<Ticket> crearTicket(@RequestBody TicketRecord record) {
+    public ResponseEntity<TicketResponse> crearTicket(@RequestBody TicketRecord record) {
         return ResponseEntity.ok(ticketService.crearTicket(record));
     }
 }
