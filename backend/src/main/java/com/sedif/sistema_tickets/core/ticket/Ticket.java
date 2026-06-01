@@ -1,7 +1,7 @@
 package com.sedif.sistema_tickets.core.ticket;
 
 import com.sedif.sistema_tickets.core.usuarios.Usuario;
-import com.sedif.sistema_tickets.core.estatusticket.Estatus; // Importante: Importar la nueva ubicación
+import com.sedif.sistema_tickets.core.estatusticket.Estatus; 
 import com.sedif.sistema_tickets.util.audit.Auditable;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -25,7 +25,7 @@ public class Ticket extends Auditable {
     private String descripcion;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "fn_estatus_id", nullable = false)
+    @JoinColumn(name = "fn_estadoticket_id", nullable = false)
     private Estatus estatus; 
 
     @ManyToOne(fetch = FetchType.LAZY)

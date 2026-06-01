@@ -6,7 +6,7 @@ import lombok.Setter;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "estatus")
+@Table(name = "estadoticket")
 @Getter @Setter @NoArgsConstructor
 public class Estatus {
 
