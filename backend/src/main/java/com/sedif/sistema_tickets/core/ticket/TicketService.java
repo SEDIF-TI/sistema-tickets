@@ -37,13 +37,13 @@ public class TicketService {
         Ticket ticketGuardado = ticketRepository.save(nuevoTicket);
 
         return new TicketResponse(
-                ticketGuardado.getId(),
-                ticketGuardado.getTitulo(),
-                ticketGuardado.getDescripcion(),
-                ticketGuardado.getEstatus().getNombre(),
-                ticketGuardado.getUsuarioArea().getId(),
-                ticketGuardado.getUsuarioSoporte() != null ? ticketGuardado.getUsuarioSoporte().getId() : null
-        );
+                        ticketGuardado.getId(),
+                        ticketGuardado.getTitulo(),
+                        ticketGuardado.getDescripcion(),
+                        ticketGuardado.getEstatus().getId(), // <-- Ahora obtenemos el ID
+                        ticketGuardado.getUsuarioArea().getId(),
+                        ticketGuardado.getUsuarioSoporte() != null ? ticketGuardado.getUsuarioSoporte().getId() : null
+                );
     }
 
     private Usuario resolverAsignacion(Usuario usuarioArea) {
