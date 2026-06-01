@@ -8,6 +8,7 @@ import com.sedif.sistema_tickets.util.enums.RolUsuario;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -36,14 +37,14 @@ public class TicketService {
 
         Ticket ticketGuardado = ticketRepository.save(nuevoTicket);
 
-        return new TicketResponse(
-                        ticketGuardado.getId(),
-                        ticketGuardado.getTitulo(),
-                        ticketGuardado.getDescripcion(),
-                        ticketGuardado.getEstatus().getId(), // <-- Ahora obtenemos el ID
-                        ticketGuardado.getUsuarioArea().getId(),
-                        ticketGuardado.getUsuarioSoporte() != null ? ticketGuardado.getUsuarioSoporte().getId() : null
-                );
+    return new TicketResponse(
+                    ticketGuardado.getId(),
+                    ticketGuardado.getTitulo(),
+                    ticketGuardado.getDescripcion(),
+                    ticketGuardado.getEstatus().getId(), // <-- Ahora obtenemos el ID
+                    ticketGuardado.getUsuarioArea().getId(),
+                    ticketGuardado.getUsuarioSoporte() != null ? ticketGuardado.getUsuarioSoporte().getId() : null
+            );
     }
 
     private Usuario resolverAsignacion(Usuario usuarioArea) {
@@ -61,5 +62,19 @@ public class TicketService {
                     long carga2 = ticketRepository.countByUsuarioSoporteAndEstatusNombre(u2, "ABIERTO");
                     return Long.compare(carga1, carga2);
                 }).orElse(null);
+    }
+
+
+    public List<TicketResponse> obtenerTodosLosTickets() {
+    return ticketRepository.findAll().stream()
+            .map(ticket -> new TicketResponse(
+                    ticket.getId(),
+                    ticket.getTitulo(),
+                    ticket.getDescripcion(),
+                    ticket.getEstatus().getId(), // Obtenemos el ID del estado
+                    ticket.getUsuarioArea().getId(),
+                    ticket.getUsuarioSoporte() != null ? ticket.getUsuarioSoporte().getId() : null
+            ))
+            .toList();
     }
 }
