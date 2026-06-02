@@ -33,4 +33,14 @@ public class AreaResource {
         areaService.eliminarArea(id);
         return ResponseEntity.noContent().build();
     }
+
+    // --- NUEVO ENDPOINT INTEGRADO ---
+    @PatchMapping("/{id}/soporte-fijo")
+    public ResponseEntity<AreaResponse> asignarSoporteFijo(
+            @PathVariable Long id,
+            @RequestBody SoporteFijoRequestRecord request) {
+        
+        AreaResponse response = areaService.asignarSoporteFijo(id, request);
+        return ResponseEntity.ok(response);
+    }
 }
