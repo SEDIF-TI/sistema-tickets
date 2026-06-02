@@ -37,4 +37,24 @@ public class JwtService {
         byte[] keyBytes = Decoders.BASE64.decode(SECRET_KEY);
         return Keys.hmacShaKeyFor(keyBytes);
     }
+
+    // MÉTODOS PARA LEER Y VALIDAR EL TOKEN ---
+
+    public String extraerIdentificador(String token) {
+        try {
+            return Jwts.parserBuilder()
+                    .setSigningKey(getSignInKey())
+                    .build()
+                    .parseClaimsJws(token)
+                    .getBody()
+                    .getSubject();
+        } catch (Exception e) {
+            return null; // Si el token es inválido, expirado o alterado, retorna null
+        }
+    }
+
+    public boolean isTokenValido(String token) {
+        return extraerIdentificador(token) != null;
+    }
+
 }

@@ -16,4 +16,10 @@ public class AuthResource {
         AuthResponseRecord response = authService.iniciarSesion(request);
         return ResponseEntity.ok(response);
     }
+
+    @PostMapping("/registro")
+    public ResponseEntity<String> registrar(@RequestBody RegistroRequest request) {
+        String respuesta = authService.registrarUsuario(request);
+        return ResponseEntity.ok(respuesta);
+    }
 }

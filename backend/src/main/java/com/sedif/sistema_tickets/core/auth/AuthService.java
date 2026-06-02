@@ -51,4 +51,31 @@ public class AuthService {
                 "Autenticación exitosa."
         );
     }
+
+    // Agréguelo dentro de su clase AuthService
+
+    public String registrarUsuario(RegistroRequest request) {
+        // 1. Validar que el usuario o correo no estén repetidos
+        if (usuarioRepository.findByCorreoOrUsername(request.correo(), request.username()).isPresent()) {
+            throw new IllegalArgumentException("Error: El correo o nombre de usuario ya están registrados.");
+        }
+
+        // 2. Mapear los datos a la entidad Usuario
+        Usuario nuevoUsuario = new Usuario();
+        nuevoUsuario.setNombre(request.nombre());
+        nuevoUsuario.setCorreo(request.correo());
+        nuevoUsuario.setUsername(request.username());
+        
+        // 3. LA CLAVE: Encriptar la contraseña antes de guardarla
+        nuevoUsuario.setPassword(passwordEncoder.encode(request.password()));
+        
+        nuevoUsuario.setRol(request.rol());
+        nuevoUsuario.setActivo(true);
+        nuevoUsuario.setDisponibleSoporte(false); // Por defecto en falso hasta que se le asigne un área o ticket
+
+        // 4. Persistir en la base de datos
+        usuarioRepository.save(nuevoUsuario);
+
+        return "Usuario registrado exitosamente.";
+    }
 }
