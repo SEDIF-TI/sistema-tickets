@@ -29,6 +29,11 @@ public class Usuario extends Auditable {
     @Column(name = "s_correo", nullable = false, unique = true, length = 100)
     private String correo;
 
+    // --- NUEVO CAMPO AGREGADO PARA LOGIN DUAL ---
+    @Column(name = "s_username", unique = true, length = 50)
+    private String username; // Campo para login tradicional con username
+    // --------------------------------------------
+
     @Column(name = "s_password", nullable = false)
     private String password;
 
