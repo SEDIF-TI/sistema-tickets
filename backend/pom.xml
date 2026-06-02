@@ -11,8 +11,8 @@
 	<groupId>com.sedif</groupId>
 	<artifactId>sistema_tickets</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<name/>
-	<description/>
+	<name>Sistema de Tickets</name>
+	<description>Sistema de gestión de tickets</description>
 	<url/>
 	<licenses>
 		<license/>
