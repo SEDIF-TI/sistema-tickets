@@ -1,6 +1,8 @@
 package com.sedif.sistema_tickets.core.aviso;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +28,22 @@ public class AvisoService {
         nuevoAviso.setTitulo(request.titulo());
         nuevoAviso.setMensaje(request.mensaje());
         // 'activo' ya es true por defecto en la entidad
+
+        // ----------------------------------------------------------------------
+        // NUEVO: EXTRACCIÓN DEL USUARIO DESDE EL CONTEXTO DE SEGURIDAD JWT
+        // ----------------------------------------------------------------------
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        
+        // Verificamos que exista una autenticación activa (que haya pasado el filtro)
+        if (authentication != null && authentication.isAuthenticated()) {
+            // Extraemos el identificador (correo o username) que guardamos en el token
+            String usuarioActual = authentication.getName();
+            
+            // Asumiendo que su clase Auditable tiene estos setters expuestos:
+            nuevoAviso.setCreadoPor(usuarioActual);
+            nuevoAviso.setModificadoPor(usuarioActual);
+        }
+        // ----------------------------------------------------------------------
 
         Aviso avisoGuardado = avisoRepository.save(nuevoAviso);
         return AvisoResponseRecord.desdeEntidad(avisoGuardado);
