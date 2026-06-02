@@ -2,13 +2,15 @@ package com.sedif.sistema_tickets.core.ticket;
 
 import com.sedif.sistema_tickets.core.usuarios.Usuario;
 import com.sedif.sistema_tickets.core.usuarios.UsuarioRepository;
-import com.sedif.sistema_tickets.core.estatusticket.Estatus;           // Importar Estatus
-import com.sedif.sistema_tickets.core.estatusticket.EstatusRepository; // Importar Repositorio
-import com.sedif.sistema_tickets.util.enums.RolUsuario;
+import com.sedif.sistema_tickets.core.estatusticket.Estatus;
+import com.sedif.sistema_tickets.core.estatusticket.EstatusRepository;
+import com.sedif.sistema_tickets.core.ticket.filtros.TicketFiltroStrategy;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -17,6 +19,7 @@ public class TicketService {
     private final TicketRepository ticketRepository;
     private final UsuarioRepository usuarioRepository;
     private final EstatusRepository estatusRepository;
+    private final Map<String, TicketFiltroStrategy> estrategiasFiltro;
 
     @Transactional
     public TicketResponse crearTicket(TicketRecord record) {
@@ -37,14 +40,7 @@ public class TicketService {
 
         Ticket ticketGuardado = ticketRepository.save(nuevoTicket);
 
-    return new TicketResponse(
-                    ticketGuardado.getId(),
-                    ticketGuardado.getTitulo(),
-                    ticketGuardado.getDescripcion(),
-                    ticketGuardado.getEstatus().getId(), // <-- Ahora obtenemos el ID
-                    ticketGuardado.getUsuarioArea().getId(),
-                    ticketGuardado.getUsuarioSoporte() != null ? ticketGuardado.getUsuarioSoporte().getId() : null
-            );
+        return mapearATicketResponse(ticketGuardado);
     }
 
     private Usuario resolverAsignacion(Usuario usuarioArea) {
@@ -56,7 +52,8 @@ public class TicketService {
         }
 
         return usuarioRepository.findAll().stream()
-                .filter(u -> u.getRol() == RolUsuario.SOPORTE && Boolean.TRUE.equals(u.getDisponibleSoporte()))
+                // Comparamos el nombre del rol en la entidad, ya no usamos Enum
+                .filter(u -> u.getRol() != null && "SOPORTE".equals(u.getRol().getNombre()) && Boolean.TRUE.equals(u.getDisponibleSoporte()))
                 .min((u1, u2) -> {
                     long carga1 = ticketRepository.countByUsuarioSoporteAndEstatusNombre(u1, "ABIERTO");
                     long carga2 = ticketRepository.countByUsuarioSoporteAndEstatusNombre(u2, "ABIERTO");
@@ -64,17 +61,38 @@ public class TicketService {
                 }).orElse(null);
     }
 
-
     public List<TicketResponse> obtenerTodosLosTickets() {
-    return ticketRepository.findAll().stream()
-            .map(ticket -> new TicketResponse(
-                    ticket.getId(),
-                    ticket.getTitulo(),
-                    ticket.getDescripcion(),
-                    ticket.getEstatus().getId(), // Obtenemos el ID del estado
-                    ticket.getUsuarioArea().getId(),
-                    ticket.getUsuarioSoporte() != null ? ticket.getUsuarioSoporte().getId() : null
-            ))
-            .toList();
+        return ticketRepository.findAll().stream()
+                .map(this::mapearATicketResponse)
+                .toList();
+    }
+
+    public List<TicketResponse> obtenerTicketsSegunRol(Long usuarioSolicitanteId) {
+        Usuario usuario = usuarioRepository.findById(usuarioSolicitanteId)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+        String nivel = usuario.getRol().getNivelVision(); 
+        TicketFiltroStrategy estrategia = estrategiasFiltro.get(nivel);
+
+        if (estrategia == null) {
+            // CORREGIDO: Usamos la variable 'nivel' que sí existe
+            throw new RuntimeException("Error crítico: No existe una estrategia programada para el nivel de visión: " + nivel);
+        }
+
+        return estrategia.obtenerTickets(usuario).stream()
+                .map(this::mapearATicketResponse)
+                .toList();
+    }
+
+    // Método privado para centralizar el mapeo y evitar repetir código
+    private TicketResponse mapearATicketResponse(Ticket t) {
+        return new TicketResponse(
+                t.getId(),
+                t.getTitulo(),
+                t.getDescripcion(),
+                t.getEstatus().getId(),
+                t.getUsuarioArea().getId(),
+                t.getUsuarioSoporte() != null ? t.getUsuarioSoporte().getId() : null
+        );
     }
 }

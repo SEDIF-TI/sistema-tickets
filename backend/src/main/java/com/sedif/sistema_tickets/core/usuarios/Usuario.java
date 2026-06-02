@@ -2,7 +2,6 @@ package com.sedif.sistema_tickets.core.usuarios;
 
 import com.sedif.sistema_tickets.core.area.Area;
 import com.sedif.sistema_tickets.util.audit.Auditable;
-import com.sedif.sistema_tickets.util.enums.RolUsuario;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -32,9 +31,9 @@ public class Usuario extends Auditable {
     @Column(name = "s_password", nullable = false)
     private String password;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "s_rol", nullable = false)
-    private RolUsuario rol;
+    @ManyToOne
+    @JoinColumn(name = "fn_rol_id")
+    private Rol rol;
 
     @Column(name = "b_activo", nullable = false)
     private Boolean activo = true;
