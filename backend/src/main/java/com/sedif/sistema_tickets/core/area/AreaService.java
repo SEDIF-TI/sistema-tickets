@@ -2,7 +2,6 @@ package com.sedif.sistema_tickets.core.area;
 
 import com.sedif.sistema_tickets.core.usuarios.Usuario;
 import com.sedif.sistema_tickets.core.usuarios.UsuarioRepository;
-import com.sedif.sistema_tickets.util.enums.RolUsuario;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -82,9 +81,11 @@ public class AreaService {
                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
 
         // 4. Reglas de negocio restrictivas
-        if (tecnico.getRol() != RolUsuario.SOPORTE) {
+        if (tecnico.getRol() == null || !"SOPORTE".equals(tecnico.getRol().getNombre())) {
             throw new IllegalArgumentException("Violación de integridad: El usuario asignado debe tener el rol de SOPORTE.");
         }
+
+
         if (!Boolean.TRUE.equals(tecnico.getActivo())) {
             throw new IllegalArgumentException("Operación denegada: El técnico seleccionado se encuentra inactivo (baja lógica).");
         }

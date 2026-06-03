@@ -24,34 +24,28 @@ public class UsuarioService {
      */
     @Transactional
     public UsuarioResponse crearUsuario(UsuarioRequest request) {
-        // 1. Verificar que el correo no esté duplicado
         if (usuarioRepository.existsByCorreo(request.correo())) {
-            throw new IllegalArgumentException("El correo ya está registrado en el sistema.");
+            throw new IllegalArgumentException("El correo ya está registrado.");
         }
 
-        // Buscamos el rol en la base de datos por su ID
+        // 1. Buscamos la entidad Rol, no usamos el Enum
         Rol rol = rolRepository.findById(request.rolId())
-                .orElseThrow(() -> new IllegalArgumentException("Rol no encontrado."));
+                .orElseThrow(() -> new IllegalArgumentException("El rol seleccionado no existe."));
 
         Usuario nuevoUsuario = new Usuario();
         nuevoUsuario.setNombre(request.nombre());
         nuevoUsuario.setCorreo(request.correo());
-        nuevoUsuario.setPassword(request.password());
-        nuevoUsuario.setRol(rol); // Asignamos la entidad Rol
+        nuevoUsuario.setPassword(request.password()); 
+        nuevoUsuario.setRol(rol);
 
-        // 2. Si el nivel de visión del rol es "AREA", es obligatorio asignarle un área
-        if ("AREA".equals(rol.getNivelVision())) {
-            if (request.areaId() == null) {
-                throw new IllegalArgumentException("Un usuario con este rol debe tener un área asignada.");
-            }
+        // Si el usuario pertenece a una área, asignarla
+        if (request.areaId() != null) {
             Area area = areaRepository.findById(request.areaId())
-                    .orElseThrow(() -> new IllegalArgumentException("El área especificada no existe."));
+                    .orElseThrow(() -> new IllegalArgumentException("Área no encontrada."));
             nuevoUsuario.setArea(area);
         }
 
-        // 3. Guardar en base de datos
         Usuario usuarioGuardado = usuarioRepository.save(nuevoUsuario);
-
         return UsuarioResponse.desdeEntidad(usuarioGuardado);
     }
 
@@ -105,5 +99,33 @@ public class UsuarioService {
 
         Usuario usuarioActualizado = usuarioRepository.save(usuario);
         return UsuarioResponse.desdeEntidad(usuarioActualizado);
+    }
+
+    // Asegúrate de que en UsuarioService.java tengas exactamente esto:
+    @Transactional
+    public UsuarioResponse actualizarUsuario(Long id, ActualizarUsuarioRequest request) {
+        // 1. Buscar usuario
+        Usuario usuario = usuarioRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado con ID: " + id));
+
+        // 2. Actualizar campos básicos
+        usuario.setNombre(request.nombre());
+        usuario.setCorreo(request.correo());
+
+        // 3. Actualizar Rol (buscando la entidad)
+        if (request.rolId() != null) {
+            Rol rol = rolRepository.findById(request.rolId())
+                    .orElseThrow(() -> new IllegalArgumentException("Rol no encontrado."));
+            usuario.setRol(rol);
+        }
+
+        // 4. Actualizar Área
+        if (request.areaId() != null) {
+            Area area = areaRepository.findById(request.areaId())
+                    .orElseThrow(() -> new IllegalArgumentException("Área no encontrada."));
+            usuario.setArea(area);
+        }
+
+        return UsuarioResponse.desdeEntidad(usuarioRepository.save(usuario));
     }
 }

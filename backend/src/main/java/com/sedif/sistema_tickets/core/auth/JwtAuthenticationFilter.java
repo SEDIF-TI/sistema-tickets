@@ -59,9 +59,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                         usuario,
                         null,
-                        List.of(new SimpleGrantedAuthority("ROLE_" + usuario.getRol().name()))
+                        List.of(new SimpleGrantedAuthority("ROLE_" + usuario.getRol().getNombre())) // <--- .getNombre()
                 );
-                
+                                
                 authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                 
                 // Actualizamos el contexto de seguridad de Spring
