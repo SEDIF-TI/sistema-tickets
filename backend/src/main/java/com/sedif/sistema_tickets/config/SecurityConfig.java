@@ -28,14 +28,19 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
             .csrf(csrf -> csrf.disable())
-            .cors(cors -> cors.disable())
+            // HABILITAR CORS CORRECTAMENTE
+            .cors(cors -> cors.configurationSource(request -> {
+                var corsConfiguration = new org.springframework.web.cors.CorsConfiguration();
+                corsConfiguration.setAllowedOrigins(java.util.List.of("*")); // Ajusta a la URL de tu frontend en producción
+                corsConfiguration.setAllowedMethods(java.util.List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+                corsConfiguration.setAllowedHeaders(java.util.List.of("*"));
+                return corsConfiguration;
+            }))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/v1/auth/**").permitAll() // Dejamos libre el login
-                .anyRequest().authenticated() // Bloqueamos absolutamente todo lo demás
+                .requestMatchers("/api/v1/auth/**").permitAll()
+                .anyRequest().authenticated()
             )
-            // Configuramos la aplicación sin estado (Stateless) porque usaremos JWT
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            // Colocamos nuestro filtro personalizado ANTES del filtro estándar de Spring
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
