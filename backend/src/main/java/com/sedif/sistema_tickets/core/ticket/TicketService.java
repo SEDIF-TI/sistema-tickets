@@ -6,6 +6,7 @@ import com.sedif.sistema_tickets.core.estatusticket.Estatus;
 import com.sedif.sistema_tickets.core.estatusticket.EstatusRepository;
 import com.sedif.sistema_tickets.core.ticket.filtros.TicketFiltroStrategy;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,7 +47,8 @@ public class TicketService {
     private Usuario resolverAsignacion(Usuario usuarioArea) {
         if (usuarioArea.getArea() != null && usuarioArea.getArea().getSoporteFijo() != null) {
             Usuario fijo = usuarioArea.getArea().getSoporteFijo();
-            if (Boolean.TRUE.equals(fijo.getDisponibleSoporte())) {
+            // Validamos que el soporte fijo siga activo y disponible
+            if (Boolean.TRUE.equals(fijo.getActivo()) && Boolean.TRUE.equals(fijo.getDisponibleSoporte())) {
                 return fijo;
             }
         }

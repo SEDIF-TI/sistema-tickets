@@ -75,4 +75,21 @@ public class UsuarioResource {
         }
     }
 
+    /**
+     * Endpoint para actualizar la información de un usuario.
+     * Método HTTP: PUT
+     * URL: http://localhost:8080/api/usuarios/{id}
+     */
+    @PutMapping("/{id}")
+    public ResponseEntity<?> actualizarUsuario(
+            @PathVariable Long id, 
+            @RequestBody ActualizarUsuarioRequest request) {
+        try {
+            UsuarioResponse response = usuarioService.actualizarUsuario(id, request);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
 }
