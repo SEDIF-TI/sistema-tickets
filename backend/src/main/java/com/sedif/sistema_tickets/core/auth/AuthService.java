@@ -1,5 +1,7 @@
 package com.sedif.sistema_tickets.core.auth;
 
+import com.sedif.sistema_tickets.core.usuarios.Rol;
+import com.sedif.sistema_tickets.core.usuarios.RolRepository;
 import com.sedif.sistema_tickets.core.usuarios.Usuario;
 import com.sedif.sistema_tickets.core.usuarios.UsuarioRepository;
 import lombok.RequiredArgsConstructor;
@@ -12,7 +14,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class AuthService {
 
     private final UsuarioRepository usuarioRepository;
-    private final JwtService jwtService; // Inyectamos el nuevo motor de JWT
+    private final RolRepository rolRepository; // 1. Inyecta el repositorio de roles
+    private final JwtService jwtService;
     private final PasswordEncoder passwordEncoder;
 
     @Transactional(readOnly = true)
@@ -46,7 +49,7 @@ public class AuthService {
         return new AuthResponseRecord(
                 usuario.getId(),
                 usuario.getNombre(),
-                usuario.getRol().name(),
+                usuario.getRol().getNombre(),
                 tokenJwt,
                 "Autenticación exitosa."
         );
@@ -60,22 +63,22 @@ public class AuthService {
             throw new IllegalArgumentException("Error: El correo o nombre de usuario ya están registrados.");
         }
 
-        // 2. Mapear los datos a la entidad Usuario
+        // 2. Busca el rol en la base de datos usando el ID que viene en el request
+        Rol rol = rolRepository.findById(request.rolId())
+                .orElseThrow(() -> new IllegalArgumentException("Rol no encontrado con ID: " + request.rolId()));
+
+        // 3. Mapeo a la entidad
         Usuario nuevoUsuario = new Usuario();
         nuevoUsuario.setNombre(request.nombre());
         nuevoUsuario.setCorreo(request.correo());
         nuevoUsuario.setUsername(request.username());
-        
-        // 3. LA CLAVE: Encriptar la contraseña antes de guardarla
         nuevoUsuario.setPassword(passwordEncoder.encode(request.password()));
         
-        nuevoUsuario.setRol(request.rol());
+        nuevoUsuario.setRol(rol); // 4. Asigna el objeto Rol encontrado
         nuevoUsuario.setActivo(true);
-        nuevoUsuario.setDisponibleSoporte(false); // Por defecto en falso hasta que se le asigne un área o ticket
+        nuevoUsuario.setDisponibleSoporte(false);
 
-        // 4. Persistir en la base de datos
         usuarioRepository.save(nuevoUsuario);
-
         return "Usuario registrado exitosamente.";
     }
 }
