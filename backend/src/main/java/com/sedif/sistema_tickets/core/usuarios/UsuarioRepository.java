@@ -1,7 +1,6 @@
 package com.sedif.sistema_tickets.core.usuarios;
 
-import com.sedif.sistema_tickets.util.enums.RolUsuario;
-import org.springframework.data.domain.Pageable;
+import com.sedif.sistema_tickets.core.estatusticket.Estatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -39,16 +38,14 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
      * Trae a los técnicos disponibles, que NO están casados con ningún área,
      * y los ordena de menor a mayor cantidad de tickets abiertos.
      */
-    @Query("SELECT u FROM Usuario u " +
-           "LEFT JOIN Ticket t ON t.usuarioSoporte = u AND t.estatus = :estatus " +
-           "WHERE u.rol = :rol " +
-           "AND u.activo = true " +
-           "AND u.disponibleSoporte = true " +
-           "AND u.id NOT IN (SELECT a.soporteFijo.id FROM Area a WHERE a.soporteFijo IS NOT NULL) " +
-           "GROUP BY u " +
-           "ORDER BY COUNT(t.id) ASC")
-    List<Usuario> buscarTecnicosGlobalesOrdenadosPorCarga(
-                            @Param("rol") RolUsuario rol, 
-                            @Param("estatus") String estatus, 
-                            Pageable pageable);
+    // Modifica el @Query en UsuarioRepository.java
+       @Query("SELECT u FROM Usuario u " +
+              "LEFT JOIN Ticket t ON t.usuarioSoporte = u AND t.estatus = :estatus " +
+              "WHERE u.rol.id = :rolId " + // <--- Cambiado de u.rol = :rol a u.rol.id = :rolId
+              "AND u.activo = true " +
+              "AND u.disponibleSoporte = true " +
+              "AND u.id NOT IN (SELECT a.soporteFijo.id FROM Area a WHERE a.soporteFijo IS NOT NULL) " +
+              "GROUP BY u " +
+              "ORDER BY COUNT(t.id) ASC")
+       List<Usuario> buscarTecnicosGlobalesOrdenadosPorCarga(@Param("rolId") Long rolId, @Param("estatus") Estatus estatus);
 }
