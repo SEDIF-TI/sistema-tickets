@@ -44,6 +44,7 @@ public class SecurityConfig {
             // 3. Configurar rutas públicas y privadas
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/v1/auth/**").permitAll()
+                .requestMatchers("/ws-tickets/**").permitAll() // <-- Autorización para WebSockets
                 .anyRequest().authenticated()
             )
             // 4. Configurar manejo de sesiones sin estado (Stateless)
