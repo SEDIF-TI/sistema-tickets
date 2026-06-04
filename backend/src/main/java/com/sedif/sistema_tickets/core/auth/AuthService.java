@@ -8,6 +8,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.sedif.sistema_tickets.core.usuarios.VistaDTO;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -45,13 +48,20 @@ public class AuthService {
         // 4. Generación del JWT en memoria (Sin tocar la base de datos)
         String tokenJwt = jwtService.generarToken(usuario);
 
+        // NUEVO: Transformar las Vistas de la base de datos a VistaDTO
+        List<VistaDTO> vistasPermitidas = usuario.getRol().getVistas().stream()
+                .filter(vista -> vista.getActivo() != null && vista.getActivo()) // Filtramos solo las activas
+                .map(vista -> new VistaDTO(vista.getNombre(), vista.getRuta(), vista.getIcono()))
+                .collect(Collectors.toList());
+
         // 5. Retorno
         return new AuthResponseRecord(
                 usuario.getId(),
                 usuario.getNombre(),
                 usuario.getRol().getNombre(),
                 tokenJwt,
-                "Autenticación exitosa."
+                "Autenticación exitosa.",
+                vistasPermitidas // <-- Pasamos las vistas aquí
         );
     }
 

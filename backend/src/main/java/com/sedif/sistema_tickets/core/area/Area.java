@@ -32,5 +32,9 @@ public class Area extends Auditable {
     @JoinColumn(name = "fn_soporte_fijo_id")
     private Usuario soporteFijo;
     
-    // Se eliminaron los constructores y getters/setters manuales gracias a Lombok.
+    @Column(name = "b_prioritaria", nullable = false)
+    private Boolean prioritaria = false; // Por defecto, las áreas nuevas no tienen prioridad especial
+
+        // Se eliminaron los constructores y getters/setters manuales gracias a Lombok.
+
 }

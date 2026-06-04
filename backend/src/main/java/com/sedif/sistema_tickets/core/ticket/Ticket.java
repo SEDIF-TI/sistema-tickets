@@ -35,4 +35,7 @@ public class Ticket extends Auditable {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "fn_usuario_soporte_id")
     private Usuario usuarioSoporte;
+
+    @Column(name = "s_prioridad", nullable = false, length = 20)
+    private String prioridad;
 }

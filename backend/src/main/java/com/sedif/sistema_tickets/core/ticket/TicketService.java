@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -22,25 +23,42 @@ public class TicketService {
     private final Map<String, TicketFiltroStrategy> estrategiasFiltro;
 
     @Transactional
-    public TicketResponse crearTicket(TicketRecord record) {
-        Usuario usuarioArea = usuarioRepository.findById(record.usuarioAreaId())
-                .orElseThrow(() -> new RuntimeException("Usuario de área no encontrado"));
+    public Ticket crearTicket(TicketRequestRecord request, String identificadorUsuario) {
+        
+        // 1. Buscamos al usuario que está logueado haciendo la petición
+        Usuario usuario = usuarioRepository.findByCorreoOrUsername(identificadorUsuario, identificadorUsuario)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
 
+        // CORRECCIÓN 1: Buscamos la entidad Estatus real en la base de datos
+        Estatus estatusAbierto = estatusRepository.findByNombre("ABIERTO")
+                .orElseThrow(() -> new IllegalStateException("Error del sistema: El estatus ABIERTO no está configurado en la BD."));
+
+        // 2. Creamos la base del ticket
         Ticket nuevoTicket = new Ticket();
-        nuevoTicket.setTitulo(record.titulo());
-        nuevoTicket.setDescripcion(record.descripcion());
-        nuevoTicket.setUsuarioArea(usuarioArea);
+        nuevoTicket.setTitulo(request.titulo());
+        nuevoTicket.setDescripcion(request.descripcion());
+        
+        // CORRECCIÓN 2: Usamos los nombres correctos de tu entidad
+        nuevoTicket.setUsuarioArea(usuario); 
+        nuevoTicket.setEstatus(estatusAbierto); 
+        
+        nuevoTicket.setFechaCreacion(LocalDateTime.now());
 
-        Estatus estatusInicial = estatusRepository.findByNombre("ABIERTO")
-                .orElseThrow(() -> new RuntimeException("Estatus 'ABIERTO' no configurado en el sistema"));
-        nuevoTicket.setEstatus(estatusInicial);
+        // 3. APLICAMOS LA REGLA DE NEGOCIO DE PRIORIDAD
+        if (usuario.getArea() != null && Boolean.TRUE.equals(usuario.getArea().getPrioritaria())) {
+            nuevoTicket.setPrioridad("ALTA");
+        } else {
+            nuevoTicket.setPrioridad("NORMAL");
+        }
 
-        Usuario soporteAsignado = resolverAsignacion(usuarioArea);
-        nuevoTicket.setUsuarioSoporte(soporteAsignado);
+        // CORRECCIÓN 3: Ejecutamos tu balanceador para asignar al técnico adecuado
+        Usuario soporteAsignado = resolverAsignacion(usuario);
+        if (soporteAsignado != null) {
+            nuevoTicket.setUsuarioSoporte(soporteAsignado);
+        }
 
-        Ticket ticketGuardado = ticketRepository.save(nuevoTicket);
-
-        return mapearATicketResponse(ticketGuardado);
+        // 4. Guardamos en la base de datos
+        return ticketRepository.save(nuevoTicket);
     }
 
     private Usuario resolverAsignacion(Usuario usuarioArea) {
@@ -76,7 +94,6 @@ public class TicketService {
         TicketFiltroStrategy estrategia = estrategiasFiltro.get(nivel);
 
         if (estrategia == null) {
-            // CORREGIDO: Usamos la variable 'nivel' que sí existe
             throw new RuntimeException("Error crítico: No existe una estrategia programada para el nivel de visión: " + nivel);
         }
 

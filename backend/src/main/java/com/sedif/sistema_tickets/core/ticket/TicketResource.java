@@ -2,20 +2,26 @@ package com.sedif.sistema_tickets.core.ticket;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/tickets")
+@RequestMapping("/api/v1/tickets") // Le agregué /v1/ para que sea consistente con tu AuthResource
 @RequiredArgsConstructor
 public class TicketResource {
 
     private final TicketService ticketService;
 
     @PostMapping
-    public ResponseEntity<TicketResponse> crearTicket(@RequestBody TicketRecord record) {
-        return ResponseEntity.ok(ticketService.crearTicket(record));
+    public ResponseEntity<Ticket> crearTicket(
+            @RequestBody TicketRequestRecord request, 
+            Authentication authentication // Spring inyecta al usuario logueado aquí mágicamente
+    ) {
+        // authentication.getName() extrae el correo/username del Token JWT de forma segura
+        Ticket nuevoTicket = ticketService.crearTicket(request, authentication.getName());
+        return ResponseEntity.ok(nuevoTicket);
     }
 
     @GetMapping
