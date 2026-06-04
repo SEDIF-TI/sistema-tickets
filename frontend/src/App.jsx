@@ -3,6 +3,7 @@ import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import theme from './theme/theme.js';
 import { AuthProvider } from './context/AuthContext.jsx';
+import { WebSocketProvider } from './context/WebSocketContext.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import MainLayout from './components/MainLayout.jsx';
 import { Typography } from '@mui/material';
