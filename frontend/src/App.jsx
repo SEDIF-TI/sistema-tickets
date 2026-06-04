@@ -2,6 +2,7 @@ import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import theme from './theme/theme.js';
 import { AuthProvider } from './context/AuthContext.jsx';
+import { WebSocketProvider } from './context/WebSocketContext.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 
 function App() {
@@ -12,7 +13,9 @@ function App() {
       <CssBaseline /> 
       
       <AuthProvider>
-        <LoginPage />
+        <WebSocketProvider>
+          <LoginPage />
+        </WebSocketProvider>
       </AuthProvider>
       
     </ThemeProvider>
