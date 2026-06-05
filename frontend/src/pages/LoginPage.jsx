@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom';
 import { useState, useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { 
@@ -19,6 +20,8 @@ export default function LoginPage() {
     // Traemos la función login de nuestro contexto
     const { login } = useContext(AuthContext);
 
+    const navigate = useNavigate();
+
     const handleSubmit = async (e) => {
         e.preventDefault(); // Evita que la página se recargue
         setError(''); // Limpiamos errores previos
@@ -30,13 +33,18 @@ export default function LoginPage() {
         }
 
         // 2. Intento de inicio de sesión
-        try {
-            await login(identificador, password);
-            // Si el login es exitoso, aquí luego agregaremos la redirección al Dashboard
+       try {
+            const respuestaUser = await login(identificador, password);
             console.log("¡Login exitoso!");
+            
+            if (respuestaUser.vistas && respuestaUser.vistas.length > 0) {
+                // 3. ¡Ahora sí funcionará!
+                navigate(respuestaUser.vistas[0].ruta); 
+            } else {
+                setError('Tu usuario no tiene pantallas configuradas.');
+            }
         } catch (err) {
-            // Si el backend devuelve un 401 o 403, caemos aquí
-            setError('Credenciales inválidas. Verifica tu información.');
+            setError('Credenciales inválidas.');
         }
     };
 
