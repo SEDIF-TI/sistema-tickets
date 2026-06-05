@@ -20,19 +20,21 @@ function App() {
       <CssBaseline />
       <Router>
         <AuthProvider>
-          <Routes>
-            {/* Ruta pública del Login */}
-            <Route path="/login" element={<LoginPage />} />
+          <WebSocketProvider>
+            <Routes>
+              {/* Ruta pública del Login */}
+              <Route path="/login" element={<LoginPage />} />
 
-            {/* Rutas Protegidas envueltas en el MainLayout */}
-            <Route path="/empleado/nuevo" element={<MainLayout><LevantarTicket /></MainLayout>} />
-            <Route path="/soporte/bandeja" element={<MainLayout><MisTickets /></MainLayout>} />
-            <Route path="/admin/dashboard" element={<MainLayout><Dashboard /></MainLayout>} />
-            <Route path="/empleado/nuevo" element={<MainLayout><FormularioTicket /></MainLayout>} />
+              {/* Rutas Protegidas envueltas en el MainLayout */}
+              <Route path="/empleado/nuevo" element={<MainLayout><LevantarTicket /></MainLayout>} />
+              <Route path="/soporte/bandeja" element={<MainLayout><MisTickets /></MainLayout>} />
+              <Route path="/admin/dashboard" element={<MainLayout><Dashboard /></MainLayout>} />
+              <Route path="/empleado/nuevo" element={<MainLayout><FormularioTicket /></MainLayout>} />
 
-            {/* Redirección por defecto si entran a una ruta que no existe */}
-            <Route path="*" element={<Navigate to="/login" replace />} />
-          </Routes>
+              {/* Redirección por defecto si entran a una ruta que no existe */}
+              <Route path="*" element={<Navigate to="/login" replace />} />
+            </Routes>
+          </WebSocketProvider>
         </AuthProvider>
       </Router>
     </ThemeProvider>
