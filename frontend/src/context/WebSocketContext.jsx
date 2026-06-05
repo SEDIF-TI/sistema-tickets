@@ -14,8 +14,14 @@ export const WebSocketProvider = ({ children }) => {
     useEffect(() => {
         // Regla de negocio: Si no hay usuario o no hay token, no intentamos conectar
         if (!user || !user.token) {
+            if (stompClient) {
+                stompClient.deactivate();
+                setStompClient(null);
+            }
             return;
         }
+
+        if (stompClient) return;
 
         const client = new Client({
             // Ruta de su backend
