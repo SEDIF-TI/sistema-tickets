@@ -25,9 +25,15 @@ public class TicketService {
     @Transactional
     public Ticket crearTicket(TicketRequestRecord request, String identificadorUsuario) {
         
-        // 1. Buscamos al usuario que está logueado haciendo la petición
-        Usuario usuario = usuarioRepository.findByCorreoOrUsername(identificadorUsuario, identificadorUsuario)
-                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
+    System.out.println("DEBUG: Intentando crear ticket para usuario con identificador: " + identificadorUsuario);
+        
+        // 1. Buscamos al usuario
+        Usuario usuario = usuarioRepository.findByCorreoOrUsername(identificadorUsuario.trim(), identificadorUsuario.trim())
+                .orElseGet(() -> {
+                    System.err.println("DEBUG: Falló búsqueda exacta. Intentando buscar por correo en minúsculas...");
+                    return usuarioRepository.findByCorreoOrUsername(identificadorUsuario.toLowerCase(), identificadorUsuario.toLowerCase())
+                            .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado en BD: " + identificadorUsuario));
+                });
 
         // CORRECCIÓN 1: Buscamos la entidad Estatus real en la base de datos
         Estatus estatusAbierto = estatusRepository.findByNombre("ABIERTO")
@@ -112,5 +118,25 @@ public class TicketService {
                 t.getUsuarioArea().getId(),
                 t.getUsuarioSoporte() != null ? t.getUsuarioSoporte().getId() : null
         );
+    }
+
+    @Transactional
+    public Ticket finalizarTicketPorEmpleado(Long ticketId, String correoUsuario) {
+        // 1. Buscamos el ticket
+        Ticket ticket = ticketRepository.findById(ticketId)
+                .orElseThrow(() -> new IllegalArgumentException("Ticket no encontrado"));
+
+        // 2. Seguridad: Validamos que quien intenta cerrar el ticket es quien lo creó
+        if (!ticket.getCreadoPor().equals(correoUsuario)) {
+            throw new SecurityException("No tienes permiso para finalizar este ticket. Solo el creador puede hacerlo.");
+        }
+    
+        // 3. Buscamos el estatus final usando las clases correctas de tu proyecto
+        Estatus estatusCerrado = estatusRepository.findByNombre("CERRADO") 
+                .orElseThrow(() -> new IllegalArgumentException("El estatus CERRADO no existe en la base de datos"));
+
+        // 4. Actualizamos y guardamos (usando el setter correcto)
+        ticket.setEstatus(estatusCerrado);
+        return ticketRepository.save(ticket);
     }
 }

@@ -43,31 +43,39 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
+        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+        filterChain.doFilter(request, response);
+        return;
+    }
+
         // 2. Extraer el token (quitamos la palabra "Bearer " que ocupa 7 caracteres)
         jwt = authHeader.substring(7);
         identificador = jwtService.extraerIdentificador(jwt);
 
         // 3. Si hay un usuario en el token y aún no está autenticado en este hilo
-        if (identificador != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-            
-            // Buscamos al usuario en la base de datos
-            Usuario usuario = usuarioRepository.findByCorreoOrUsername(identificador, identificador).orElse(null);
-
-            // Si el usuario existe, está activo y el token es válido, le damos acceso
-            if (usuario != null && Boolean.TRUE.equals(usuario.getActivo()) && jwtService.isTokenValido(jwt)) {
-                
-                UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                        usuario,
-                        null,
-                        List.of(new SimpleGrantedAuthority("ROLE_" + usuario.getRol().getNombre())) // <--- .getNombre()
-                );
-                                
-                authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                
-                // Actualizamos el contexto de seguridad de Spring
-                SecurityContextHolder.getContext().setAuthentication(authToken);
-            }
-        }
+                if (identificador != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                    String correoNormalizado = identificador.toLowerCase().trim();
+                    
+                    // Buscamos al usuario en la base de datos
+                    Usuario usuario = usuarioRepository.findByCorreoOrUsername(correoNormalizado, correoNormalizado)
+                            .orElse(null);
+                    
+                    // Validamos: que exista, que esté activo y que el JWT sea auténtico
+                    if (usuario != null && Boolean.TRUE.equals(usuario.getActivo()) && jwtService.isTokenValido(jwt)) {
+                        
+                        // CAMBIO AQUÍ: Pasamos el usuario.getCorreo() (String) en lugar de 'usuario' (objeto)
+                        UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                                usuario.getCorreo(), 
+                                null,
+                                List.of(new SimpleGrantedAuthority("ROLE_" + usuario.getRol().getNombre()))
+                        );
+                        authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                        SecurityContextHolder.getContext().setAuthentication(authToken);
+                    } else {
+                        System.err.println("DEBUG: El usuario fue encontrado pero falló la validación (Activo: " 
+                            + (usuario != null ? usuario.getActivo() : "N/A") + " o Token inválido)");
+                    }
+                }
         
         // 4. Continuar con la cadena de filtros
         filterChain.doFilter(request, response);
