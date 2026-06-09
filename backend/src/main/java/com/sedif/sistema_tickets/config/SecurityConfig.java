@@ -12,6 +12,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.web.filter.CorsFilter; // Importante: usa este
 
 import java.util.List;
 
@@ -27,31 +29,42 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
-    @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        http
-            // 1. HABILITAR CORS CORRECTAMENTE (Solo una vez)
-            .cors(cors -> cors.configurationSource(request -> {
-                CorsConfiguration config = new CorsConfiguration();
-                config.setAllowedOrigins(List.of("http://localhost:5173")); // El puerto exacto de Vite
-                config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-                config.setAllowedHeaders(List.of("*"));
-                config.setAllowCredentials(true); // Obligatorio para que pasen los Tokens
-                return config;
-            }))
-            // 2. Deshabilitar CSRF (común en APIs REST)
-            .csrf(csrf -> csrf.disable())
-            // 3. Configurar rutas públicas y privadas
-            .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/v1/auth/**").permitAll()
-                .requestMatchers("/ws-tickets/**").permitAll() // <-- Autorización para WebSockets
-                .anyRequest().authenticated()
-            )
-            // 4. Configurar manejo de sesiones sin estado (Stateless)
-            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            // 5. Agregar nuestro filtro JWT antes del filtro de Spring
-            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+@Bean
+public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    http
+        .cors(cors -> cors.configurationSource(request -> {
+             // Solo devolvemos la configuración que ya gestiona el CorsFilter
+             var corsConfig = new CorsConfiguration();
+             corsConfig.setAllowedOriginPatterns(List.of("*"));
+             corsConfig.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+             corsConfig.setAllowedHeaders(List.of("*"));
+             corsConfig.setAllowCredentials(true);
+             return corsConfig;
+        }))
+        .csrf(csrf -> csrf.disable())
+        .authorizeHttpRequests(auth -> auth
+            .requestMatchers("/api/v1/auth/**").permitAll()
+            .requestMatchers("/ws-tickets/**").permitAll()
+            .requestMatchers("/api/v1/test/**").permitAll()
+            .anyRequest().authenticated() // Al permitir todo lo necesario arriba, esto protege el resto
+        )
+        .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+        .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
-        return http.build();
+    return http.build();
+}
+
+    @Bean
+    public CorsFilter corsFilter() {
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        CorsConfiguration config = new CorsConfiguration();
+        
+        config.setAllowCredentials(true);
+        config.setAllowedOriginPatterns(List.of("*"));
+        config.setAllowedHeaders(List.of("*"));
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        
+        source.registerCorsConfiguration("/**", config);
+        return new CorsFilter(source);
     }
 }

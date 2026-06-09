@@ -7,7 +7,9 @@ import { WebSocketProvider } from './context/WebSocketContext.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import MainLayout from './components/MainLayout.jsx';
 import { Typography } from '@mui/material';
-// import FormularioTicket from './pages/empleado/FormularioTicket';
+import FormularioTicket from './pages/empleado/FormularioTicket';
+import TicketsPage from './pages/tickets/TicketsPage';
+import SoporteLayout from './components/SoporteLayout.jsx';
 import PanelSoporte from './pages/soporte/PanelSoporte.jsx';
 
 // Páginas de prueba temporales para verificar que las rutas funcionan
@@ -19,24 +21,22 @@ function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Router>
+      <Router> {/* Router afuera de los proveedores */}
         <AuthProvider>
           <WebSocketProvider>
             <Routes>
               {/* Ruta pública del Login */}
               <Route path="/login" element={<LoginPage />} />
 
-              {/* Rutas Protegidas envueltas en el MainLayout */}
-              <Route path="/empleado/nuevo" element={<MainLayout><LevantarTicket /></MainLayout>} />
-              <Route path="/soporte/bandeja" element={<MainLayout><MisTickets /></MainLayout>} />
+              {/* Rutas Protegidas (Solo dejamos las que funcionan) */}
+              <Route path="/empleado/nuevo" element={<MainLayout><FormularioTicket /></MainLayout>} />
+              <Route path="/empleado/historial" element={<MainLayout><TicketsPage /></MainLayout>} />
+              <Route path="/soporte/bandeja" element={<SoporteLayout><PanelSoporte /></SoporteLayout>} />
               <Route path="/admin/dashboard" element={<MainLayout><Dashboard /></MainLayout>} />
-              
-              {/* Esta línea se conserva comentada para no afectar el código de su compañero */}
-              {/* <Route path="/empleado/nuevo" element={<MainLayout><FormularioTicket /></MainLayout>} /> */}
-              
-              <Route path="/panel-soporte" element={<PanelSoporte />} />
+              {/* Debes tener esta línea para que el router no te expulse */}
+              <Route path="/soporte/nuevo" element={<SoporteLayout><FormularioTicket /></SoporteLayout>} />
 
-              {/* Redirección por defecto si entran a una ruta que no existe */}
+              {/* Redirección por defecto */}
               <Route path="*" element={<Navigate to="/login" replace />} />
             </Routes>
           </WebSocketProvider>
