@@ -40,4 +40,11 @@ public class TicketResource {
         
         return ResponseEntity.ok(ticketFinalizado);
     }
+
+    @GetMapping("/area")
+    public ResponseEntity<List<TicketResponse>> obtenerHistorialArea(Authentication authentication) {
+        String correoUsuario = authentication.getName();
+        List<TicketResponse> historial = ticketService.obtenerTicketsDeMiArea(correoUsuario);
+        return ResponseEntity.ok(historial);
+    }
 }

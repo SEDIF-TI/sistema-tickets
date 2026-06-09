@@ -18,6 +18,8 @@ import {
 } from '@mui/material';
 import LogoutIcon from '@mui/icons-material/Logout';
 
+import AddIcon from '@mui/icons-material/Add';
+import ListIcon from '@mui/icons-material/List';
 const drawerWidth = 240;
 
 export default function MainLayout({ children }) {
@@ -61,18 +63,24 @@ export default function MainLayout({ children }) {
             >
                 <Toolbar />
                 <List>
-                    {vistas.map((vista, index) => {
-                        const Icono = getIcon(vista.icono);
-                        return (
-                            <ListItem key={index} disablePadding sx={{ display: 'block' }}>
-                                <ListItemButton onClick={() => navigate(vista.ruta)} sx={{ justifyContent: 'center', py: 2 }}>
-                                    <ListItemIcon sx={{ minWidth: 0, justifyContent: 'center' }}>
-                                        <Icono color="primary" />
-                                    </ListItemIcon>
-                                </ListItemButton>
-                            </ListItem>
-                        );
-                    })}
+                    {/* Botones Fijos para Empleado */}
+                    {/* Botones Fijos para Empleado */}
+                    {/* Botones Fijos para Empleado */}
+                    <ListItem disablePadding sx={{ display: 'block' }}>
+                        <ListItemButton onClick={() => navigate('/empleado/nuevo')} sx={{ justifyContent: 'center', py: 2 }}>
+                            <ListItemIcon sx={{ minWidth: 0, justifyContent: 'center' }}>
+                                <AddIcon sx={{ color: '#5c0a28' }} /> {/* <-- CAMBIO AQUÍ */}
+                            </ListItemIcon>
+                        </ListItemButton>
+                    </ListItem>
+
+                    <ListItem disablePadding sx={{ display: 'block' }}>
+                        <ListItemButton onClick={() => navigate('/empleado/historial')} sx={{ justifyContent: 'center', py: 2 }}>
+                            <ListItemIcon sx={{ minWidth: 0, justifyContent: 'center' }}>
+                                <ListIcon sx={{ color: '#5c0a28' }} /> {/* <-- CAMBIO AQUÍ */}
+                            </ListItemIcon>
+                        </ListItemButton>
+                    </ListItem>
                 </List>
 
             </Drawer>
