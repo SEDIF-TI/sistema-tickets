@@ -21,6 +21,9 @@ public class Ticket extends Auditable {
     @Column(name = "s_titulo", nullable = false)
     private String titulo;
 
+    @Column(name = "s_sede")
+    private String sede;
+
     @Column(name = "s_descripcion", nullable = false, columnDefinition = "TEXT")
     private String descripcion;
 
@@ -38,4 +41,5 @@ public class Ticket extends Auditable {
 
     @Column(name = "s_prioridad", nullable = false, length = 20)
     private String prioridad;
+
 }
