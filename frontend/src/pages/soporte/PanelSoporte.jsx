@@ -5,12 +5,11 @@ import {
     Dialog, DialogTitle, DialogContent, DialogActions, TextField, IconButton,
     TablePagination, InputAdornment, CircularProgress
 } from '@mui/material';
-import InfoIcon from '@mui/icons-material/Info';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import SearchIcon from '@mui/icons-material/Search';
 import { useWebSocket } from '../../context/WebSocketContext.jsx';
-import api from '../../services/api'; // Necesario para la carga inicial de datos
+import api from '../../services/api';
 
 export default function PanelSoporte() {
     const { stompClient, isConnected } = useWebSocket();
@@ -29,13 +28,9 @@ export default function PanelSoporte() {
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [busqueda, setBusqueda] = useState('');
 
-    // =================================================================
-    // 1. CARGA INICIAL (HTTP) - Trae el historial de la base de datos
-    // =================================================================
     useEffect(() => {
         const cargarTicketsHistoricos = async () => {
             try {
-                // Ajusta la URL si tu endpoint para obtener tickets se llama diferente
                 const respuesta = await api.get('/v1/tickets'); 
                 setTickets(respuesta.data);
             } catch (error) {
@@ -48,15 +43,11 @@ export default function PanelSoporte() {
         cargarTicketsHistoricos();
     }, []);
 
-    // =================================================================
-    // 2. ACTUALIZACIÓN EN TIEMPO REAL (WebSockets)
-    // =================================================================
     useEffect(() => {
         if (isConnected && stompClient && stompClient.connected) {
             try {
                 const suscripcion = stompClient.subscribe('/topic/tickets-soporte', (mensaje) => {
                     const nuevoTicket = JSON.parse(mensaje.body);
-                    // Agrega el nuevo ticket al inicio de la lista
                     setTickets((prev) => [nuevoTicket, ...prev]);
                 });
                 return () => {
@@ -68,9 +59,6 @@ export default function PanelSoporte() {
         }
     }, [isConnected, stompClient]);
 
-    // =================================================================
-    // MANEJADORES DE EVENTOS
-    // =================================================================
     const handleOpen = (ticket) => {
         setTicketSeleccionado(ticket);
         setOpen(true);
@@ -82,6 +70,7 @@ export default function PanelSoporte() {
     };
 
     const handleGuardar = () => {
+        // Aquí conectaremos luego el endpoint para guardar la justificación en la BD
         console.log(`Guardando justificación para el ticket ${ticketSeleccionado?.id}:`, justificacion);
         handleClose();
     };
@@ -95,11 +84,7 @@ export default function PanelSoporte() {
         setPage(0);
     };
 
-    // =================================================================
-    // LÓGICA DE FILTRADO Y PAGINACIÓN
-    // =================================================================
     const ticketsFiltrados = tickets.filter((ticket) => {
-        // Uso de optional chaining (?.) por si algún campo viene nulo desde el backend
         const search = busqueda.toLowerCase();
         const solicitante = (ticket.solicitante || '').toLowerCase();
         const departamento = (ticket.departamento || '').toLowerCase();
@@ -112,7 +97,6 @@ export default function PanelSoporte() {
 
     return (
         <Box sx={{ width: '100%' }}>
-            {/* Encabezado de la página */}
             <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Typography variant="h4" fontWeight="bold" color="primary">
                     Tickets Asignados
@@ -125,7 +109,6 @@ export default function PanelSoporte() {
             </Box>
 
             <Paper elevation={3} sx={{ borderRadius: 2, p: 2, mb: 4 }}>
-                {/* Controles: Buscador y Contador */}
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                     <Typography variant="body2" color="textSecondary">
                         Mostrando registros de soporte
@@ -149,7 +132,6 @@ export default function PanelSoporte() {
                     />
                 </Box>
 
-                {/* Tabla principal */}
                 <TableContainer>
                     <Table sx={{ minWidth: 650 }} aria-label="tabla de tickets asignados">
                         <TableHead sx={{ backgroundColor: 'primary.main' }}>
@@ -186,7 +168,10 @@ export default function PanelSoporte() {
                                         <TableCell component="th" scope="row" sx={{ fontWeight: 'bold' }}>
                                             {ticket.id}
                                         </TableCell>
+                                        
+                                        {/* FECHA: Busca fechaCreacion desde el backend */}
                                         <TableCell>{ticket.fechaCreacion ? new Date(ticket.fechaCreacion).toLocaleString() : 'N/A'}</TableCell>
+                                        
                                         <TableCell>{ticket.fechaFin || '--/--/----'}</TableCell>
                                         <TableCell>{ticket.solicitante || 'Usuario'}</TableCell>
                                         <TableCell>{ticket.departamento || 'Área'}</TableCell>
@@ -195,6 +180,7 @@ export default function PanelSoporte() {
                                             <Button 
                                                 variant="outlined" 
                                                 size="small" 
+                                                onClick={() => handleOpen(ticket)}
                                                 startIcon={<VisibilityIcon />} 
                                                 sx={{ textTransform: 'none', borderRadius: 2 }}
                                             >
@@ -211,9 +197,7 @@ export default function PanelSoporte() {
                                             />
                                         </TableCell>
                                         <TableCell align="center">
-                                            <IconButton color="primary" onClick={() => handleOpen(ticket)}>
-                                                <InfoIcon />
-                                            </IconButton>
+                                            {/* El ícono de 'Info' (amarillo en tu dibujo) fue eliminado */}
                                             <IconButton color="success">
                                                 <CheckCircleIcon />
                                             </IconButton>
@@ -225,7 +209,6 @@ export default function PanelSoporte() {
                     </Table>
                 </TableContainer>
 
-                {/* Controles de Paginación inferior */}
                 <TablePagination
                     rowsPerPageOptions={[5, 10, 25]}
                     component="div"
@@ -239,25 +222,58 @@ export default function PanelSoporte() {
                 />
             </Paper>
 
-            {/* Modal de Justificación Simplificado */}
+            {/* MODAL / DIALOG ACTUALIZADO */}
             <Dialog open={open} onClose={handleClose} fullWidth maxWidth="sm">
                 <DialogTitle sx={{ backgroundColor: 'primary.main', color: 'white' }}>
                     Detalle del Ticket #{ticketSeleccionado?.id}
                 </DialogTitle>
                 <DialogContent sx={{ mt: 2 }}>
+                    
+                    {/* Título y Descripción */}
                     <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>Título:</Typography>
                     <Typography variant="body1" sx={{ mb: 2 }}>{ticketSeleccionado?.titulo}</Typography>
 
                     <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>Descripción:</Typography>
-                    <Paper variant="outlined" sx={{ p: 2, bgcolor: '#f9f9f9', mb: 2 }}>
+                    <Paper variant="outlined" sx={{ p: 2, bgcolor: '#f9f9f9', mb: 3 }}>
                         <Typography variant="body2">{ticketSeleccionado?.descripcion}</Typography>
                     </Paper>
 
-                    <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>Sede:</Typography>
-                    <Typography variant="body2" sx={{ mb: 2 }}>{ticketSeleccionado?.sede || 'No especificada'}</Typography>
+                    {/* Fila con SEDE (Negro) y ÁREA (Rojo) */}
+                    <Box sx={{ display: 'flex', gap: 6, mb: 3 }}>
+                        <Box>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>Sede:</Typography>
+                            {/* Si no hay sede, pone SEDIF por defecto */}
+                            <Typography variant="body2">{ticketSeleccionado?.sede || 'SEDIF'}</Typography>
+                        </Box>
+                        <Box>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>Área de origen:</Typography>
+                            <Typography variant="body2">{ticketSeleccionado?.departamento || 'No especificada'}</Typography>
+                        </Box>
+                    </Box>
+
+                    {/* CAJA DE TEXTO PARA JUSTIFICACIÓN (Amarillo) */}
+                    <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>Justificación / Notas:</Typography>
+                    <TextField
+                        autoFocus
+                        margin="dense"
+                        fullWidth
+                        multiline
+                        rows={3}
+                        value={justificacion}
+                        onChange={(e) => setJustificacion(e.target.value)}
+                        variant="outlined"
+                        placeholder="Escribe la justificación aquí..."
+                    />
+
                 </DialogContent>
-                <DialogActions>
-                    <Button onClick={handleClose} variant="contained" color="primary">Cerrar</Button>
+                <DialogActions sx={{ p: 2 }}>
+                    <Button onClick={handleClose} variant="contained" sx={{ backgroundColor: '#4b5563', color: 'white', '&:hover': { backgroundColor: '#374151' }, textTransform: 'none' }}>
+                        Cerrar
+                    </Button>
+                    {/* BOTÓN DE CONFIRMAR (Verde) */}
+                    <Button onClick={handleGuardar} variant="contained" color="primary" sx={{ textTransform: 'none' }}>
+                        Confirmar
+                    </Button>
                 </DialogActions>
             </Dialog>
         </Box>
