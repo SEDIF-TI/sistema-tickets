@@ -114,7 +114,7 @@ public class TicketService {
                 t.getId(),
                 t.getTitulo(),
                 t.getDescripcion(),
-                t.getEstatus().getId(),
+                t.getEstatus().getNombre(),
                 t.getUsuarioArea().getId(),
                 t.getUsuarioSoporte() != null ? t.getUsuarioSoporte().getId() : null
         );
@@ -138,5 +138,24 @@ public class TicketService {
         // 4. Actualizamos y guardamos (usando el setter correcto)
         ticket.setEstatus(estatusCerrado);
         return ticketRepository.save(ticket);
+    }
+
+    @Transactional(readOnly = true)
+    public List<TicketResponse> obtenerTicketsDeMiArea(String correoUsuario) {
+        // 1. Buscamos al usuario logueado
+        Usuario empleado = usuarioRepository.findByCorreoOrUsername(correoUsuario, correoUsuario)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
+
+        // 2. Verificamos que tenga un área asignada
+        if (empleado.getArea() == null) {
+            throw new IllegalStateException("El usuario no tiene un área asignada para ver el historial.");
+        }
+
+        // 3. Buscamos los tickets de su área y los mapeamos a la respuesta
+        Long miAreaId = empleado.getArea().getId();
+        return ticketRepository.findByUsuarioArea_Area_IdOrderByFechaCreacionDesc(miAreaId)
+                .stream()
+                .map(this::mapearATicketResponse)
+                .toList();
     }
 }

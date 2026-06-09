@@ -1,49 +1,49 @@
 import { createTheme } from '@mui/material/styles';
 
 const theme = createTheme({
+    // 1. Definimos la paleta de colores institucionales
     palette: {
-        // Color principal (Botones primarios, barras de navegación superior)
         primary: {
-            main: '#611232', // Guinda institucional (Cambia este valor)
-            light: '#8f2f53',
-            dark: '#3d0a1f',
-            contrastText: '#ffffff', // Color del texto sobre el color primario
-        },
-        // Color secundario (Botones secundarios, iconos destacados)
-        secondary: {
-            main: '#bda674', // Dorado institucional (Cambia este valor)
-            light: '#d4c29c',
-            dark: '#8f7b50',
+            main: '#5c0a28', // Color guinda/vino institucional
+            dark: '#4a0820',
             contrastText: '#ffffff',
         },
-        // Colores de fondo de la aplicación
+        success: {
+            main: '#2e7d32',
+            light: '#e8f5e9',
+        },
         background: {
-            default: '#f5f5f5', // Gris muy claro para el fondo general
-            paper: '#ffffff',   // Blanco para las tarjetas y formularios
-        }
+            default: '#f8fafc', // Fondo sutil para las pantallas
+            paper: '#ffffff',
+        },
     },
-    typography: {
-        fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
-    },
-    // Aquí podemos estandarizar cómo se ven todos los componentes
+    // 2. Definimos estilos globales para componentes específicos
     components: {
         MuiButton: {
             styleOverrides: {
                 root: {
-                    borderRadius: '8px', // Bordes de los botones
-                    textTransform: 'none', // Evita que el texto esté todo en MAYÚSCULAS
-                    fontWeight: 'bold',
-                    padding: '10px 20px',
+                    textTransform: 'none', // Quita las mayúsculas forzadas
+                    borderRadius: '8px',   // Bordes redondeados institucionales
+                    fontWeight: 600,
+                    padding: '8px 20px',
                 },
             },
         },
-        MuiTextField: {
+        MuiTableHead: {
             styleOverrides: {
                 root: {
-                    backgroundColor: '#ffffff', // Fondo blanco para los inputs
-                }
-            }
-        }
+                    backgroundColor: '#f8fafc', // Fondo grisáceo limpio para cabeceras
+                },
+            },
+        },
+        MuiTableCell: {
+            styleOverrides: {
+                head: {
+                    fontWeight: 600,
+                    color: '#475569',
+                },
+            },
+        },
     },
 });
 

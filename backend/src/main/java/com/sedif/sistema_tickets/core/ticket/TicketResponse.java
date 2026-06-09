@@ -8,7 +8,7 @@ public record TicketResponse(
     Long id,
     String titulo,
     String descripcion,
-    Long estatusId, // <-- Cambiado a Long
+    String estatus, // <-- Cambiado a Long
     Long usuarioAreaId,
     Long usuarioSoporteId
 ) {}
