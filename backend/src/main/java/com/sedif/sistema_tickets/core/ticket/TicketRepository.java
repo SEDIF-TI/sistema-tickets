@@ -15,4 +15,7 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
 
     // NUEVO: Trae solo los tickets asignados a un técnico específico (para su propia vista)
     List<Ticket> findByUsuarioSoporte_Id(Long soporteId);
+
+    // Busca tickets navegando: Ticket -> Usuario (usuarioArea) -> Area -> Id
+    List<Ticket> findByUsuarioArea_Area_IdOrderByFechaCreacionDesc(Long areaId);
 }
