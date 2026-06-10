@@ -18,11 +18,11 @@ public class BotConfig {
             // Registramos tu bot para que empiece a "escuchar" (Long Polling)
             api.registerBot(sedifTelegramBot);
             
-            System.out.println("🚀 [SISTEMA] Bot de Telegram registrado y escuchando correctamente.");
+            System.out.println("[SISTEMA] Bot de Telegram registrado y escuchando correctamente.");
             return api;
             
         } catch (TelegramApiException e) {
-            System.err.println("🚨 [SISTEMA] Error crítico al iniciar el bot de Telegram: " + e.getMessage());
+            System.err.println("[SISTEMA] Error crítico al iniciar el bot de Telegram: " + e.getMessage());
             return null;
         }
     }
