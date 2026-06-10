@@ -1,6 +1,9 @@
 package com.sedif.sistema_tickets.core.ticket;
 
 import com.sedif.sistema_tickets.core.usuarios.Usuario;
+
+import java.time.LocalDateTime;
+
 import com.sedif.sistema_tickets.core.estatusticket.Estatus; 
 import com.sedif.sistema_tickets.util.audit.Auditable;
 import jakarta.persistence.*;
@@ -42,4 +45,6 @@ public class Ticket extends Auditable {
     @Column(name = "s_prioridad", nullable = false, length = 20)
     private String prioridad;
 
+    @Column(name = "d_fecha_fin")
+    private LocalDateTime fechaFin;
 }
