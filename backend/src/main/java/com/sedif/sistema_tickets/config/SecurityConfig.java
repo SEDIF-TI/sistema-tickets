@@ -14,6 +14,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.filter.CorsFilter; // Importante: usa este
+import org.springframework.http.HttpMethod;
 
 import java.util.List;
 
@@ -46,6 +47,7 @@ public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Excepti
             .requestMatchers("/api/v1/auth/**").permitAll()
             .requestMatchers("/ws-tickets/**").permitAll()
             .requestMatchers("/api/v1/test/**").permitAll()
+            .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
             .anyRequest().authenticated() // Al permitir todo lo necesario arriba, esto protege el resto
         )
         .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

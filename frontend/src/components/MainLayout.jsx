@@ -9,12 +9,11 @@ import {
     Toolbar, 
     List, 
     Typography, 
-    Divider, 
     ListItem, 
     ListItemButton, 
     ListItemIcon, 
-    ListItemText, 
-    Button 
+    Button,
+    Tooltip
 } from '@mui/material';
 import LogoutIcon from '@mui/icons-material/Logout';
 
@@ -26,14 +25,10 @@ export default function MainLayout({ children }) {
     const { user, logout } = useContext(AuthContext);
     const navigate = useNavigate();
 
-    console.log("Datos exactos del usuario:", user);
-
-    // Si por alguna razón no hay usuario o vistas, evitamos un error
     const vistas = user?.vistas || [];
 
     return (
         <Box sx={{ display: 'flex' }}>
-            {/* Barra Superior (Navbar) */}
             <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
                 <Toolbar sx={{ display: 'flex', justifyContent: 'space-between' }}>
                     <Typography variant="h6" noWrap component="div" sx={{ fontWeight: 'bold' }}>
@@ -67,17 +62,30 @@ export default function MainLayout({ children }) {
                 </Toolbar>
             </AppBar>
 
-            {/* Barra Lateral Dinámica (Sidebar) */}
             <Drawer
                 variant="permanent"
                 sx={{
-                    width: 70, // Ancho reducido para solo iconos
+                    width: 70,
                     flexShrink: 0,
-                    [`& .MuiDrawer-paper`]: { width: 70, overflowX: 'hidden' }, // Ocultamos desbordamiento
+                    [`& .MuiDrawer-paper`]: { width: 70, overflowX: 'hidden' },
                 }}
             >
                 <Toolbar />
                 <List>
+                    {vistas.map((vista, index) => {
+                        const Icono = getIcon(vista.icono);
+                        return (
+                            <ListItem key={index} disablePadding sx={{ display: 'block' }}>
+                                <Tooltip title={vista.nombre || 'Menú'} placement="right">
+                                    <ListItemButton onClick={() => navigate(vista.ruta)} sx={{ justifyContent: 'center', py: 2 }}>
+                                        <ListItemIcon sx={{ minWidth: 0, justifyContent: 'center' }}>
+                                            <Icono color="primary" />
+                                        </ListItemIcon>
+                                    </ListItemButton>
+                                </Tooltip>
+                            </ListItem>
+                        );
+                    })}
                     {/* Botones Fijos para Empleado */}
                     {/* Botones Fijos para Empleado */}
                     {/* Botones Fijos para Empleado */}
@@ -97,10 +105,8 @@ export default function MainLayout({ children }) {
                         </ListItemButton>
                     </ListItem>
                 </List>
-
             </Drawer>
 
-            {/* Contenedor del contenido de cada página */}
             <Box component="main" sx={{ flexGrow: 1, p: 3, mt: 8 }}>
                 {children}
             </Box>

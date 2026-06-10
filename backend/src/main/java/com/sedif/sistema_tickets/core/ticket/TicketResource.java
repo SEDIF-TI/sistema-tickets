@@ -47,4 +47,18 @@ public class TicketResource {
         List<TicketResponse> historial = ticketService.obtenerTicketsDeMiArea(correoUsuario);
         return ResponseEntity.ok(historial);
     }
+
+    @PutMapping("/{id}/atender")
+    public ResponseEntity<Ticket> atenderTicket(@PathVariable Long id) {
+        Ticket ticketAtendido = ticketService.atenderTicket(id);
+        return ResponseEntity.ok(ticketAtendido);
+    }
+
+    @PutMapping("/{id}/resolver")
+    public ResponseEntity<Ticket> resolverTicket(@PathVariable Long id, @RequestBody ResolucionRequest request) {
+        // Se extrae la justificación del cuerpo de la petición JSON
+        Ticket ticketResuelto = ticketService.resolverTicket(id, request.justificacion());
+        return ResponseEntity.ok(ticketResuelto);
+    }
 }
+record ResolucionRequest(String justificacion) {}

@@ -4,10 +4,13 @@ import com.sedif.sistema_tickets.core.usuarios.Usuario;
 import com.sedif.sistema_tickets.core.usuarios.UsuarioRepository;
 import com.sedif.sistema_tickets.core.estatusticket.Estatus;
 import com.sedif.sistema_tickets.core.estatusticket.EstatusRepository;
+import com.sedif.sistema_tickets.core.ticket.bitacora.Bitacora;
+import com.sedif.sistema_tickets.core.ticket.bitacora.BitacoraRepository;
 import com.sedif.sistema_tickets.core.ticket.filtros.TicketFiltroStrategy;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -21,7 +24,7 @@ public class TicketService {
     private final UsuarioRepository usuarioRepository;
     private final EstatusRepository estatusRepository;
     private final Map<String, TicketFiltroStrategy> estrategiasFiltro;
-
+    private final BitacoraRepository bitacoraRepository;
     @Transactional
     public Ticket crearTicket(TicketRequestRecord request, String identificadorUsuario) {
         
@@ -43,6 +46,8 @@ public class TicketService {
         Ticket nuevoTicket = new Ticket();
         nuevoTicket.setTitulo(request.titulo());
         nuevoTicket.setDescripcion(request.descripcion());
+
+        nuevoTicket.setSede(request.sede());
         
         // CORRECCIÓN 2: Usamos los nombres correctos de tu entidad
         nuevoTicket.setUsuarioArea(usuario); 
@@ -110,13 +115,36 @@ public class TicketService {
 
     // Método privado para centralizar el mapeo y evitar repetir código
     private TicketResponse mapearATicketResponse(Ticket t) {
+        // 1. Manejo seguro de nulos para los nombres
+        String nombreSolicitante = "Desconocido";
+        String nombreDepartamento = "Sin área";
+
+        if (t.getUsuarioArea() != null) {
+            nombreSolicitante = t.getUsuarioArea().getNombre();
+            if (t.getUsuarioArea().getArea() != null) {
+                nombreDepartamento = t.getUsuarioArea().getArea().getNombre();
+            }
+        }
+
+        // Buscamos si existe una justificación en la tabla Bitácora
+        String justificacion = null;
+        var historial = bitacoraRepository.findByTicketIdOrderByFechaCreacionDesc(t.getId());
+        if (!historial.isEmpty()) {
+            justificacion = historial.get(0).getJustificacion();
+        }
         return new TicketResponse(
                 t.getId(),
                 t.getTitulo(),
                 t.getDescripcion(),
+                t.getSede(),
+                t.getFechaCreacion(),
+                t.getFechaFin(),
+                nombreSolicitante,
+                nombreDepartamento,
                 t.getEstatus().getNombre(),
-                t.getUsuarioArea().getId(),
-                t.getUsuarioSoporte() != null ? t.getUsuarioSoporte().getId() : null
+                t.getUsuarioArea()!= null ? t.getUsuarioArea().getId() : null,
+                t.getUsuarioSoporte() != null ? t.getUsuarioSoporte().getId() : null,
+                justificacion
         );
     }
 
@@ -158,4 +186,47 @@ public class TicketService {
                 .map(this::mapearATicketResponse)
                 .toList();
     }
+
+    @Transactional
+    public Ticket atenderTicket(Long ticketId) {
+        Ticket ticket = ticketRepository.findById(ticketId)
+                .orElseThrow(() -> new IllegalArgumentException("Ticket no encontrado"));
+
+        Estatus estatusEnCamino = estatusRepository.findByNombre("EN PROCESO")
+                .orElseThrow(() -> new IllegalStateException("El estatus EN PROCESO no existe en la BD."));
+
+        ticket.setEstatus(estatusEnCamino);
+        ticketRepository.save(ticket);
+
+        // Generamos el registro en la bitácora
+        Bitacora bitacora = new Bitacora();
+        bitacora.setTicket(ticket);
+        bitacora.setEstatusRegistrado("EN PROCESO");
+        bitacora.setJustificacion("El técnico va en camino para atender el reporte.");
+        bitacoraRepository.save(bitacora);
+
+        return ticket;
+    }
+
+    @Transactional
+    public Ticket resolverTicket(Long ticketId, String justificacion) {
+        Ticket ticket = ticketRepository.findById(ticketId)
+                .orElseThrow(() -> new IllegalArgumentException("Ticket no encontrado"));
+
+        Estatus estatusResuelto = estatusRepository.findByNombre("CERRADO")
+                .orElseThrow(() -> new IllegalStateException("El estatus CERRADO no existe en la BD."));
+
+        ticket.setEstatus(estatusResuelto);
+        ticket.setFechaFin(LocalDateTime.now()); // <-- SE ASIGNA LA HORA EXACTA DE RESOLUCIÓN
+        ticketRepository.save(ticket);
+
+        // Guardamos la justificación técnica
+        Bitacora bitacora = new Bitacora();
+        bitacora.setTicket(ticket);
+        bitacora.setEstatusRegistrado("CERRADO");
+        bitacora.setJustificacion(justificacion);
+        bitacoraRepository.save(bitacora);
+
+        return ticket;
+    }    
 }

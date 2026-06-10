@@ -9,6 +9,8 @@ import MainLayout from './components/MainLayout.jsx';
 import { Typography } from '@mui/material';
 import FormularioTicket from './pages/empleado/FormularioTicket';
 import TicketsPage from './pages/tickets/TicketsPage';
+import SoporteLayout from './components/SoporteLayout.jsx';
+import PanelSoporte from './pages/soporte/PanelSoporte.jsx';
 
 // Páginas de prueba temporales para verificar que las rutas funcionan
 const LevantarTicket = () => <Typography variant="h4">Formulario: Crear Nuevo Ticket</Typography>;
@@ -29,8 +31,10 @@ function App() {
               {/* Rutas Protegidas (Solo dejamos las que funcionan) */}
               <Route path="/empleado/nuevo" element={<MainLayout><FormularioTicket /></MainLayout>} />
               <Route path="/empleado/historial" element={<MainLayout><TicketsPage /></MainLayout>} />
-              <Route path="/soporte/bandeja" element={<MainLayout><MisTickets /></MainLayout>} />
+              <Route path="/soporte/bandeja" element={<SoporteLayout><PanelSoporte /></SoporteLayout>} />
               <Route path="/admin/dashboard" element={<MainLayout><Dashboard /></MainLayout>} />
+              {/* Debes tener esta línea para que el router no te expulse */}
+              <Route path="/soporte/nuevo" element={<SoporteLayout><FormularioTicket /></SoporteLayout>} />
 
               {/* Redirección por defecto */}
               <Route path="*" element={<Navigate to="/login" replace />} />
