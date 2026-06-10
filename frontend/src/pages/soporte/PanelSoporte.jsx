@@ -8,22 +8,22 @@ import {
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import SearchIcon from '@mui/icons-material/Search';
+import DirectionsRunIcon from '@mui/icons-material/DirectionsRun';
 import { useWebSocket } from '../../context/WebSocketContext.jsx';
 import api from '../../services/api';
 
 export default function PanelSoporte() {
     const { stompClient, isConnected } = useWebSocket();
     
-    // Estados de datos
     const [tickets, setTickets] = useState([]);
     const [cargando, setCargando] = useState(true);
 
-    // Estados para el Modal
-    const [open, setOpen] = useState(false);
+    const [openDetalle, setOpenDetalle] = useState(false);
+    const [openResolucion, setOpenResolucion] = useState(false);
+    
     const [justificacion, setJustificacion] = useState('');
     const [ticketSeleccionado, setTicketSeleccionado] = useState(null);
 
-    // Estados para la Paginación y Búsqueda
     const [page, setPage] = useState(0);
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [busqueda, setBusqueda] = useState('');
@@ -39,7 +39,6 @@ export default function PanelSoporte() {
                 setCargando(false);
             }
         };
-
         cargarTicketsHistoricos();
     }, []);
 
@@ -59,26 +58,58 @@ export default function PanelSoporte() {
         }
     }, [isConnected, stompClient]);
 
-    const handleOpen = (ticket) => {
-        setTicketSeleccionado(ticket);
-        setOpen(true);
+    const handleAtenderTicket = async (ticket) => {
+        try {
+            await api.put(`/v1/tickets/${ticket.id}/atender`);
+            setTickets((prev) => prev.map(t => t.id === ticket.id ? { ...t, estatus: 'EN PROCESO' } : t));
+        } catch (error) {
+            console.error("Error al marcar el ticket en camino:", error);
+        }
     };
 
-    const handleClose = () => {
-        setOpen(false);
+    const handleResolverTicket = async () => {
+        if (!justificacion.trim()) {
+            alert("Debes escribir una justificación antes de confirmar.");
+            return;
+        }
+
+        try {
+            await api.put(`/v1/tickets/${ticketSeleccionado.id}/resolver`, { justificacion });
+            setTickets((prev) => prev.map(t => 
+                t.id === ticketSeleccionado.id 
+                ? { ...t, estatus: 'CERRADO', fechaFin: new Date().toISOString(), justificacion: justificacion } 
+                : t
+            ));
+            handleCloseResolucion();
+        } catch (error) {
+            console.error("Error al resolver el ticket:", error);
+        }
+    };
+
+    const handleOpenDetalle = (ticket) => {
+        setTicketSeleccionado(ticket);
+        setOpenDetalle(true);
+    };
+
+    const handleCloseDetalle = () => {
+        setOpenDetalle(false);
+        setTicketSeleccionado(null);
+    };
+
+    const handleOpenResolucion = (ticket) => {
+        setTicketSeleccionado(ticket);
+        setJustificacion('');
+        setOpenResolucion(true);
+    };
+
+    const handleCloseResolucion = (event, reason) => {
+        if (reason && reason === 'backdropClick') return;
+        setOpenResolucion(false);
+        setTicketSeleccionado(null);
         setJustificacion('');
     };
 
-    const handleGuardar = () => {
-        // Aquí conectaremos luego el endpoint para guardar la justificación en la BD
-        console.log(`Guardando justificación para el ticket ${ticketSeleccionado?.id}:`, justificacion);
-        handleClose();
-    };
-
-    const handleChangePage = (event, newPage) => {
-        setPage(newPage);
-    };
-
+    const handleChangePage = (event, newPage) => setPage(newPage);
     const handleChangeRowsPerPage = (event) => {
         setRowsPerPage(parseInt(event.target.value, 10));
         setPage(0);
@@ -169,10 +200,10 @@ export default function PanelSoporte() {
                                             {ticket.id}
                                         </TableCell>
                                         
-                                        {/* FECHA: Busca fechaCreacion desde el backend */}
                                         <TableCell>{ticket.fechaCreacion ? new Date(ticket.fechaCreacion).toLocaleString() : 'N/A'}</TableCell>
                                         
-                                        <TableCell>{ticket.fechaFin || '--/--/----'}</TableCell>
+                                        <TableCell>{ticket.fechaFin ? new Date(ticket.fechaFin).toLocaleString() : '--/--/----'}</TableCell>
+                                        
                                         <TableCell>{ticket.solicitante || 'Usuario'}</TableCell>
                                         <TableCell>{ticket.departamento || 'Área'}</TableCell>
                                         
@@ -180,7 +211,7 @@ export default function PanelSoporte() {
                                             <Button 
                                                 variant="outlined" 
                                                 size="small" 
-                                                onClick={() => handleOpen(ticket)}
+                                                onClick={() => handleOpenDetalle(ticket)}
                                                 startIcon={<VisibilityIcon />} 
                                                 sx={{ textTransform: 'none', borderRadius: 2 }}
                                             >
@@ -192,15 +223,44 @@ export default function PanelSoporte() {
                                             <Chip 
                                                 label={ticket.estado || ticket.estatus || 'Abierto'} 
                                                 size="small" 
-                                                color="warning" 
-                                                sx={{ fontWeight: 'bold', borderRadius: 1 }}
+                                                sx={{ 
+                                                    fontWeight: 'bold', 
+                                                    borderRadius: 1,
+                                                    backgroundColor: 
+                                                        (ticket.estatus === 'RESUELTO' || ticket.estatus === 'CERRADO') ? 'primary.dark' : 
+                                                        (ticket.estatus === 'EN PROCESO') ? 'primary.light' : 
+                                                        '#e0e0e0', // Gris neutral para abierto
+                                                    color: (ticket.estatus === 'ABIERTO' || ticket.estatus === 'ASIGNADO') ? 'text.primary' : 'white'
+                                                }}
                                             />
                                         </TableCell>
+                                        
                                         <TableCell align="center">
-                                            {/* El ícono de 'Info' (amarillo en tu dibujo) fue eliminado */}
-                                            <IconButton color="success">
-                                                <CheckCircleIcon />
-                                            </IconButton>
+                                            {(ticket.estatus === 'ASIGNADO' || ticket.estatus === 'ABIERTO') && (
+                                                <IconButton 
+                                                    onClick={() => handleAtenderTicket(ticket)} 
+                                                    title="Voy en camino"
+                                                    sx={{ color: 'primary.light' }}
+                                                >
+                                                    <DirectionsRunIcon />
+                                                </IconButton>
+                                            )}
+                                            
+                                            {ticket.estatus === 'EN PROCESO' && (
+                                                <IconButton 
+                                                    onClick={() => handleOpenResolucion(ticket)} 
+                                                    title="Resolver Ticket"
+                                                    sx={{ color: 'primary.main' }}
+                                                >
+                                                    <CheckCircleIcon />
+                                                </IconButton>
+                                            )}
+                                            
+                                            {(ticket.estatus === 'RESUELTO' || ticket.estatus === 'CERRADO') && (
+                                                <Typography variant="caption" color="textSecondary" sx={{ fontWeight: 'bold' }}>
+                                                    Finalizado
+                                                </Typography>
+                                            )}
                                         </TableCell>
                                     </TableRow>
                                 ))
@@ -222,14 +282,12 @@ export default function PanelSoporte() {
                 />
             </Paper>
 
-            {/* MODAL / DIALOG ACTUALIZADO */}
-            <Dialog open={open} onClose={handleClose} fullWidth maxWidth="sm">
+            {/* MODAL DE DETALLES */}
+            <Dialog open={openDetalle} onClose={handleCloseDetalle} fullWidth maxWidth="sm">
                 <DialogTitle sx={{ backgroundColor: 'primary.main', color: 'white' }}>
                     Detalle del Ticket #{ticketSeleccionado?.id}
                 </DialogTitle>
                 <DialogContent sx={{ mt: 2 }}>
-                    
-                    {/* Título y Descripción */}
                     <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>Título:</Typography>
                     <Typography variant="body1" sx={{ mb: 2 }}>{ticketSeleccionado?.titulo}</Typography>
 
@@ -238,11 +296,9 @@ export default function PanelSoporte() {
                         <Typography variant="body2">{ticketSeleccionado?.descripcion}</Typography>
                     </Paper>
 
-                    {/* Fila con SEDE (Negro) y ÁREA (Rojo) */}
                     <Box sx={{ display: 'flex', gap: 6, mb: 3 }}>
                         <Box>
                             <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>Sede:</Typography>
-                            {/* Si no hay sede, pone SEDIF por defecto */}
                             <Typography variant="body2">{ticketSeleccionado?.sede || 'SEDIF'}</Typography>
                         </Box>
                         <Box>
@@ -251,31 +307,63 @@ export default function PanelSoporte() {
                         </Box>
                     </Box>
 
-                    {/* CAJA DE TEXTO PARA JUSTIFICACIÓN (Amarillo) */}
-                    <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>Justificación / Notas:</Typography>
+                    {/* ========================================================= */}
+                    {/* JUSTIFICACIÓN (Solo aparece si el ticket está finalizado) */}
+                    {/* ========================================================= */}
+                    {(ticketSeleccionado?.estatus === 'CERRADO' || ticketSeleccionado?.estatus === 'RESUELTO') && ticketSeleccionado?.justificacion && (
+                        <Box sx={{ mt: 1 }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+                                Resolución del Técnico:
+                            </Typography>
+                            <Paper variant="outlined" sx={{ p: 2, mt: 1, bgcolor: '#f3f4f6', borderLeft: '4px solid', borderColor: 'primary.main' }}>
+                                <Typography variant="body2">{ticketSeleccionado.justificacion}</Typography>
+                            </Paper>
+                        </Box>
+                    )}
+
+                </DialogContent>
+                <DialogActions sx={{ p: 2 }}>
+                    <Button onClick={handleCloseDetalle} variant="contained" sx={{ backgroundColor: '#4b5563', color: 'white', '&:hover': { backgroundColor: '#374151' }, textTransform: 'none' }}>
+                        Cerrar
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* MODAL DE RESOLUCIÓN (AJUSTADO A COLOR INSTITUCIONAL) */}
+            <Dialog open={openResolucion} onClose={handleCloseResolucion} fullWidth maxWidth="sm" disableEscapeKeyDown>
+                <DialogTitle sx={{ backgroundColor: 'primary.main', color: 'white' }}>
+                    Resolver Ticket #{ticketSeleccionado?.id}
+                </DialogTitle>
+                <DialogContent sx={{ mt: 2 }}>
+                    <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+                        Estás a punto de marcar este ticket como resuelto. Ingresa el detalle del trabajo realizado para la bitácora del sistema.
+                    </Typography>
+                    
+                    <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>Justificación Técnica *</Typography>
                     <TextField
                         autoFocus
                         margin="dense"
                         fullWidth
                         multiline
-                        rows={3}
+                        rows={4}
                         value={justificacion}
                         onChange={(e) => setJustificacion(e.target.value)}
                         variant="outlined"
-                        placeholder="Escribe la justificación aquí..."
+                        placeholder="Ej. Se reemplazó el cartucho de tóner negro y se reinició la cola de impresión..."
+                        required
                     />
-
                 </DialogContent>
                 <DialogActions sx={{ p: 2 }}>
-                    <Button onClick={handleClose} variant="contained" sx={{ backgroundColor: '#4b5563', color: 'white', '&:hover': { backgroundColor: '#374151' }, textTransform: 'none' }}>
-                        Cerrar
+                    <Button onClick={() => handleCloseResolucion()} color="inherit" sx={{ textTransform: 'none' }}>
+                        Cancelar
                     </Button>
-                    {/* BOTÓN DE CONFIRMAR (Verde) */}
-                    <Button onClick={handleGuardar} variant="contained" color="primary" sx={{ textTransform: 'none' }}>
+                    {/* BOTÓN ACTUALIZADO */}
+                    <Button onClick={handleResolverTicket} variant="contained" color="primary" sx={{ textTransform: 'none' }}>
                         Confirmar
                     </Button>
                 </DialogActions>
             </Dialog>
+
         </Box>
     );
 }

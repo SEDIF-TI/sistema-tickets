@@ -6,3 +6,4 @@ public record TicketRecord(
         String descripcion,
         Long usuarioAreaId // ID de quien levanta el ticket
 ) {}
+
