@@ -51,4 +51,8 @@ public class Usuario extends Auditable {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "fn_area_id")
     private Area area;
+
+    // Nueva columna para vincular notificaciones de Telegram
+    @Column(name = "telegram_chat_id")
+    private Long telegramChatId;
 }
