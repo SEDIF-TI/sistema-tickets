@@ -26,6 +26,8 @@ export default function MainLayout({ children }) {
     const { user, logout } = useContext(AuthContext);
     const navigate = useNavigate();
 
+    console.log("Datos exactos del usuario:", user);
+
     // Si por alguna razón no hay usuario o vistas, evitamos un error
     const vistas = user?.vistas || [];
 
@@ -37,14 +39,27 @@ export default function MainLayout({ children }) {
                     <Typography variant="h6" noWrap component="div" sx={{ fontWeight: 'bold' }}>
                         SEDIF - Sistema de Tickets
                     </Typography>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                        <Typography variant="body2">
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 1, sm: 2 } }}>
+                        <Typography variant="body2" sx={{ display: { xs: 'none', sm: 'block' } }}>
                             {user?.nombre} ({user?.rol})
                         </Typography>
+                        
+                        {/* NUEVO BOTÓN DE TELEGRAM */}
+                        <Button 
+                            variant="outlined"
+                            color="inherit" 
+                            href={`https://t.me/Notificaciones_SEDIF_bot?start=${user?.usuarioId}`}
+                            target="_blank" // Para que abra Telegram en una pestaña nueva
+                            sx={{ textTransform: 'none', borderColor: 'rgba(255,255,255,0.5)', display: { xs: 'none', sm: 'flex' } }}
+                        >
+                            Vincular Telegram
+                        </Button>
+
                         <Button 
                             color="inherit" 
                             startIcon={<LogoutIcon />} 
                             onClick={() => { logout(); navigate('/login'); }}
+                            sx={{ textTransform: 'none' }}
                         >
                             Salir
                         </Button>
