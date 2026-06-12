@@ -16,7 +16,7 @@ export default function TicketsPage() {
 
     const cargarHistorial = async () => {
         try {
-            const response = await api.get('/v1/tickets/area');
+            const response = await api.get('/v1/tickets/mis-tickets');
             setHistorialTickets(response.data);
         } catch (error) {
             console.error("Error al cargar el historial:", error);

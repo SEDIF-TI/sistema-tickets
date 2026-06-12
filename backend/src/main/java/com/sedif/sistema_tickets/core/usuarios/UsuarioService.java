@@ -178,4 +178,17 @@ public class UsuarioService {
         usuario.setActivo(!usuario.getActivo());
         return UsuarioResponse.desdeEntidad(usuarioRepository.save(usuario));
     }
+
+    @Transactional
+    public void actualizarPassword(String correo, String nuevaPassword) {
+        Usuario usuario = usuarioRepository.findByCorreo(correo)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
+        
+        // Encriptamos y guardamos
+        usuario.setPassword(passwordEncoder.encode(nuevaPassword));
+        // IMPORTANTE: Aquí quitamos la restricción
+        usuario.setPasswordTemporal(false);
+        
+        usuarioRepository.save(usuario);
+    }
 }
