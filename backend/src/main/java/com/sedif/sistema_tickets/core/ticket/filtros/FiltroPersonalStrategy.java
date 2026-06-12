@@ -15,6 +15,7 @@ public class FiltroPersonalStrategy implements TicketFiltroStrategy {
 
     @Override
     public List<Ticket> obtenerTickets(Usuario usuario) {
-        return ticketRepository.findByUsuarioSoporte_Id(usuario.getId());
+        // CAMBIO: Quita el guion bajo para que coincida con TicketRepository
+        return ticketRepository.findByUsuarioSoporteId(usuario.getId());
     }
 }

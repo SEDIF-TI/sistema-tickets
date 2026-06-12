@@ -55,4 +55,8 @@ public class Usuario extends Auditable {
     // Nueva columna para vincular notificaciones de Telegram
     @Column(name = "telegram_chat_id")
     private Long telegramChatId;
+
+    // Agrega este campo a tu Usuario.java
+    @Column(name = "b_password_temporal", nullable = false)
+    private Boolean passwordTemporal = true; // true por defecto al crear
 }
