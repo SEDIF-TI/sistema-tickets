@@ -16,11 +16,10 @@ public class TicketResource {
 
     @PostMapping
     public ResponseEntity<Ticket> crearTicket(@RequestBody TicketRequestRecord request, Authentication authentication) {
-        // Usamos authentication.getName() que ya contiene el correo gracias al JwtAuthenticationFilter
+        // Si authentication es null, el filtro JWT no está funcionando
+        System.out.println("DEBUG: Usuario autenticado: " + (authentication != null ? authentication.getName() : "NULO"));
+        
         String correoUsuario = authentication.getName();
-        
-        System.out.println("LOG: Solicitud POST recibida en /api/v1/tickets. Usuario: " + correoUsuario);
-        
         Ticket nuevoTicket = ticketService.crearTicket(request, correoUsuario);
         return ResponseEntity.ok(nuevoTicket);
     }

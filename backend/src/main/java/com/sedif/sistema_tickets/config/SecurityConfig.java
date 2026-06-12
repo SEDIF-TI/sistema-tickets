@@ -30,11 +30,11 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
-@Bean
+    @Bean
 public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
     http
+        .csrf(csrf -> csrf.disable())
         .cors(cors -> cors.configurationSource(request -> {
-             // Solo devolvemos la configuración que ya gestiona el CorsFilter
              var corsConfig = new CorsConfiguration();
              corsConfig.setAllowedOriginPatterns(List.of("*"));
              corsConfig.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
@@ -42,13 +42,17 @@ public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Excepti
              corsConfig.setAllowCredentials(true);
              return corsConfig;
         }))
-        .csrf(csrf -> csrf.disable())
         .authorizeHttpRequests(auth -> auth
+            // 1. Rutas públicas
             .requestMatchers("/api/v1/auth/**").permitAll()
             .requestMatchers("/ws-tickets/**").permitAll()
-            .requestMatchers("/api/v1/test/**").permitAll()
-            .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-            .anyRequest().authenticated() // Al permitir todo lo necesario arriba, esto protege el resto
+            
+            // 2. RUTA PROTEGIDA: Solo administradores
+            // Nota: Spring Security añade el prefijo "ROLE_" automáticamente si usas hasRole()
+            .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
+            
+            // 3. El resto de rutas requieren estar autenticado (cualquier rol)
+            .anyRequest().authenticated()
         )
         .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);

@@ -12,8 +12,9 @@ import java.util.List;
 public class FiltroAreaStrategy implements TicketFiltroStrategy {
     private final TicketRepository ticketRepository;
 
-    @Override
+   @Override
     public List<Ticket> obtenerTickets(Usuario usuario) {
-        return ticketRepository.findByUsuarioArea_Area_Id(usuario.getArea().getId());
+        // CAMBIO: Quita el guion bajo para que coincida con TicketRepository
+        return ticketRepository.findByUsuarioAreaAreaId(usuario.getArea().getId());
     }
 }
