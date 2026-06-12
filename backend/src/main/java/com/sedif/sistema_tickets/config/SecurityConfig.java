@@ -31,46 +31,47 @@ public class SecurityConfig {
     }
 
     @Bean
-public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-    http
-        .csrf(csrf -> csrf.disable())
-        .cors(cors -> cors.configurationSource(request -> {
-             var corsConfig = new CorsConfiguration();
-             corsConfig.setAllowedOriginPatterns(List.of("*"));
-             corsConfig.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-             corsConfig.setAllowedHeaders(List.of("*"));
-             corsConfig.setAllowCredentials(true);
-             return corsConfig;
-        }))
-        .authorizeHttpRequests(auth -> auth
-            // 1. Rutas públicas
-            .requestMatchers("/api/v1/auth/**").permitAll()
-            .requestMatchers("/ws-tickets/**").permitAll()
-            
-            // 2. RUTA PROTEGIDA: Solo administradores
-            // Nota: Spring Security añade el prefijo "ROLE_" automáticamente si usas hasRole()
-            .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
-            
-            // 3. El resto de rutas requieren estar autenticado (cualquier rol)
-            .anyRequest().authenticated()
-        )
-        .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-        .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http
+            // 1. Habilita CORS explícitamente aquí
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            .csrf(csrf -> csrf.disable())
+            .exceptionHandling(ex -> ex
+                // Manejo cuando un usuario autenticado intenta acceder a algo que no tiene permiso
+                .accessDeniedHandler((request, response, accessDeniedException) -> {
+                    response.setStatus(403);
+                    response.getWriter().write("Acceso denegado: Se requiere rol de administrador.");
+                })
+                // Manejo cuando un usuario NO está autenticado o el token es inválido
+                .authenticationEntryPoint((request, response, authException) -> {
+                    response.setStatus(403); 
+                    response.getWriter().write("Acceso denegado: Autenticación requerida.");
+                })
+            )
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/api/v1/auth/**").permitAll()
+                .requestMatchers("/ws-tickets/**").permitAll()
+                .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
+                .anyRequest().authenticated()
+            )
+            .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
-    return http.build();
-}
+        return http.build();
+    }
 
+    // 2. Crea este Bean para que el filtro de seguridad lo encuentre
     @Bean
-    public CorsFilter corsFilter() {
+    public org.springframework.web.cors.CorsConfigurationSource corsConfigurationSource() {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         CorsConfiguration config = new CorsConfiguration();
         
         config.setAllowCredentials(true);
-        config.setAllowedOriginPatterns(List.of("*"));
+        config.setAllowedOriginPatterns(List.of("*")); // O mejor: List.of("http://localhost:5173")
         config.setAllowedHeaders(List.of("*"));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         
         source.registerCorsConfiguration("/**", config);
-        return new CorsFilter(source);
+        return source;
     }
 }

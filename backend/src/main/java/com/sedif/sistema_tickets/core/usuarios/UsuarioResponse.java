@@ -9,7 +9,8 @@ public record UsuarioResponse(
         Boolean disponibleSoporte,
         Long areaId,
         String areaNombre,
-        String passwordTemporal // <--- Nuevo campo
+        Boolean passwordTemporal,
+        String passwordTemporalTexto
 ) {
     // Método estándar para lectura normal
     public static UsuarioResponse desdeEntidad(Usuario usuario) {
@@ -22,7 +23,8 @@ public record UsuarioResponse(
                 usuario.getDisponibleSoporte(),
                 usuario.getArea() != null ? usuario.getArea().getId() : null,
                 usuario.getArea() != null ? usuario.getArea().getNombre() : "Sin Área asignada",
-                null // En lectura normal no enviamos contraseña
+                usuario.getPasswordTemporal(), // El booleano del estado
+                null // Sin texto plano
         );
     }
 
@@ -37,6 +39,7 @@ public record UsuarioResponse(
                 usuario.getDisponibleSoporte(),
                 usuario.getArea() != null ? usuario.getArea().getId() : null,
                 usuario.getArea() != null ? usuario.getArea().getNombre() : "Sin Área asignada",
+                true, // Al crear, forzamos que sea true
                 passwordTemporal // Enviamos la contraseña aquí
         );
     }
