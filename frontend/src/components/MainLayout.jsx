@@ -19,6 +19,7 @@ import LogoutIcon from '@mui/icons-material/Logout';
 
 import AddIcon from '@mui/icons-material/Add';
 import ListIcon from '@mui/icons-material/List';
+import DescriptionIcon from '@mui/icons-material/Description';
 const drawerWidth = 240;
 
 export default function MainLayout({ children }) {
@@ -90,6 +91,15 @@ export default function MainLayout({ children }) {
                                 <ListIcon sx={{ color: '#5c0a28' }} /> {/* <-- CAMBIO AQUÍ */}
                             </ListItemIcon>
                         </ListItemButton>
+                    </ListItem>
+                    <ListItem disablePadding sx={{ display: 'block' }}>
+                        <Tooltip title="Generar Documento" placement="right">
+                            <ListItemButton onClick={() => navigate('/documentos')} sx={{ justifyContent: 'center', py: 2 }}>
+                                <ListItemIcon sx={{ minWidth: 0, justifyContent: 'center' }}>
+                                    <DescriptionIcon sx={{ color: '#5c0a28' }} />
+                                </ListItemIcon>
+                            </ListItemButton>
+                        </Tooltip>
                     </ListItem>
                 </List>
             </Drawer>

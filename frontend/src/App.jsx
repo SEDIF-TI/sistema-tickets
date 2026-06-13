@@ -11,6 +11,7 @@ import FormularioTicket from './pages/empleado/FormularioTicket';
 import TicketsPage from './pages/tickets/TicketsPage';
 import SoporteLayout from './components/SoporteLayout.jsx';
 import PanelSoporte from './pages/soporte/PanelSoporte.jsx';
+import GeneradorDocumentos from './components/GeneradorDocumentos.jsx';
 
 // Páginas de prueba temporales para verificar que las rutas funcionan
 const LevantarTicket = () => <Typography variant="h4">Formulario: Crear Nuevo Ticket</Typography>;
@@ -35,6 +36,7 @@ function App() {
               <Route path="/admin/dashboard" element={<MainLayout><Dashboard /></MainLayout>} />
               {/* Debes tener esta línea para que el router no te expulse */}
               <Route path="/soporte/nuevo" element={<SoporteLayout><FormularioTicket /></SoporteLayout>} />
+              <Route path="/documentos" element={<SoporteLayout><GeneradorDocumentos /></SoporteLayout>} />
 
               {/* Redirección por defecto */}
               <Route path="*" element={<Navigate to="/login" replace />} />
