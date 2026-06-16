@@ -12,20 +12,18 @@ import {
     ListItem, 
     ListItemButton, 
     ListItemIcon, 
-    Button,
-    Tooltip
+    Tooltip,
+    Divider
 } from '@mui/material';
 import LogoutIcon from '@mui/icons-material/Logout';
 
-import AddIcon from '@mui/icons-material/Add';
-import ListIcon from '@mui/icons-material/List';
-import DescriptionIcon from '@mui/icons-material/Description';
 const drawerWidth = 240;
 
 export default function MainLayout({ children }) {
     const { user, logout } = useContext(AuthContext);
     const navigate = useNavigate();
 
+    // Ahora las vistas vienen dinámicamente desde la base de datos
     const vistas = user?.vistas || [];
 
     return (
@@ -35,73 +33,38 @@ export default function MainLayout({ children }) {
                     <Typography variant="h6" noWrap component="div" sx={{ fontWeight: 'bold' }}>
                         SEDIF - Sistema de Tickets
                     </Typography>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                        <Typography variant="body2">
-                            {user?.nombre} ({user?.rol})
-                        </Typography>
-                        <Button 
-                            color="inherit" 
-                            startIcon={<LogoutIcon />} 
-                            onClick={() => { logout(); navigate('/login'); }}
-                        >
-                            Salir
-                        </Button>
-                    </Box>
+                    <LogoutIcon onClick={() => { logout(); navigate('/login'); }} sx={{ cursor: 'pointer' }} />
                 </Toolbar>
             </AppBar>
 
             <Drawer
                 variant="permanent"
                 sx={{
-                    width: 70,
+                    width: drawerWidth,
                     flexShrink: 0,
-                    [`& .MuiDrawer-paper`]: { width: 70, overflowX: 'hidden' },
+                    [`& .MuiDrawer-paper`]: { width: drawerWidth, boxSizing: 'border-box', mt: 8 },
                 }}
             >
-                <Toolbar />
                 <List>
                     {vistas.map((vista, index) => {
                         const Icono = getIcon(vista.icono);
                         return (
                             <ListItem key={index} disablePadding sx={{ display: 'block' }}>
-                                <Tooltip title={vista.nombre || 'Menú'} placement="right">
-                                    <ListItemButton onClick={() => navigate(vista.ruta)} sx={{ justifyContent: 'center', py: 2 }}>
+                                <Tooltip title={vista.nombre} placement="right">
+                                    <ListItemButton 
+                                        onClick={() => navigate(vista.ruta)} 
+                                        sx={{ justifyContent: 'center', py: 2 }}
+                                    >
                                         <ListItemIcon sx={{ minWidth: 0, justifyContent: 'center' }}>
-                                            <Icono color="primary" />
+                                            <Icono sx={{ color: '#5c0a28' }} />
                                         </ListItemIcon>
                                     </ListItemButton>
                                 </Tooltip>
                             </ListItem>
                         );
                     })}
-                    {/* Botones Fijos para Empleado */}
-                    {/* Botones Fijos para Empleado */}
-                    {/* Botones Fijos para Empleado */}
-                    <ListItem disablePadding sx={{ display: 'block' }}>
-                        <ListItemButton onClick={() => navigate('/empleado/nuevo')} sx={{ justifyContent: 'center', py: 2 }}>
-                            <ListItemIcon sx={{ minWidth: 0, justifyContent: 'center' }}>
-                                <AddIcon sx={{ color: '#5c0a28' }} /> {/* <-- CAMBIO AQUÍ */}
-                            </ListItemIcon>
-                        </ListItemButton>
-                    </ListItem>
-
-                    <ListItem disablePadding sx={{ display: 'block' }}>
-                        <ListItemButton onClick={() => navigate('/empleado/historial')} sx={{ justifyContent: 'center', py: 2 }}>
-                            <ListItemIcon sx={{ minWidth: 0, justifyContent: 'center' }}>
-                                <ListIcon sx={{ color: '#5c0a28' }} /> {/* <-- CAMBIO AQUÍ */}
-                            </ListItemIcon>
-                        </ListItemButton>
-                    </ListItem>
-                    <ListItem disablePadding sx={{ display: 'block' }}>
-                        <Tooltip title="Generar Documento" placement="right">
-                            <ListItemButton onClick={() => navigate('/documentos')} sx={{ justifyContent: 'center', py: 2 }}>
-                                <ListItemIcon sx={{ minWidth: 0, justifyContent: 'center' }}>
-                                    <DescriptionIcon sx={{ color: '#5c0a28' }} />
-                                </ListItemIcon>
-                            </ListItemButton>
-                        </Tooltip>
-                    </ListItem>
                 </List>
+                <Divider />
             </Drawer>
 
             <Box component="main" sx={{ flexGrow: 1, p: 3, mt: 8 }}>

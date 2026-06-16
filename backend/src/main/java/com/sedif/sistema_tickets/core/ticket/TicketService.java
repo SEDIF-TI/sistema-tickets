@@ -4,6 +4,7 @@ import com.sedif.sistema_tickets.core.usuarios.Usuario;
 import com.sedif.sistema_tickets.core.usuarios.UsuarioRepository;
 import com.sedif.sistema_tickets.core.estatusticket.Estatus;
 import com.sedif.sistema_tickets.core.estatusticket.EstatusRepository;
+import com.sedif.sistema_tickets.core.telegram.SedifTelegramBot;
 import com.sedif.sistema_tickets.core.ticket.bitacora.Bitacora;
 import com.sedif.sistema_tickets.core.ticket.bitacora.BitacoraRepository;
 import com.sedif.sistema_tickets.core.ticket.filtros.TicketFiltroStrategy;
@@ -20,56 +21,77 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class TicketService {
 
+    private final SedifTelegramBot telegramBot;
     private final TicketRepository ticketRepository;
     private final UsuarioRepository usuarioRepository;
     private final EstatusRepository estatusRepository;
     private final Map<String, TicketFiltroStrategy> estrategiasFiltro;
     private final BitacoraRepository bitacoraRepository;
+
+
     @Transactional
-    public Ticket crearTicket(TicketRequestRecord request, String identificadorUsuario) {
-        
-    System.out.println("DEBUG: Intentando crear ticket para usuario con identificador: " + identificadorUsuario);
-        
-        // 1. Buscamos al usuario
-        Usuario usuario = usuarioRepository.findByCorreoOrUsername(identificadorUsuario.trim(), identificadorUsuario.trim())
-                .orElseGet(() -> {
-                    System.err.println("DEBUG: Falló búsqueda exacta. Intentando buscar por correo en minúsculas...");
-                    return usuarioRepository.findByCorreoOrUsername(identificadorUsuario.toLowerCase(), identificadorUsuario.toLowerCase())
-                            .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado en BD: " + identificadorUsuario));
-                });
+    public Ticket crearTicket(TicketRequestRecord request, String correoUsuario) {
+        // 1. Buscar al usuario solicitante
+        Usuario usuario = usuarioRepository.findByCorreo(correoUsuario)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
 
-        // CORRECCIÓN 1: Buscamos la entidad Estatus real en la base de datos
+        // 2. Buscar Estatus (Estrategia de negocio)
         Estatus estatusAbierto = estatusRepository.findByNombre("ABIERTO")
-                .orElseThrow(() -> new IllegalStateException("Error del sistema: El estatus ABIERTO no está configurado en la BD."));
+                .orElseThrow(() -> new IllegalStateException("Estatus ABIERTO no configurado en la base de datos"));
 
-        // 2. Creamos la base del ticket
+        // 3. Construcción del Ticket
         Ticket nuevoTicket = new Ticket();
         nuevoTicket.setTitulo(request.titulo());
         nuevoTicket.setDescripcion(request.descripcion());
-
         nuevoTicket.setSede(request.sede());
-        
-        // CORRECCIÓN 2: Usamos los nombres correctos de tu entidad
         nuevoTicket.setUsuarioArea(usuario); 
         nuevoTicket.setEstatus(estatusAbierto); 
-        
         nuevoTicket.setFechaCreacion(LocalDateTime.now());
+        nuevoTicket.setCreadoPor(usuario.getCorreo());
+        
+        // 4. Asignación de Prioridad (Con validación robusta)
+        String prioridad = (request.prioridad() != null && !request.prioridad().isBlank()) 
+                           ? request.prioridad() 
+                           : "NORMAL"; 
+        nuevoTicket.setPrioridad(prioridad);
 
-        // 3. APLICAMOS LA REGLA DE NEGOCIO DE PRIORIDAD
-        if (usuario.getArea() != null && Boolean.TRUE.equals(usuario.getArea().getPrioritaria())) {
-            nuevoTicket.setPrioridad("ALTA");
+        // 5. LÓGICA UNIFICADA DE ASIGNACIÓN (Auto-asignación vs Balanceador)
+        if (usuario.getRol() != null && "SOPORTE".equals(usuario.getRol().getNombre())) {
+            // REGLA: Si quien levanta el ticket es de soporte, se lo auto-asigna
+            nuevoTicket.setUsuarioSoporte(usuario);
+            System.out.println("DEBUG: Ticket auto-asignado al técnico creador: " + usuario.getNombre());
         } else {
-            nuevoTicket.setPrioridad("NORMAL");
+            // REGLA: Si es un empleado de otra área, usamos el balanceador de cargas
+            Usuario soporteAsignado = resolverAsignacion(usuario);
+            if (soporteAsignado != null) {
+                nuevoTicket.setUsuarioSoporte(soporteAsignado);
+                System.out.println("DEBUG: Ticket #" + nuevoTicket.getId() + " asignado por balanceador a: " + soporteAsignado.getNombre());
+            } else {
+                System.err.println("WARNING: Ticket creado sin técnico asignado.");
+            }
         }
 
-        // CORRECCIÓN 3: Ejecutamos tu balanceador para asignar al técnico adecuado
-        Usuario soporteAsignado = resolverAsignacion(usuario);
-        if (soporteAsignado != null) {
-            nuevoTicket.setUsuarioSoporte(soporteAsignado);
+        // 6. Persistencia (¡Se guarda una sola vez!)
+        Ticket ticketGuardado = ticketRepository.save(nuevoTicket);
+
+        // 7. Notificación automática por Telegram
+        if (ticketGuardado.getUsuarioSoporte() != null && 
+            ticketGuardado.getUsuarioSoporte().getTelegramChatId() != null) {
+            
+            String mensaje = "🚨 *NUEVO TICKET ASIGNADO* 🚨\n\n" +
+                             "🆔 *ID:* #" + ticketGuardado.getId() + "\n" +
+                             "📌 *Título:* " + ticketGuardado.getTitulo();
+            
+            try {
+                telegramBot.enviarMensaje(ticketGuardado.getUsuarioSoporte().getTelegramChatId(), mensaje);
+                System.out.println("✅ [SISTEMA] Notificación de Telegram enviada con éxito.");
+            } catch (Exception e) {
+                System.err.println("❌ [SISTEMA] Error al enviar notificación a Telegram: " + e.getMessage());
+            }
         }
 
-        // 4. Guardamos en la base de datos
-        return ticketRepository.save(nuevoTicket);
+        // 8. Retorno final correcto
+        return ticketGuardado;
     }
 
     private Usuario resolverAsignacion(Usuario usuarioArea) {
@@ -150,38 +172,31 @@ public class TicketService {
 
     @Transactional
     public Ticket finalizarTicketPorEmpleado(Long ticketId, String correoUsuario) {
-        // 1. Buscamos el ticket
+        Usuario usuario = usuarioRepository.findByCorreo(correoUsuario)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
         Ticket ticket = ticketRepository.findById(ticketId)
                 .orElseThrow(() -> new IllegalArgumentException("Ticket no encontrado"));
 
-        // 2. Seguridad: Validamos que quien intenta cerrar el ticket es quien lo creó
-        if (!ticket.getCreadoPor().equals(correoUsuario)) {
-            throw new SecurityException("No tienes permiso para finalizar este ticket. Solo el creador puede hacerlo.");
+        // Seguridad: Filtro invisible por Área
+        if (!ticket.getUsuarioArea().getArea().getId().equals(usuario.getArea().getId())) {
+            throw new SecurityException("No tienes permiso: El ticket pertenece a otra área.");
         }
     
-        // 3. Buscamos el estatus final usando las clases correctas de tu proyecto
-        Estatus estatusCerrado = estatusRepository.findByNombre("CERRADO") 
-                .orElseThrow(() -> new IllegalArgumentException("El estatus CERRADO no existe en la base de datos"));
-
-        // 4. Actualizamos y guardamos (usando el setter correcto)
-        ticket.setEstatus(estatusCerrado);
+        ticket.setEstatus(estatusRepository.findByNombre("CERRADO").orElseThrow());
+        ticket.setFechaFin(LocalDateTime.now());
         return ticketRepository.save(ticket);
     }
 
     @Transactional(readOnly = true)
     public List<TicketResponse> obtenerTicketsDeMiArea(String correoUsuario) {
-        // 1. Buscamos al usuario logueado
-        Usuario empleado = usuarioRepository.findByCorreoOrUsername(correoUsuario, correoUsuario)
+        Usuario empleado = usuarioRepository.findByCorreo(correoUsuario)
                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
 
-        // 2. Verificamos que tenga un área asignada
-        if (empleado.getArea() == null) {
-            throw new IllegalStateException("El usuario no tiene un área asignada para ver el historial.");
-        }
+        if (empleado.getArea() == null) throw new IllegalStateException("Usuario sin área.");
 
-        // 3. Buscamos los tickets de su área y los mapeamos a la respuesta
-        Long miAreaId = empleado.getArea().getId();
-        return ticketRepository.findByUsuarioArea_Area_IdOrderByFechaCreacionDesc(miAreaId)
+        // Aplicamos el filtro invisible de base de datos
+        // En tu método obtenerTicketsDeMiArea:
+        return ticketRepository.findByUsuarioAreaAreaIdOrderByFechaCreacionDesc(empleado.getArea().getId())
                 .stream()
                 .map(this::mapearATicketResponse)
                 .toList();

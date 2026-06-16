@@ -9,6 +9,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.sedif.sistema_tickets.core.usuarios.VistaDTO;
+
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -49,19 +51,22 @@ public class AuthService {
         String tokenJwt = jwtService.generarToken(usuario);
 
         // NUEVO: Transformar las Vistas de la base de datos a VistaDTO
-        List<VistaDTO> vistasPermitidas = usuario.getRol().getVistas().stream()
-                .filter(vista -> vista.getActivo() != null && vista.getActivo()) // Filtramos solo las activas
-                .map(vista -> new VistaDTO(vista.getNombre(), vista.getRuta(), vista.getIcono()))
-                .collect(Collectors.toList());
+        List<VistaDTO> vistasPermitidas = new ArrayList<>();
+    
+        if (usuario.getRol() != null && usuario.getRol().getVistas() != null) {
+            vistasPermitidas = usuario.getRol().getVistas().stream()
+                    .filter(v -> Boolean.TRUE.equals(v.getActivo()))
+                    .map(v -> new VistaDTO(v.getNombre(), v.getRuta(), v.getIcono()))
+                    .collect(Collectors.toList());
+        }
 
-        // 5. Retorno
         return new AuthResponseRecord(
                 usuario.getId(),
                 usuario.getNombre(),
                 usuario.getRol().getNombre(),
                 tokenJwt,
                 "Autenticación exitosa.",
-                vistasPermitidas // <-- Pasamos las vistas aquí
+                vistasPermitidas // Ahora enviamos una lista vacía si no hay vistas, evitando el error
         );
     }
 

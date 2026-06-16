@@ -8,5 +8,6 @@ public record UsuarioRequest(
         String password,
         Long rolId,
         // Solo será obligatorio si el rol es AREA
-        Long areaId
+        Long areaId,
+        boolean disponibleSoporte
 ) {}
