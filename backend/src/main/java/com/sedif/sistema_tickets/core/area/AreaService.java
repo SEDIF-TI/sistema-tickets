@@ -6,6 +6,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import api from './api';
+
 import java.util.List;
 
 @Service
@@ -48,6 +50,11 @@ public class AreaService {
         
         if (record.activo() != null) {
             areaExistente.setActivo(record.activo());
+        }
+
+        // Dentro de actualizarArea en AreaService.java
+        if (record.prioritaria() != null) {
+            areaExistente.setPrioritaria(record.prioritaria());
         }
 
         Area areaActualizada = areaRepository.save(areaExistente);
