@@ -13,43 +13,52 @@ import java.util.List;
  * Controlador REST que expone los endpoints para la gestión de usuarios.
  */
 @RestController
-@RequestMapping("/api/usuarios")
-@RequiredArgsConstructor // Lombok: Genera automáticamente el constructor para inyectar UsuarioService
+// CAMBIO 1: Ruta exacta que espera tu frontend y tu SecurityConfig
+@RequestMapping("/api/v1/admin/usuarios") 
+@RequiredArgsConstructor 
 public class UsuarioResource {
 
     private final UsuarioService usuarioService;
 
-    /**
-     * Endpoint para crear un usuario.
-     * Método HTTP: POST
-     * URL: http://localhost:8080/api/usuarios
-     */
     @PostMapping
     public ResponseEntity<?> crearUsuario(@RequestBody UsuarioRequest request) {
         try {
             UsuarioResponse response = usuarioService.crearUsuario(request);
             return ResponseEntity.status(HttpStatus.CREATED).body(response);
         } catch (IllegalArgumentException e) {
-            // Si falla una validación, devolvemos un código 400 (Bad Request) con el mensaje de error
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
 
-    /**
-     * Endpoint para listar usuarios.
-     * Método HTTP: GET
-     * URL: http://localhost:8080/api/usuarios
-     */
     @GetMapping
     public ResponseEntity<List<UsuarioResponse>> listarUsuarios() {
         return ResponseEntity.ok(usuarioService.listarUsuarios());
     }
 
+    // --- CAMBIO 2: Endpoints faltantes para los botones de React ---
 
-    /**
-     * Endpoint para cambiar la disponibilidad de un usuario de soporte.
-     * Método HTTP: PATCH
-     */
+    @PutMapping("/{id}/reset-password")
+    public ResponseEntity<?> resetearPassword(@PathVariable Long id) {
+        try {
+            UsuarioResponse response = usuarioService.resetearPassword(id);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @PutMapping("/{id}/toggle-estado")
+    public ResponseEntity<?> alternarEstado(@PathVariable Long id) {
+        try {
+            UsuarioResponse response = usuarioService.alternarEstadoUsuario(id);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    // --- Fin de los endpoints nuevos ---
+
     @PatchMapping("/{id}/disponibilidad")
     public ResponseEntity<?> actualizarDisponibilidad(
             @PathVariable Long id, 
@@ -62,11 +71,6 @@ public class UsuarioResource {
         }
     }
 
-    /**
-     * Endpoint para realizar la baja lógica (inactivación) de un usuario.
-     * Método HTTP: DELETE
-     * URL: http://localhost:8080/api/usuarios/{id}
-     */
     @DeleteMapping("/{id}")
     public ResponseEntity<?> inactivarUsuario(@PathVariable Long id) {
         try {
@@ -77,11 +81,6 @@ public class UsuarioResource {
         }
     }
 
-    /**
-     * Endpoint para actualizar la información de un usuario.
-     * Método HTTP: PUT
-     * URL: http://localhost:8080/api/usuarios/{id}
-     */
     @PutMapping("/{id}")
     public ResponseEntity<?> actualizarUsuario(
             @PathVariable Long id, 
@@ -94,12 +93,10 @@ public class UsuarioResource {
         }
     }
 
-    // En UsuarioResource.java (o crea un AuthResource especializado)
+    // ADVERTENCIA: Este endpoint ahora vive en /api/v1/admin/usuarios/password
     @PutMapping("/password")
     public ResponseEntity<String> cambiarPassword(@RequestBody CambioPasswordRequest request, Principal principal) {
-        // principal.getName() nos da el correo del usuario logueado
         usuarioService.actualizarPassword(principal.getName(), request.nuevaPassword());
         return ResponseEntity.ok("Contraseña actualizada correctamente.");
     }
-
 }

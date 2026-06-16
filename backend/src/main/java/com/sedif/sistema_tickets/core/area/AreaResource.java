@@ -7,7 +7,8 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/areas")
+// CAMBIO 1: Alineamos la ruta con el estándar v1/admin
+@RequestMapping("/api/v1/admin/areas") 
 @RequiredArgsConstructor 
 public class AreaResource {
 
@@ -34,7 +35,6 @@ public class AreaResource {
         return ResponseEntity.noContent().build();
     }
 
-    // --- NUEVO ENDPOINT INTEGRADO ---
     @PatchMapping("/{id}/soporte-fijo")
     public ResponseEntity<AreaResponse> asignarSoporteFijo(
             @PathVariable Long id,

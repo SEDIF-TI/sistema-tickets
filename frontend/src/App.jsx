@@ -14,6 +14,8 @@ import TicketsPage from './pages/tickets/TicketsPage';
 import PanelSoporte from './pages/soporte/PanelSoporte.jsx';
 import AdminUsuariosPage from './pages/admin/AdminUsuariosPage.jsx';
 import { Typography } from '@mui/material';
+import AdminAreasPage from './pages/admin/AdminAreasPage';
+
 
 // Páginas de prueba temporales (puedes reemplazarlas por tus componentes reales)
 const Dashboard = () => <Typography variant="h4">Dashboard General del Administrador</Typography>;
@@ -36,6 +38,7 @@ function App() {
               <Route path="/empleado/historial" element={<MainLayout><TicketsPage /></MainLayout>} />
               <Route path="/admin/dashboard" element={<MainLayout><Dashboard /></MainLayout>} />
               <Route path="/admin/usuarios" element={<MainLayout><AdminUsuariosPage /></MainLayout>} />
+              <Route path="/admin/areas" element={<MainLayout><AdminAreasPage /></MainLayout>} />
 
               {/* Rutas protegidas bajo SoporteLayout */}
               <Route path="/soporte/bandeja" element={<SoporteLayout><PanelSoporte /></SoporteLayout>} />

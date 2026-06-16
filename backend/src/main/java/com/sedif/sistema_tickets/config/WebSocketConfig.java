@@ -13,10 +13,9 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         // 1. PUNTO DE ENTRADA (HANDSHAKE)
-        // El frontend apuntará a "http://localhost:8080/ws-tickets" para conectarse.
         registry.addEndpoint("/ws-tickets")
-                // Permite conexiones desde su frontend en Vite (puerto 5173 u otros)
-                .setAllowedOriginPatterns("*") 
+                // CAMBIO AQUÍ: Usar el origen exacto de React para evitar el bloqueo de CORS/SockJS
+                .setAllowedOrigins("http://localhost:5173") 
                 // Habilita el modo de compatibilidad HTTP si el WebSocket nativo falla
                 .withSockJS(); 
     }
@@ -24,11 +23,9 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Override
     public void configureMessageBroker(MessageBrokerRegistry config) {
         // 2. CANALES DE SALIDA (DEL SERVIDOR AL FRONTEND)
-        // Todo lo que el servidor difunda empezará con "/topic" (ej. "/topic/avisos")
         config.enableSimpleBroker("/topic");
         
         // 3. CANALES DE ENTRADA (DEL FRONTEND AL SERVIDOR)
-        // Todo lo que el frontend envíe al backend deberá empezar con "/app"
         config.setApplicationDestinationPrefixes("/app");
     }
 }

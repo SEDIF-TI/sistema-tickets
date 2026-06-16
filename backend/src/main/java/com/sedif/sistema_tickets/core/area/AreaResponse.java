@@ -5,7 +5,8 @@ public record AreaResponse(
         String nombre,
         Boolean activo,
         Long soporteFijoId,
-        String soporteFijoNombre
+        String soporteFijoNombre,
+        Boolean prioritaria
 ) {
     /**
      * Transforma una Entidad Area en un Record de respuesta de forma segura.
@@ -16,7 +17,8 @@ public record AreaResponse(
                 area.getNombre(),
                 area.getActivo(),
                 area.getSoporteFijo() != null ? area.getSoporteFijo().getId() : null,
-                area.getSoporteFijo() != null ? area.getSoporteFijo().getNombre() : "Sin soporte fijo asignado"
+                area.getSoporteFijo() != null ? area.getSoporteFijo().getNombre() : "Sin soporte fijo asignado",
+                area.getPrioritaria()
         );
     }
 }

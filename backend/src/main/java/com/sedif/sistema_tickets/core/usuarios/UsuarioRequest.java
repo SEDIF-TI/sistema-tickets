@@ -5,6 +5,7 @@ package com.sedif.sistema_tickets.core.usuarios;
 public record UsuarioRequest(
         String nombre,
         String correo,
+        String username,
         String password,
         Long rolId,
         // Solo será obligatorio si el rol es AREA

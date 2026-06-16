@@ -40,6 +40,7 @@ public class UsuarioService {
         Usuario nuevoUsuario = new Usuario();
         nuevoUsuario.setNombre(request.nombre());
         nuevoUsuario.setCorreo(request.correo());
+        nuevoUsuario.setUsername(request.username());
         
         // 3. Encriptar contraseña y activar bandera de cambio forzoso
         nuevoUsuario.setPassword(passwordEncoder.encode(passwordTemporal));
