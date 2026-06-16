@@ -4,7 +4,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import com.sedif.sistema_tickets.core.usuarios.dto.CambioPasswordRequest;
 
+import java.security.Principal;
 import java.util.List;
 
 /**
@@ -90,6 +92,14 @@ public class UsuarioResource {
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
+    }
+
+    // En UsuarioResource.java (o crea un AuthResource especializado)
+    @PutMapping("/password")
+    public ResponseEntity<String> cambiarPassword(@RequestBody CambioPasswordRequest request, Principal principal) {
+        // principal.getName() nos da el correo del usuario logueado
+        usuarioService.actualizarPassword(principal.getName(), request.nuevaPassword());
+        return ResponseEntity.ok("Contraseña actualizada correctamente.");
     }
 
 }

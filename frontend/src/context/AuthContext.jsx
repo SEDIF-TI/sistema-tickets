@@ -14,9 +14,10 @@ export const AuthProvider = ({ children }) => {
         setLoading(false);
     }, []);
 
+    // AuthContext.jsx
     const login = async (identificador, password) => {
         const response = await api.post('/v1/auth/login', { identificador, password });
-        const userData = response.data; // { usuarioId, nombre, rol, token, mensaje }
+        const userData = response.data; // { id, nombre, rol, token, mensaje, vistas }
         
         localStorage.setItem('user', JSON.stringify(userData));
         setUser(userData);
