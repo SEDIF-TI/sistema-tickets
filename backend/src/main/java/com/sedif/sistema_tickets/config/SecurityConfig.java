@@ -52,11 +52,14 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll() 
                 .requestMatchers("/api/v1/auth/**").permitAll()
                 .requestMatchers("/ws-tickets/**").permitAll()
+                .requestMatchers("/error").permitAll()
                 
-                // AGREGA ESTA LÍNEA PARA VER LOS ERRORES REALES:
-                .requestMatchers("/error").permitAll() 
+                // --- LA EXCEPCIÓN: Cualquier usuario logueado puede actualizar su clave ---
+                .requestMatchers("/api/v1/admin/usuarios/password", "/api/usuarios/password").authenticated()
                 
+                // --- La regla de administradores (DEBE IR DESPUÉS DE LA EXCEPCIÓN) ---
                 .requestMatchers("/api/v1/admin/**").hasAnyAuthority("ADMINISTRADOR", "ROLE_ADMINISTRADOR")
+                
                 .anyRequest().authenticated()
             )
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
