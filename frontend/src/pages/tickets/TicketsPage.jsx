@@ -104,7 +104,7 @@ export default function TicketsPage() {
                     variant="contained" 
                     color="primary"
                     startIcon={<AddIcon />} 
-                    onClick={() => navigate('/empleado/nuevo')}
+                    onClick={() => navigate('/tickets/nuevo')}
                 >
                     Levantar Ticket
                 </Button>

@@ -49,8 +49,13 @@ public class SecurityConfig {
                 })
             )
             .authorizeHttpRequests(auth -> auth
+                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll() 
                 .requestMatchers("/api/v1/auth/**").permitAll()
                 .requestMatchers("/ws-tickets/**").permitAll()
+                
+                // AGREGA ESTA LÍNEA PARA VER LOS ERRORES REALES:
+                .requestMatchers("/error").permitAll() 
+                
                 .requestMatchers("/api/v1/admin/**").hasAnyAuthority("ADMINISTRADOR", "ROLE_ADMINISTRADOR")
                 .anyRequest().authenticated()
             )
