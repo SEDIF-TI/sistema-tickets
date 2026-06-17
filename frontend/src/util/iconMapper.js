@@ -1,16 +1,23 @@
-import AddCircleIcon from '@mui/icons-material/AddCircle';
-import AssignmentIcon from '@mui/icons-material/Assignment';
 import DashboardIcon from '@mui/icons-material/Dashboard';
-
-// Este objeto asocia el texto del backend con el componente real de MUI
-const iconMap = {
-    'AddCircleIcon': AddCircleIcon,
-    'AssignmentIcon': AssignmentIcon,
-    'DashboardIcon': DashboardIcon,
-};
+import PeopleIcon from '@mui/icons-material/People';
+import BusinessIcon from '@mui/icons-material/Business';
+import ConfirmationNumberIcon from '@mui/icons-material/ConfirmationNumber';
+import HistoryIcon from '@mui/icons-material/History'; // <-- Ícono de reloj para historial
+import LabelIcon from '@mui/icons-material/Label';
 
 export const getIcon = (iconName) => {
-    // Si el icono existe en nuestro mapa, lo devuelve; si no, pone uno por defecto
-    const IconComponent = iconMap[iconName];
-    return IconComponent ? IconComponent : DashboardIcon;
+    switch (iconName) {
+        case 'dashboard':
+            return DashboardIcon;
+        case 'usuarios':
+            return PeopleIcon;
+        case 'areas':
+            return BusinessIcon;
+        case 'tickets':
+            return ConfirmationNumberIcon;
+        case 'historial': // <-- Agregamos el caso exacto
+            return HistoryIcon; 
+        default:
+            return LabelIcon; // Cambiamos el por defecto
+    }
 };

@@ -19,10 +19,14 @@ public class JwtService {
     // Es una llave de 256-bits codificada en Base64. NUNCA la comparta.
     private static final String SECRET_KEY = "404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970";
 
-    public String generarToken(Usuario usuario) {
+public String generarToken(Usuario usuario) {
         Map<String, Object> extraClaims = new HashMap<>();
         extraClaims.put("rol", usuario.getRol().getNombre());
         extraClaims.put("nombre", usuario.getNombre());
+        
+        // ¡AGREGA ESTA LÍNEA PARA AVISARLE A REACT!
+        // Usamos una validación por si algún usuario viejo tiene este campo nulo en la BD
+        extraClaims.put("passwordTemporal", usuario.getPasswordTemporal() != null ? usuario.getPasswordTemporal() : false);
 
         return Jwts.builder()
                 .setClaims(extraClaims)
