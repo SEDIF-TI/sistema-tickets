@@ -1,57 +1,105 @@
+import React, { useContext } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { Typography } from '@mui/material';
+
+// --- Material UI y Temas ---
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import theme from './theme/theme.js';
-import { AuthProvider } from './context/AuthContext.jsx';
+
+// --- Contextos Globales ---
+import { AuthProvider, AuthContext } from './context/AuthContext.jsx';
 import { WebSocketProvider } from './context/WebSocketContext.jsx';
-import LoginPage from './pages/LoginPage.jsx';
+
+// --- Layouts ---
 import MainLayout from './components/MainLayout.jsx';
-import SoporteLayout from './components/SoporteLayout.jsx';
+// Importamos SoporteLayout por si en el futuro quieres separar el menú visualmente
+import SoporteLayout from './components/SoporteLayout.jsx'; 
 
-// Tus componentes de páginas
-import FormularioTicket from './pages/empleado/FormularioTicket';
-import TicketsPage from './pages/tickets/TicketsPage';
-import PanelSoporte from './pages/soporte/PanelSoporte.jsx';
-import GeneradorDocumentos from './components/GeneradorDocumentos.jsx';
+// --- Páginas Públicas / Seguridad ---
+import LoginPage from './pages/LoginPage.jsx';
+import PrimerCambioPassword from './pages/PrimerCambioPassword.jsx';
+
+// --- Páginas de Administrador ---
 import AdminUsuariosPage from './pages/admin/AdminUsuariosPage.jsx';
-import adminAreasPage from './pages/admin/AdminAreasPage.jsx';
-import { Typography } from '@mui/material';
+import AdminAreasPage from './pages/admin/AdminAreasPage.jsx';
 
-// Páginas de prueba temporales (puedes reemplazarlas por tus componentes reales)
-const Dashboard = () => <Typography variant="h4">Dashboard General del Administrador</Typography>;
+// --- Páginas de Empleado / Soporte ---
+import FormularioTicket from './pages/empleado/FormularioTicket.jsx';
+import TicketsPage from './pages/tickets/TicketsPage.jsx';
+import PanelSoporte from './pages/soporte/PanelSoporte.jsx';
+// RECUPERADO DE TU CÓDIGO: El generador de PDF que tú hiciste
+import GeneradorDocumentos from './components/GeneradorDocumentos.jsx';
 
-function App() {
-  return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      {/* Proveedores globales primero */}
-      <AuthProvider>
-        <WebSocketProvider>
-          {/* Router adentro para que los contextos sean accesibles */}
-          <Router>
+// Página de prueba temporal
+const DashboardPage = () => <Typography variant="h4">Dashboard General del Administrador</Typography>;
+
+// ----------------------------------------------------------------------
+// 1. COMPONENTE INTERNO: Manejo de Seguridad y Rutas
+// ----------------------------------------------------------------------
+function AppContent() {
+    const { user } = useContext(AuthContext);
+
+    // 1. SI NO ESTÁ LOGUEADO: Mandarlo al Login automáticamente
+    if (!user) {
+        return (
             <Routes>
-              {/* Ruta pública */}
-              <Route path="/login" element={<LoginPage />} />
-
-              {/* Rutas protegidas bajo MainLayout */}
-              <Route path="/empleado/nuevo" element={<MainLayout><FormularioTicket /></MainLayout>} />
-              <Route path="/empleado/historial" element={<MainLayout><TicketsPage /></MainLayout>} />
-              <Route path="/admin/dashboard" element={<MainLayout><Dashboard /></MainLayout>} />
-              <Route path="/admin/usuarios" element={<MainLayout><AdminUsuariosPage /></MainLayout>} />
-
-              {/* Rutas protegidas bajo SoporteLayout */}
-              <Route path="/soporte/bandeja" element={<SoporteLayout><PanelSoporte /></SoporteLayout>} />
-              <Route path="/soporte/nuevo" element={<SoporteLayout><FormularioTicket /></SoporteLayout>} />
-              <Route path="/documentos" element={<SoporteLayout><GeneradorDocumentos /></SoporteLayout>} />
-
-              {/* Redirección por defecto */}
-              <Route path="*" element={<Navigate to="/login" replace />} />
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="*" element={<Navigate to="/login" replace />} />
             </Routes>
-          </Router>
-        </WebSocketProvider>
-      </AuthProvider>
-    </ThemeProvider>
-  );
+        );
+    }
+
+    // 2. INTERCEPTOR CRÍTICO: Bloqueamos el resto si su clave es temporal
+    if (user.passwordTemporal) {
+        return (
+            <Routes>
+                <Route path="/primer-cambio" element={<PrimerCambioPassword />} />
+                <Route path="*" element={<Navigate to="/primer-cambio" replace />} />
+            </Routes>
+        );
+    }
+
+    // 3. SI TODO ESTÁ BIEN Y ES UN USUARIO VÁLIDO: Acceso normal a la aplicación
+    return (
+        <MainLayout>
+            <Routes>
+                {/* Rutas de Admin */}
+                <Route path="/admin/dashboard" element={<DashboardPage />} />
+                <Route path="/admin/usuarios" element={<AdminUsuariosPage />} />
+                <Route path="/admin/areas" element={<AdminAreasPage />} />
+                
+                {/* Rutas de Tickets Generales (Unificadas para que funcionen para todos) */}
+                <Route path="/tickets/nuevo" element={<FormularioTicket />} />
+                <Route path="/tickets" element={<TicketsPage />} />
+                
+                {/* Rutas específicas de Soporte (Recuperadas de tu versión) */}
+                <Route path="/soporte/panel" element={<PanelSoporte />} />
+                <Route path="/documentos" element={<GeneradorDocumentos />} />
+
+                {/* Ruta comodín (Redirige al dashboard si escriben una URL que no existe) */}
+                <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
+            </Routes>
+        </MainLayout>
+    );
+}
+
+// ----------------------------------------------------------------------
+// 2. COMPONENTE PRINCIPAL: Solo se encarga de encender los proveedores
+// ----------------------------------------------------------------------
+function App() {
+    return (
+        <ThemeProvider theme={theme}>
+            <CssBaseline />
+            <AuthProvider>
+                <WebSocketProvider>
+                    <Router>
+                        <AppContent />
+                    </Router>
+                </WebSocketProvider>
+            </AuthProvider>
+        </ThemeProvider>
+    );
 }
 
 export default App;
