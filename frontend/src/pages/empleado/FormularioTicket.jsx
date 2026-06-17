@@ -28,15 +28,21 @@ export default function FormularioTicket() {
             const payload = {
                 titulo,
                 descripcion,
-                sede: esSoporte ? sede : null 
+                sede: esSoporte ? sede : null
             };
 
             await api.post('/v1/tickets', payload);
             
-            // MAGIA: Redirigimos al historial mandando el mensaje de éxito para el Snackbar
-            navigate('/empleado/historial', { 
-                state: { mensajeExito: '¡Ticket creado correctamente!' } 
-            });
+            // Redirección condicional enviando el mensaje de éxito en el estado de la ruta
+            if (user?.rol === 'SOPORTE') {
+                navigate('/soporte/bandeja', {
+                    state: { mensajeExito: '¡Ticket creado correctamente!' }
+                });
+            } else {
+                navigate('/empleado/historial', {
+                    state: { mensajeExito: '¡Ticket creado correctamente!' }
+                });
+            }
             
         } catch (error) {
             console.error("Error al crear:", error);
@@ -59,47 +65,47 @@ export default function FormularioTicket() {
                 )}
 
                 <form onSubmit={handleSubmit}>
-                    <TextField 
-                        fullWidth 
-                        label="Título *" 
-                        variant="outlined" 
+                    <TextField
+                        fullWidth
+                        label="Título *"
+                        variant="outlined"
                         margin="normal"
-                        value={titulo} 
-                        onChange={(e) => setTitulo(e.target.value)} 
-                        required 
+                        value={titulo}
+                        onChange={(e) => setTitulo(e.target.value)}
+                        required
                     />
 
                     {/* RENDERIZACIÓN CONDICIONAL: Solo aparece si el rol es Soporte/Admin */}
                     {esSoporte && (
-                        <TextField 
-                            fullWidth 
-                            label="Sede *" 
-                            variant="outlined" 
+                        <TextField
+                            fullWidth
+                            label="Sede *"
+                            variant="outlined"
                             margin="normal"
-                            value={sede} 
-                            onChange={(e) => setSede(e.target.value)} 
-                            required={esSoporte} 
+                            value={sede}
+                            onChange={(e) => setSede(e.target.value)}
+                            required={esSoporte}
                         />
                     )}
 
-                    <TextField 
-                        fullWidth 
-                        label="Descripción *" 
-                        variant="outlined" 
+                    <TextField
+                        fullWidth
+                        label="Descripción *"
+                        variant="outlined"
                         margin="normal"
-                        multiline 
+                        multiline
                         rows={4}
-                        value={descripcion} 
-                        onChange={(e) => setDescripcion(e.target.value)} 
-                        required 
+                        value={descripcion}
+                        onChange={(e) => setDescripcion(e.target.value)}
+                        required
                     />
                     
                     <Box sx={{ mt: 4, display: 'flex', justifyContent: 'flex-end' }}>
                         {/* El botón toma tu color #5c0a28 automáticamente por el color="primary" del theme.js */}
-                        <Button 
-                            type="submit" 
-                            variant="contained" 
-                            color="primary" 
+                        <Button
+                            type="submit"
+                            variant="contained"
+                            color="primary"
                             sx={{ px: 4, py: 1.5, fontSize: '1rem' }}
                         >
                             Enviar Ticket

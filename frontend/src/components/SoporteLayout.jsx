@@ -10,6 +10,7 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import AddCircleIcon from '@mui/icons-material/AddCircle';
 import NotificationsIcon from '@mui/icons-material/Notifications';
+import DescriptionIcon from '@mui/icons-material/Description';
 
 const drawerWidth = 70; // 1. Ancho del menú
 
@@ -99,6 +100,19 @@ export default function SoporteLayout({ children }) {
                             >
                                 <ListItemIcon sx={{ minWidth: 0, justifyContent: 'center' }}>
                                     <AddCircleIcon color="primary" />
+                                </ListItemIcon>
+                            </ListItemButton>
+                        </Tooltip>
+                    </ListItem>
+                    {/* Bloque del Botón: Generar Documentos */}
+                    <ListItem disablePadding sx={{ display: 'block' }}>
+                        <Tooltip title="Generar Documento" placement="right">
+                            <ListItemButton 
+                                onClick={() => navigate('/documentos')} 
+                                sx={{ justifyContent: 'center', py: 2 }}
+                            >
+                                <ListItemIcon sx={{ minWidth: 0, justifyContent: 'center' }}>
+                                    <DescriptionIcon color="primary" />
                                 </ListItemIcon>
                             </ListItemButton>
                         </Tooltip>

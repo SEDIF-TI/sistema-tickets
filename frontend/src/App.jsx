@@ -13,6 +13,7 @@ import { WebSocketProvider } from './context/WebSocketContext.jsx';
 
 // --- Layouts ---
 import MainLayout from './components/MainLayout.jsx';
+// Importamos SoporteLayout por si en el futuro quieres separar el menú visualmente
 import SoporteLayout from './components/SoporteLayout.jsx'; 
 
 // --- Páginas Públicas / Seguridad ---
@@ -27,17 +28,20 @@ import AdminAreasPage from './pages/admin/AdminAreasPage.jsx';
 import FormularioTicket from './pages/empleado/FormularioTicket.jsx';
 import TicketsPage from './pages/tickets/TicketsPage.jsx';
 import PanelSoporte from './pages/soporte/PanelSoporte.jsx';
+// RECUPERADO DE TU CÓDIGO: El generador de PDF que tú hiciste
+import GeneradorDocumentos from './components/GeneradorDocumentos.jsx';
 
 // Página de prueba temporal
 const DashboardPage = () => <Typography variant="h4">Dashboard General del Administrador</Typography>;
 
 // ----------------------------------------------------------------------
 // 1. COMPONENTE INTERNO: Este sí puede leer el contexto porque está adentro
+// 1. COMPONENTE INTERNO: Manejo de Seguridad y Rutas
 // ----------------------------------------------------------------------
 function AppContent() {
     const { user } = useContext(AuthContext);
 
-    // 1. SI NO ESTÁ LOGUEADO: Mandarlo al Login
+    // 1. SI NO ESTÁ LOGUEADO: Mandarlo al Login automáticamente
     if (!user) {
         return (
             <Routes>
@@ -75,6 +79,9 @@ function AppContent() {
                 <Route path="/tickets/nuevo" element={<FormularioTicket />} />
                 <Route path="/tickets" element={<TicketsPage />} />
                 <Route path="/soporte/panel" element={<PanelSoporte />} />
+
+                {/* Ruta de PDFs */}
+                    <Route path="/documentos" element={<GeneradorDocumentos />} />
 
                 {/* RUTA COMODÍN INTELIGENTE: Decide a dónde enviarte según tu rol */}
                 <Route path="*" element={
