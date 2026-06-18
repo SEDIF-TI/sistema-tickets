@@ -28,6 +28,7 @@ import AdminAreasPage from './pages/admin/AdminAreasPage.jsx';
 import FormularioTicket from './pages/empleado/FormularioTicket.jsx';
 import TicketsPage from './pages/tickets/TicketsPage.jsx';
 import PanelSoporte from './pages/soporte/PanelSoporte.jsx';
+
 // RECUPERADO DE TU CÓDIGO: El generador de PDF que tú hiciste
 import GeneradorDocumentos from './components/GeneradorDocumentos.jsx';
 
@@ -81,7 +82,7 @@ function AppContent() {
                 <Route path="/soporte/panel" element={<PanelSoporte />} />
 
                 {/* Ruta de PDFs */}
-                    <Route path="/documentos" element={<GeneradorDocumentos />} />
+                    <Route path="/documentos/crear" element={<GeneradorDocumentos />} />
 
                 {/* RUTA COMODÍN INTELIGENTE: Decide a dónde enviarte según tu rol */}
                 <Route path="*" element={
