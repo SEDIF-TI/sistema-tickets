@@ -52,14 +52,14 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll() 
                 .requestMatchers("/api/v1/auth/**").permitAll()
                 .requestMatchers("/ws-tickets/**").permitAll()
+                .requestMatchers("/error").permitAll()
                 
-                // Permite el acceso a la ruta de manejo de errores interno para no ocultar excepciones
-                .requestMatchers("/error").permitAll() 
+                // --- LA EXCEPCIÓN: Cualquier usuario logueado puede actualizar su clave ---
+                .requestMatchers("/api/v1/admin/usuarios/password", "/api/usuarios/password").authenticated()
                 
-                // Control de acceso para rutas administrativas evaluando la autoridad literal
+                // --- La regla de administradores (DEBE IR DESPUÉS DE LA EXCEPCIÓN) ---
                 .requestMatchers("/api/v1/admin/**").hasAnyAuthority("ADMINISTRADOR", "ROLE_ADMINISTRADOR")
                 
-                // Cualquier otra ruta (incluyendo el módulo de tickets) requiere estar autenticado
                 .anyRequest().authenticated()
             )
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
