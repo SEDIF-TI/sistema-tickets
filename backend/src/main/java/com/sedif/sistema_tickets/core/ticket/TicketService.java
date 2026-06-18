@@ -244,4 +244,21 @@ public class TicketService {
 
         return ticket;
     }    
+
+    @Transactional(readOnly = true)
+    public List<TicketResponse> obtenerTicketsParaBandeja(String correoUsuario) {
+        Usuario usuario = usuarioRepository.findByCorreo(correoUsuario)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
+
+        // Si es soporte, le damos SOLO los tickets que se le asignaron por el balanceador o él mismo
+        if (usuario.getRol() != null && "SOPORTE".equals(usuario.getRol().getNombre())) {
+            return ticketRepository.findByUsuarioSoporteId(usuario.getId())
+                    .stream()
+                    .map(this::mapearATicketResponse)
+                    .toList();
+        }
+        
+        // Si es Administrador, le damos todos
+        return obtenerTodosLosTickets();
+    }
 }
