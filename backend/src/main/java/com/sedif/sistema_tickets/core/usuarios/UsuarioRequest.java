@@ -10,5 +10,5 @@ public record UsuarioRequest(
         Long rolId,
         // Solo será obligatorio si el rol es AREA
         Long areaId,
-        boolean disponibleSoporte
+        Boolean disponibleSoporte
 ) {}
