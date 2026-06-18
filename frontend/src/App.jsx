@@ -1,5 +1,9 @@
 import React, { useContext } from 'react';
+import React, { useContext } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { Typography } from '@mui/material';
+
+// --- Material UI y Temas ---
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import theme from './theme/theme.js';
