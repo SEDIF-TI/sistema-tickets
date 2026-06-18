@@ -48,7 +48,11 @@ public class UsuarioService {
         
         nuevoUsuario.setRol(rol);
         nuevoUsuario.setActivo(true);
-        nuevoUsuario.setDisponibleSoporte(request.disponibleSoporte());
+
+        // ¡AQUÍ ESTÁ LA SOLUCIÓN!
+        // Si el request trae el campo nulo, le asignamos false automáticamente.
+        Boolean disponible = request.disponibleSoporte();
+        nuevoUsuario.setDisponibleSoporte(disponible != null ? disponible : false);
 
         // Si el usuario pertenece a una área, asignarla
         if (request.areaId() != null) {
@@ -60,7 +64,6 @@ public class UsuarioService {
         Usuario usuarioGuardado = usuarioRepository.save(nuevoUsuario);
         
         // 4. Retornamos la respuesta incluyendo la contraseña temporal para informarla al administrador
-        // Asegúrate de que tu UsuarioResponse tenga un campo para esta contraseña temporal
         return UsuarioResponse.desdeEntidadConPassword(usuarioGuardado, passwordTemporal);
     }
 
