@@ -15,7 +15,10 @@ import {
     Tooltip,
     Divider
 } from '@mui/material';
+
+// Imports de iconos corregidos (sin duplicados)
 import LogoutIcon from '@mui/icons-material/Logout';
+import InfoIcon from '@mui/icons-material/Info';
 
 const drawerWidth = 240;
 
@@ -47,7 +50,9 @@ export default function MainLayout({ children }) {
             >
                 <List>
                     {vistas.map((vista, index) => {
-                        const Icono = getIcon(vista.icono);
+                        // LA MAGIA: Si getIcon falla, usa el icono de interrogación
+                        const Icono = getIcon(vista.icono) || InfoIcon;
+                        
                         return (
                             <ListItem key={index} disablePadding sx={{ display: 'block' }}>
                                 <Tooltip title={vista.nombre} placement="right">

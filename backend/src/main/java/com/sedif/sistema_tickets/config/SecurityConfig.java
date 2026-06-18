@@ -49,9 +49,22 @@ public class SecurityConfig {
                 })
             )
             .authorizeHttpRequests(auth -> auth
+                // Tus rutas públicas (login, ws, etc)
+                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll() 
                 .requestMatchers("/api/v1/auth/**").permitAll()
                 .requestMatchers("/ws-tickets/**").permitAll()
+                .requestMatchers("/error").permitAll()
+                
+                // Tu regla para cambiar contraseña
+                .requestMatchers("/api/v1/admin/usuarios/password", "/api/usuarios/password").authenticated()
+                
+                // --- ¡ESTA ES LA LÍNEA QUE DEBES AGREGAR PARA SOLUCIONAR EL ERROR 403! ---
+                .requestMatchers("/api/v1/tickets/**").hasAnyAuthority("EMPLEADO", "ROLE_EMPLEADO", "SOPORTE", "ROLE_SOPORTE", "ADMINISTRADOR", "ROLE_ADMINISTRADOR")
+                
+                // Tu regla de administradores (siempre va al final de las reglas específicas)
                 .requestMatchers("/api/v1/admin/**").hasAnyAuthority("ADMINISTRADOR", "ROLE_ADMINISTRADOR")
+                
+                // Cualquier otra petición debe estar autenticada
                 .anyRequest().authenticated()
             )
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
