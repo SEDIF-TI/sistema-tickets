@@ -32,52 +32,63 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             @NonNull FilterChain filterChain
     ) throws ServletException, IOException {
 
-        // 1. Extraer el encabezado Authorization
         final String authHeader = request.getHeader("Authorization");
         final String jwt;
         final String identificador;
 
-        // Si no hay encabezado o no empieza con "Bearer ", lo dejamos pasar (SecurityConfig lo bloqueará después si es ruta protegida)
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
             return;
         }
 
         if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
-        filterChain.doFilter(request, response);
-        return;
-    }
+            filterChain.doFilter(request, response);
+            return;
+        }
 
-        // 2. Extraer el token (quitamos la palabra "Bearer " que ocupa 7 caracteres)
         jwt = authHeader.substring(7);
         identificador = jwtService.extraerIdentificador(jwt);
 
-        // 3. Si hay un usuario en el token y aún no está autenticado en este hilo
-                if (identificador != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                    String correoNormalizado = identificador.toLowerCase().trim();
+        if (identificador != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+            
+            System.out.println("\n====== DEBUG JWT FILTRO ======");
+            System.out.println("1. Petición a: " + request.getRequestURI());
+            System.out.println("2. Token recibido para identificador: [" + identificador + "]");
+            
+            // FIX: Buscamos exacto, y si falla, intentamos en minúsculas (previene bugs de Case Sensitivity)
+            Usuario usuario = usuarioRepository.findByCorreoOrUsername(identificador, identificador)
+                    .orElseGet(() -> usuarioRepository.findByCorreoOrUsername(identificador.toLowerCase().trim(), identificador.toLowerCase().trim()).orElse(null));
+            
+            if (usuario == null) {
+                System.err.println("3. ERROR FATAL: No se encontró el usuario en la Base de Datos.");
+            } else {
+                System.out.println("3. Usuario BD: " + usuario.getNombre() + " | Rol: " + usuario.getRol().getNombre() + " | Activo: " + usuario.getActivo());
+                
+                boolean tokenValido = jwtService.isTokenValido(jwt);
+                System.out.println("4. Validación del Token: " + (tokenValido ? "VÁLIDO" : "INVÁLIDO"));
+                
+                if (Boolean.TRUE.equals(usuario.getActivo()) && tokenValido) {
+                    String rolFinal = "ROLE_" + usuario.getRol().getNombre().toUpperCase();
+                    System.out.println("5. Autoridad inyectada a Spring: " + rolFinal);
                     
-                    // Buscamos al usuario en la base de datos
-                    Usuario usuario = usuarioRepository.findByCorreoOrUsername(correoNormalizado, correoNormalizado)
-                            .orElse(null);
+                    // FIX: Evita colapsos si el correo está vacío usando el username como respaldo
+                    String principal = (usuario.getCorreo() != null && !usuario.getCorreo().isEmpty()) ? usuario.getCorreo() : usuario.getUsername();
                     
-                    // Validamos: que exista, que esté activo y que el JWT sea auténtico
-                    if (usuario != null && Boolean.TRUE.equals(usuario.getActivo()) && jwtService.isTokenValido(jwt)) {
-                        
-                        // CAMBIO AQUÍ: Pasamos el usuario.getCorreo() (String) en lugar de 'usuario' (objeto)
-                        UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                                usuario.getCorreo(), 
-                                null,
-                                List.of(new SimpleGrantedAuthority("ROLE_" + usuario.getRol().getNombre()))
-                        );
-                        authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                        SecurityContextHolder.getContext().setAuthentication(authToken);
-                    } else {
-                        System.err.println("DEBUG: El usuario fue encontrado pero falló la validación (Activo: " 
-                            + (usuario != null ? usuario.getActivo() : "N/A") + " o Token inválido)");
-                    }
+                    UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                            principal, 
+                            null,
+                            List.of(new SimpleGrantedAuthority(rolFinal))
+                    );
+                    authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    SecurityContextHolder.getContext().setAuthentication(authToken);
+                    System.out.println("6. ¡Autenticación finalizada con éxito!");
+                } else {
+                    System.err.println("5. ERROR: Usuario inactivo o token expirado.");
                 }
+            }
+            System.out.println("==============================\n");
+        }
         
-        // 4. Continuar con la cadena de filtros
         filterChain.doFilter(request, response);
     }
 }

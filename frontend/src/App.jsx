@@ -7,42 +7,35 @@ import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import theme from './theme/theme.js';
 
-// --- Contextos Globales ---
-import { AuthProvider, AuthContext } from './context/AuthContext.jsx';
+// Contextos
+import { AuthContext, AuthProvider } from './context/AuthContext.jsx';
 import { WebSocketProvider } from './context/WebSocketContext.jsx';
 
-// --- Layouts ---
-import MainLayout from './components/MainLayout.jsx';
-// Importamos SoporteLayout por si en el futuro quieres separar el menú visualmente
-import SoporteLayout from './components/SoporteLayout.jsx'; 
-
-// --- Páginas Públicas / Seguridad ---
+// Layouts y Páginas Base
 import LoginPage from './pages/LoginPage.jsx';
-import PrimerCambioPassword from './pages/PrimerCambioPassword.jsx';
+import PrimerCambioPassword from './pages/PrimerCambioPassword.jsx'; // RECUPERADO
+import MainLayout from './components/MainLayout.jsx';
+import SoporteLayout from './components/SoporteLayout.jsx';
+import PerfilPage from './pages/PerfilPage.jsx';
 
-// --- Páginas de Administrador ---
-import AdminUsuariosPage from './pages/admin/AdminUsuariosPage.jsx';
-import AdminAreasPage from './pages/admin/AdminAreasPage.jsx';
-
-// --- Páginas de Empleado / Soporte ---
-import FormularioTicket from './pages/empleado/FormularioTicket.jsx';
-import TicketsPage from './pages/tickets/TicketsPage.jsx';
+// Páginas de Roles
+import FormularioTicket from './pages/empleado/FormularioTicket';
+import TicketsPage from './pages/tickets/TicketsPage';
 import PanelSoporte from './pages/soporte/PanelSoporte.jsx';
+import AdminUsuariosPage from './pages/admin/AdminUsuariosPage.jsx';
+import AdminAreasPage from './pages/admin/AdminAreasPage';
 
-// RECUPERADO DE TU CÓDIGO: El generador de PDF que tú hiciste
-import GeneradorDocumentos from './components/GeneradorDocumentos.jsx';
+// --- TUS MÓDULOS NUEVOS ---
+import GeneradorDocumentos from './components/GeneradorDocumentos.jsx'; // RECUPERADO
+import AdminAvisosPage from './pages/admin/AdminAvisosPage.jsx'; // NUEVO AVISOS
 
-// Página de prueba temporal
-const DashboardPage = () => <Typography variant="h4">Dashboard General del Administrador</Typography>;
+const Dashboard = () => <Typography variant="h4">Dashboard General del Administrador</Typography>;
 
-// ----------------------------------------------------------------------
-// 1. COMPONENTE INTERNO: Este sí puede leer el contexto porque está adentro
-// 1. COMPONENTE INTERNO: Manejo de Seguridad y Rutas
-// ----------------------------------------------------------------------
+// 1. EL POLICÍA DE TRÁNSITO (AppContent)
 function AppContent() {
     const { user } = useContext(AuthContext);
 
-    // 1. SI NO ESTÁ LOGUEADO: Mandarlo al Login automáticamente
+    // 1. Si NO hay sesión iniciada, solo puede ver el Login
     if (!user) {
         return (
             <Routes>
@@ -52,7 +45,7 @@ function AppContent() {
         );
     }
 
-    // 2. INTERCEPTOR CRÍTICO: Bloqueamos el resto si su clave es temporal
+    // 2. RECUPERADO: INTERCEPTOR CRÍTICO DE CONTRASEÑA TEMPORAL
     if (user.passwordTemporal) {
         return (
             <Routes>
@@ -62,42 +55,47 @@ function AppContent() {
         );
     }
 
-    // --- EXTRAEMOS EL ROL DEL USUARIO ---
-    // Dependiendo de cómo lo guardes, leemos 'rol' o 'role'. También limpiamos el prefijo 'ROLE_' si existe.
-    const userRole = user.rol || user.role || '';
+    // 3. Si SÍ hay sesión, descubrimos su rol
+    const userRole = user.rol || user.role || user.rolNombre || '';
     const cleanRole = userRole.replace('ROLE_', '').toUpperCase();
 
-    // 3. SI TODO ESTÁ BIEN: Acceso normal a la aplicación
+    // Calculamos a qué pantalla debe ir por defecto según quién es
+    let rutaPorDefecto = '/empleado/historial'; // Empleado
+    if (cleanRole === 'ADMINISTRADOR') rutaPorDefecto = '/admin/dashboard';
+    if (cleanRole === 'SOPORTE') rutaPorDefecto = '/soporte/bandeja';
+
+    // Rutas para usuarios logueados
     return (
-        <MainLayout>
-            <Routes>
-                {/* Rutas de Admin */}
-                <Route path="/admin/dashboard" element={<DashboardPage />} />
-                <Route path="/admin/usuarios" element={<AdminUsuariosPage />} />
-                <Route path="/admin/areas" element={<AdminAreasPage />} />
-                
-                {/* Rutas de Tickets y Soporte */}
-                <Route path="/tickets/nuevo" element={<FormularioTicket />} />
-                <Route path="/tickets" element={<TicketsPage />} />
-                <Route path="/soporte/panel" element={<PanelSoporte />} />
+        <Routes>
+            {/* Si intenta ir a la raíz o al login estando logueado, lo mandamos a su panel */}
+            <Route path="/" element={<Navigate to={rutaPorDefecto} replace />} />
+            <Route path="/login" element={<Navigate to={rutaPorDefecto} replace />} />
 
-                {/* Ruta de PDFs */}
-                    <Route path="/documentos/crear" element={<GeneradorDocumentos />} />
+            {/* Rutas Protegidas de Admin */}
+            <Route path="/admin/dashboard" element={<MainLayout><Dashboard /></MainLayout>} />
+            <Route path="/admin/usuarios" element={<MainLayout><AdminUsuariosPage /></MainLayout>} />
+            <Route path="/admin/areas" element={<MainLayout><AdminAreasPage /></MainLayout>} />
+            <Route path="/admin/avisos" element={<MainLayout><AdminAvisosPage /></MainLayout>} />
 
-                {/* RUTA COMODÍN INTELIGENTE: Decide a dónde enviarte según tu rol */}
-                <Route path="*" element={
-                    cleanRole === 'ADMINISTRADOR' ? <Navigate to="/admin/dashboard" replace /> :
-                    cleanRole === 'SOPORTE' ? <Navigate to="/soporte/panel" replace /> :
-                    <Navigate to="/tickets" replace /> // Destino por defecto para EMPLEADO
-                } />
-            </Routes>
-        </MainLayout>
+            {/* Rutas Protegidas de Soporte */}
+            <Route path="/soporte/bandeja" element={<SoporteLayout><PanelSoporte /></SoporteLayout>} />
+            <Route path="/soporte/nuevo" element={<SoporteLayout><FormularioTicket /></SoporteLayout>} />
+            <Route path="/documentos/crear" element={<MainLayout><GeneradorDocumentos /></MainLayout>} />
+
+            {/* Rutas Protegidas de Empleado */}
+            <Route path="/empleado/nuevo" element={<MainLayout><FormularioTicket /></MainLayout>} />
+            <Route path="/empleado/historial" element={<MainLayout><TicketsPage /></MainLayout>} />
+
+            {/* Ruta del Nuevo Perfil */}
+            <Route path="/perfil" element={<MainLayout><PerfilPage /></MainLayout>} />
+
+            {/* Cualquier otra ruta inventada lo regresa a su panel */}
+            <Route path="*" element={<Navigate to={rutaPorDefecto} replace />} />
+        </Routes>
     );
 }
 
-// ----------------------------------------------------------------------
-// 2. COMPONENTE PRINCIPAL: Solo se encarga de encender los proveedores
-// ----------------------------------------------------------------------
+// 2. LA ESTRUCTURA PRINCIPAL
 function App() {
     return (
         <ThemeProvider theme={theme}>

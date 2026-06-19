@@ -76,7 +76,9 @@ const AdminUsuariosPage = () => {
             const payload = {
                 ...formData,
                 areaId: Number(formData.areaId),
-                rolId: Number(formData.rolId)
+                rolId: Number(formData.rolId),
+                // ¡AQUÍ ESTÁ LA MAGIA! Inyectamos el valor que pide el backend a la fuerza
+                disponibleSoporte: false 
             };
 
             if (formData.id) {
