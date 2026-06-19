@@ -24,4 +24,10 @@ public class AvisoResource {
         // Este es el endpoint que el frontend consumirá para mostrar los comunicados
         return ResponseEntity.ok(avisoService.obtenerAvisosActivos());
     }
+
+    @PutMapping("/{id}/desactivar")
+    public ResponseEntity<Void> desactivarAviso(@PathVariable Long id) {
+        avisoService.desactivarAviso(id);
+        return ResponseEntity.ok().build();
+    }
 }

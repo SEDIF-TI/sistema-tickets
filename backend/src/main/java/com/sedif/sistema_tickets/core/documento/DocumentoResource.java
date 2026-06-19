@@ -27,4 +27,13 @@ public class DocumentoResource {
                 .headers(headers)
                 .body(pdfGenerado);
     }
+
+    // --- Endpoint de la Requisición ---
+    @PostMapping(value = "/requisicion", produces = MediaType.APPLICATION_PDF_VALUE)
+    public ResponseEntity<byte[]> generarRequisicion(@RequestBody RequisicionRequest request) {
+        byte[] pdfGenerado = documentoService.generarRequisicion(request);
+        HttpHeaders headers = new HttpHeaders();
+        headers.add("Content-Disposition", "attachment; filename=Requisicion_Material.pdf");
+        return ResponseEntity.ok().headers(headers).body(pdfGenerado);
+    }
 }

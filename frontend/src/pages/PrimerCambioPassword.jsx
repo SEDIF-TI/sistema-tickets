@@ -1,32 +1,14 @@
-// 1. Asegúrate de extraer la nueva función del contexto al inicio de tu componente:
-const { marcarPasswordCambiada } = useContext(AuthContext);
-const navigate = useNavigate();
-
-// 2. En tu función de envío:
-const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-        // Tu petición actual (ejemplo):
-        await api.put('/usuarios/password', { nuevaPassword: password });
-        
-        // ¡AQUÍ ESTÁ LA SOLUCIÓN!
-        marcarPasswordCambiada(); // Rompemos el bloqueo de seguridad actualizando el estado
-        
-        // Redirigimos a la raíz. 
-        // Como el estado cambió, App.jsx evaluará tu rol y te mandará a tu vista correspondiente.
-        navigate('/'); 
-        
-    } catch (error) {
-        console.error("Error al cambiar la contraseña:", error);
-    }
-};
 import React, { useState, useContext } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Box, Paper, Typography, TextField, Button, Alert } from '@mui/material';
 import { AuthContext } from '../context/AuthContext';
 import api from '../services/api';
 
 export default function PrimerCambioPassword() {
-    const { login } = useContext(AuthContext); // O la función que uses para actualizar el estado del usuario
+    // 1. Extraemos la función correcta de nuestro contexto
+    const { marcarPasswordCambiada } = useContext(AuthContext);
+    const navigate = useNavigate();
+
     const [nuevaPassword, setNuevaPassword] = useState('');
     const [confirmarPassword, setConfirmarPassword] = useState('');
     const [error, setError] = useState('');
@@ -46,18 +28,21 @@ export default function PrimerCambioPassword() {
             return;
         }
 
-        setLoading(false);
+        setLoading(true);
         try {
-            // Llamamos a tu endpoint existente en UsuarioResource
+            // Llamamos a tu endpoint existente
             await api.put('/v1/admin/usuarios/password', { nuevaPassword });
             
             alert('Contraseña actualizada con éxito. ¡Bienvenido al sistema!');
             
-            // Refrescar la página para que el AuthContext vuelva a leer el token actualizado 
-            // o limpiar la bandera temporal para permitir el acceso.
-            window.location.reload(); 
+            // 2. ¡La magia en acción! Rompemos el bloqueo y redirigimos
+            marcarPasswordCambiada(); 
+            navigate('/'); 
+            
         } catch (err) {
             setError(err.response?.data || 'No se pudo actualizar la contraseña.');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -99,7 +84,7 @@ export default function PrimerCambioPassword() {
                         sx={{ mt: 3, bgcolor: '#5c0a28', '&:hover': { bgcolor: '#42071c' } }}
                         disabled={loading}
                     >
-                        Actualizar y Entrar
+                        {loading ? 'Actualizando...' : 'Actualizar y Entrar'}
                     </Button>
                 </form>
             </Paper>

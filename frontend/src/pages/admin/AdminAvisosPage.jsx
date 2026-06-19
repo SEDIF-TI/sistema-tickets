@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react';
 import { 
     Box, Typography, Paper, TextField, Button, 
     Table, TableBody, TableCell, TableContainer, 
-    TableHead, TableRow, CircularProgress 
+    TableHead, TableRow, CircularProgress, Chip, IconButton, Tooltip
 } from '@mui/material';
 import CampaignIcon from '@mui/icons-material/Campaign';
 import SendIcon from '@mui/icons-material/Send';
+import CancelIcon from '@mui/icons-material/Cancel';
 import api from '../../services/api';
 
 export default function AdminAvisosPage() {
@@ -36,12 +37,25 @@ export default function AdminAvisosPage() {
             await api.post('/v1/avisos', { titulo, mensaje });
             setTitulo('');
             setMensaje('');
-            cargarAvisos(); // Recargamos la tabla para ver el nuevo aviso
+            cargarAvisos();
         } catch (error) {
             console.error("Error al crear aviso:", error);
             alert("Hubo un error al publicar el aviso.");
         } finally {
             setCargando(false);
+        }
+    };
+
+    // --- NUEVA FUNCIÓN PARA FINALIZAR EL AVISO ---
+    const handleFinalizarAviso = async (id) => {
+        if(window.confirm("¿Estás seguro de finalizar este aviso? Ya no aparecerá en las campanas de los usuarios.")) {
+            try {
+                await api.put(`/v1/avisos/${id}/desactivar`);
+                cargarAvisos(); // Recargamos para que desaparezca de la lista de activos
+            } catch (error) {
+                console.error("Error al finalizar aviso:", error);
+                alert("Hubo un error al finalizar el aviso.");
+            }
         }
     };
 
@@ -51,58 +65,34 @@ export default function AdminAvisosPage() {
                 <CampaignIcon fontSize="large" /> Gestión de Avisos Globales
             </Typography>
 
-            {/* Formulario para nuevo aviso */}
             <Paper elevation={3} sx={{ p: 3, mb: 4, borderRadius: 2 }}>
                 <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>Publicar Nuevo Aviso</Typography>
                 <form onSubmit={handleCrearAviso}>
-                    <TextField
-                        fullWidth
-                        label="Título del Aviso"
-                        variant="outlined"
-                        value={titulo}
-                        onChange={(e) => setTitulo(e.target.value)}
-                        required
-                        sx={{ mb: 2 }}
-                    />
-                    <TextField
-                        fullWidth
-                        label="Mensaje"
-                        variant="outlined"
-                        multiline
-                        rows={3}
-                        value={mensaje}
-                        onChange={(e) => setMensaje(e.target.value)}
-                        required
-                        sx={{ mb: 2 }}
-                    />
-                    <Button 
-                        type="submit" 
-                        variant="contained" 
-                        color="primary" 
-                        endIcon={cargando ? <CircularProgress size={20} color="inherit" /> : <SendIcon />}
-                        disabled={cargando}
-                    >
+                    <TextField fullWidth label="Título del Aviso" variant="outlined" value={titulo} onChange={(e) => setTitulo(e.target.value)} required sx={{ mb: 2 }} />
+                    <TextField fullWidth label="Mensaje" variant="outlined" multiline rows={3} value={mensaje} onChange={(e) => setMensaje(e.target.value)} required sx={{ mb: 2 }} />
+                    <Button type="submit" variant="contained" color="primary" endIcon={cargando ? <CircularProgress size={20} color="inherit" /> : <SendIcon />} disabled={cargando}>
                         Publicar a todos los usuarios
                     </Button>
                 </form>
             </Paper>
 
-            {/* Historial de avisos activos */}
             <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>Avisos Activos Publicados</Typography>
             <TableContainer component={Paper} elevation={3} sx={{ borderRadius: 2 }}>
                 <Table>
-                    <TableHead sx={{ backgroundColor: '#f3f4f6' }}>
+                    {/* --- CABECERA CON COLOR INSTITUCIONAL --- */}
+                    <TableHead sx={{ backgroundColor: '#5c0a28' }}>
                         <TableRow>
-                            <TableCell sx={{ fontWeight: 'bold' }}>ID</TableCell>
-                            <TableCell sx={{ fontWeight: 'bold' }}>Título</TableCell>
-                            <TableCell sx={{ fontWeight: 'bold' }}>Mensaje</TableCell>
-                            <TableCell sx={{ fontWeight: 'bold' }}>Estado</TableCell>
+                            <TableCell sx={{ fontWeight: 'bold', color: 'white' }}>ID</TableCell>
+                            <TableCell sx={{ fontWeight: 'bold', color: 'white' }}>Título</TableCell>
+                            <TableCell sx={{ fontWeight: 'bold', color: 'white' }}>Mensaje</TableCell>
+                            <TableCell align="center" sx={{ fontWeight: 'bold', color: 'white' }}>Estado</TableCell>
+                            <TableCell align="center" sx={{ fontWeight: 'bold', color: 'white' }}>Acciones</TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>
                         {avisos.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={4} align="center">No hay avisos activos.</TableCell>
+                                <TableCell colSpan={5} align="center">No hay avisos activos.</TableCell>
                             </TableRow>
                         ) : (
                             avisos.map((aviso) => (
@@ -110,7 +100,16 @@ export default function AdminAvisosPage() {
                                     <TableCell>{aviso.id}</TableCell>
                                     <TableCell sx={{ fontWeight: 'bold' }}>{aviso.titulo}</TableCell>
                                     <TableCell>{aviso.mensaje}</TableCell>
-                                    <TableCell>Activo</TableCell>
+                                    <TableCell align="center">
+                                        <Chip label="ACTIVO" color="success" size="small" sx={{ fontWeight: 'bold' }} />
+                                    </TableCell>
+                                    <TableCell align="center">
+                                        <Tooltip title="Finalizar Aviso">
+                                            <IconButton color="error" onClick={() => handleFinalizarAviso(aviso.id)}>
+                                                <CancelIcon />
+                                            </IconButton>
+                                        </Tooltip>
+                                    </TableCell>
                                 </TableRow>
                             ))
                         )}

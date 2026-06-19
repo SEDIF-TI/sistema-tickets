@@ -80,7 +80,7 @@ function AppContent() {
             {/* Rutas Protegidas de Soporte */}
             <Route path="/soporte/bandeja" element={<SoporteLayout><PanelSoporte /></SoporteLayout>} />
             <Route path="/soporte/nuevo" element={<SoporteLayout><FormularioTicket /></SoporteLayout>} />
-            <Route path="/documentos/crear" element={<MainLayout><GeneradorDocumentos /></MainLayout>} />
+            <Route path="/documentos/crear" element={<SoporteLayout><GeneradorDocumentos /></SoporteLayout>} />
 
             {/* Rutas Protegidas de Empleado */}
             <Route path="/empleado/nuevo" element={<MainLayout><FormularioTicket /></MainLayout>} />
