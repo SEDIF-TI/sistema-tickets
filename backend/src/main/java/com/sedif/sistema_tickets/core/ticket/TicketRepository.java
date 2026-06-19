@@ -33,4 +33,16 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
 
     // NUEVO: Contar tickets que NO estén resueltos (pendientes)
     long countByEstatusNombreNotIgnoreCase(String nombreEstatus);
+
+    @Query("SELECT t.estatus.nombre, COUNT(t) FROM Ticket t GROUP BY t.estatus.nombre")
+    List<Object[]> contarPorEstatus();
+
+    @Query("SELECT t.usuarioSoporte.nombre, COUNT(t) FROM Ticket t WHERE t.usuarioSoporte IS NOT NULL GROUP BY t.usuarioSoporte.nombre")
+    List<Object[]> contarPorIngeniero();
+
+    @Query("SELECT CAST(t.fechaCreacion AS date), COUNT(t) FROM Ticket t GROUP BY CAST(t.fechaCreacion AS date) ORDER BY CAST(t.fechaCreacion AS date) ASC")
+    List<Object[]> contarPorFecha();
+    
+    @Query("SELECT t.prioridad, COUNT(t) FROM Ticket t GROUP BY t.prioridad")
+    List<Object[]> contarPorPrioridad();
 }

@@ -40,11 +40,11 @@ public class SedifTelegramBot extends TelegramLongPollingBot {
             System.out.println("[TELEGRAM] Texto recibido: '" + messageText + "' desde el ChatID: " + chatId);
 
             if (messageText.startsWith("/start ")) {
-                System.out.println("⚙️ [TELEGRAM] Detectado comando de vinculación...");
+                System.out.println("[TELEGRAM] Detectado comando de vinculación...");
                 try {
                     String idString = messageText.replace("/start ", "").trim();
                     Long usuarioId = Long.parseLong(idString);
-                    System.out.println("🔍 [TELEGRAM] Buscando en BD al usuario con ID: " + usuarioId);
+                    System.out.println("[TELEGRAM] Buscando en BD al usuario con ID: " + usuarioId);
 
                     Usuario tecnico = usuarioRepository.findById(usuarioId).orElse(null);
                     
