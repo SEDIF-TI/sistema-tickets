@@ -1,4 +1,4 @@
-import { useContext } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import { AuthContext } from '../context/AuthContext.jsx';
 import { getIcon } from '../util/iconMapper.js';
 import { useNavigate } from 'react-router-dom';
@@ -13,9 +13,12 @@ import {
     ListItemButton, 
     ListItemIcon, 
     Tooltip,
-    Divider
+    Divider,
+    Alert,
+    AlertTitle
 } from '@mui/material';
 import LogoutIcon from '@mui/icons-material/Logout';
+import api from '../services/api.js';
 
 const drawerWidth = 240;
 
