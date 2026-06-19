@@ -8,7 +8,6 @@ export const AuthProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        // Al recargar la página, recuperamos el usuario del localStorage
         const storedUser = localStorage.getItem('user');
         if (storedUser) setUser(JSON.parse(storedUser));
         setLoading(false);
@@ -18,26 +17,44 @@ export const AuthProvider = ({ children }) => {
         const response = await api.post('/v1/auth/login', { identificador, password });
         const userData = response.data; // { id, nombre, rol, token, mensaje, vistas }
         
-        // --- LA MAGIA SUCEDE AQUÍ ---
-        // Si el login fue exitoso y nos mandó un token, lo abrimos para sacar la bandera
+        // --- DECODIFICADOR DE TOKENS A PRUEBA DE BALAS ---
         if (userData.token) {
             try {
-                // El JWT se divide en 3 partes separadas por puntos. La de en medio contiene nuestros datos.
                 const payloadBase64 = userData.token.split('.')[1];
-                // Desencriptamos el texto en base64 y lo convertimos a objeto JSON
-                const decodedPayload = JSON.parse(atob(payloadBase64));
                 
-                // Le pegamos la bandera a nuestro usuario antes de guardarlo
-                userData.passwordTemporal = decodedPayload.passwordTemporal;
+                // 1. Convertimos el formato Base64URL a Base64 estándar
+                const base64 = payloadBase64.replace(/-/g, '+').replace(/_/g, '/');
+                
+                // 2. Decodificamos soportando caracteres multi-byte (acentos y eñes)
+                const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+                    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                }).join(''));
+                
+                const decodedPayload = JSON.parse(jsonPayload);
+                
+                // Asignamos la bandera de manera segura
+                userData.passwordTemporal = decodedPayload.passwordTemporal || false;
+                
+                console.log("[AuthContext] Token decodificado con éxito. ¿Es temporal?:", userData.passwordTemporal);
             } catch (error) {
-                console.error("Error decodificando el token JWT:", error);
+                console.error("[AuthContext] Error crítico al decodificar el token JWT:", error);
+                userData.passwordTemporal = false; // Fallback seguro
             }
         }
-        // -----------------------------
+        // -------------------------------------------------
 
         localStorage.setItem('user', JSON.stringify(userData));
         setUser(userData);
         return userData;
+    };
+
+    // --- NUEVA FUNCIÓN: Actualiza el estado en caliente ---
+    const marcarPasswordCambiada = () => {
+        if (user) {
+            const usuarioActualizado = { ...user, passwordTemporal: false };
+            localStorage.setItem('user', JSON.stringify(usuarioActualizado));
+            setUser(usuarioActualizado); // Esto romperá el bloqueo en App.jsx al instante
+        }
     };
 
     const logout = () => {
@@ -46,7 +63,8 @@ export const AuthProvider = ({ children }) => {
     };
 
     return (
-        <AuthContext.Provider value={{ user, login, logout, loading }}>
+        // Agregamos marcarPasswordCambiada aquí abajo:
+        <AuthContext.Provider value={{ user, login, logout, loading, marcarPasswordCambiada }}>
             {children}
         </AuthContext.Provider>
     );

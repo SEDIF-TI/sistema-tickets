@@ -17,14 +17,38 @@ import {
     Alert,
     AlertTitle
 } from '@mui/material';
+
+// Imports de iconos corregidos (sin duplicados)
 import LogoutIcon from '@mui/icons-material/Logout';
 import api from '../services/api.js';
+import InfoIcon from '@mui/icons-material/Info';
 
 const drawerWidth = 240;
 
 export default function MainLayout({ children }) {
     const { user, logout } = useContext(AuthContext);
     const navigate = useNavigate();
+
+    // --- 1. LÓGICA DE AVISOS GLOBALES ---
+    const [avisos, setAvisos] = useState([]);
+
+    useEffect(() => {
+        // Consultamos los avisos activos al cargar la pantalla
+        const fetchAvisos = async () => {
+            try {
+                const respuesta = await api.get('/v1/avisos/activos');
+                setAvisos(respuesta.data);
+            } catch (error) {
+                console.error("Error cargando avisos globales:", error);
+            }
+        };
+        
+        // Solo intentamos cargar si hay un usuario logueado
+        if (user) {
+            fetchAvisos();
+        }
+    }, [user]);
+    // ------------------------------------
 
     // Ahora las vistas vienen dinámicamente desde la base de datos
     const vistas = user?.vistas || [];
@@ -50,7 +74,9 @@ export default function MainLayout({ children }) {
             >
                 <List>
                     {vistas.map((vista, index) => {
-                        const Icono = getIcon(vista.icono);
+                        // LA MAGIA: Si getIcon falla, usa el icono de interrogación
+                        const Icono = getIcon(vista.icono) || InfoIcon;
+                        
                         return (
                             <ListItem key={index} disablePadding sx={{ display: 'block' }}>
                                 <Tooltip title={vista.nombre} placement="right">
@@ -71,6 +97,21 @@ export default function MainLayout({ children }) {
             </Drawer>
 
             <Box component="main" sx={{ flexGrow: 1, p: 3, mt: 8 }}>
+                
+                {/* --- 2. SECCIÓN VISUAL DE AVISOS PARA TODOS --- */}
+                {/* Se mostrará justo arriba del contenido principal si hay avisos */}
+                {avisos.length > 0 && (
+                    <Box sx={{ mb: 3 }}>
+                        {avisos.map(aviso => (
+                            <Alert severity="info" key={aviso.id} sx={{ mb: 1, borderRadius: 2 }}>
+                                <AlertTitle sx={{ fontWeight: 'bold' }}>{aviso.titulo}</AlertTitle>
+                                {aviso.mensaje}
+                            </Alert>
+                        ))}
+                    </Box>
+                )}
+                {/* ---------------------------------------------- */}
+
                 {children}
             </Box>
         </Box>
