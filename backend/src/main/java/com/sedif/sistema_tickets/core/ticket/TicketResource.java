@@ -25,8 +25,12 @@ public class TicketResource {
     }
 
     @GetMapping
-    public ResponseEntity<List<TicketResponse>> obtenerTodos() {
-        return ResponseEntity.ok(ticketService.obtenerTodosLosTickets());
+    public ResponseEntity<List<TicketResponse>> obtenerTodos(Authentication authentication) {
+        // Tomamos quién es el usuario que está pidiendo ver la tabla
+        String correoUsuario = authentication.getName();
+        
+        // Llamamos a la lógica inteligente
+        return ResponseEntity.ok(ticketService.obtenerTicketsParaBandeja(correoUsuario));
     }
 
     @PutMapping("/{id}/finalizar")
