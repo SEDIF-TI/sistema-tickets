@@ -1,5 +1,4 @@
 import React, { useContext } from 'react';
-import React, { useContext } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Typography } from '@mui/material';
 
@@ -22,9 +21,7 @@ import PanelSoporte from './pages/soporte/PanelSoporte.jsx';
 import AdminUsuariosPage from './pages/admin/AdminUsuariosPage.jsx';
 import AdminAreasPage from './pages/admin/AdminAreasPage';
 import PerfilPage from './pages/PerfilPage.jsx';
-import { Typography } from '@mui/material';
-
-const Dashboard = () => <Typography variant="h4">Dashboard General del Administrador</Typography>;
+import DashboardPage from './pages/admin/DashboardPage.jsx';
 
 // 1. EL POLICÍA DE TRÁNSITO (AppContent)
 function AppContent() {
@@ -57,7 +54,7 @@ function AppContent() {
             <Route path="/login" element={<Navigate to={rutaPorDefecto} replace />} />
 
             {/* Rutas Protegidas de Admin */}
-            <Route path="/admin/dashboard" element={<MainLayout><Dashboard /></MainLayout>} />
+            <Route path="/admin/dashboard" element={<MainLayout><DashboardPage /></MainLayout>} />
             <Route path="/admin/usuarios" element={<MainLayout><AdminUsuariosPage /></MainLayout>} />
             <Route path="/admin/areas" element={<MainLayout><AdminAreasPage /></MainLayout>} />
 
