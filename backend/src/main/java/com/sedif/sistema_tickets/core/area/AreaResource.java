@@ -43,4 +43,5 @@ public class AreaResource {
         AreaResponse response = areaService.asignarSoporteFijo(id, request);
         return ResponseEntity.ok(response);
     }
+
 }
