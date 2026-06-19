@@ -23,11 +23,13 @@ import AdminAreasPage from './pages/admin/AdminAreasPage';
 import PerfilPage from './pages/PerfilPage.jsx';
 import DashboardPage from './pages/admin/DashboardPage.jsx';
 
+// --- IMPORTACIÓN NUEVA (Asegúrate de que la ruta de la carpeta sea correcta) ---
+import GeneradorDocumentos from './components/GeneradorDocumentos.jsx'; 
+
 // 1. EL POLICÍA DE TRÁNSITO (AppContent)
 function AppContent() {
     const { user } = useContext(AuthContext);
 
-    // Si NO hay sesión iniciada, solo puede ver el Login
     if (!user) {
         return (
             <Routes>
@@ -37,19 +39,15 @@ function AppContent() {
         );
     }
 
-    // Si SÍ hay sesión, descubrimos su rol
     const userRole = user.rol || user.role || user.rolNombre || '';
     const cleanRole = userRole.replace('ROLE_', '').toUpperCase();
 
-    // Calculamos a qué pantalla debe ir por defecto según quién es
-    let rutaPorDefecto = '/empleado/historial'; // Empleado
+    let rutaPorDefecto = '/empleado/historial'; 
     if (cleanRole === 'ADMINISTRADOR') rutaPorDefecto = '/admin/dashboard';
     if (cleanRole === 'SOPORTE') rutaPorDefecto = '/soporte/bandeja';
 
-    // Rutas para usuarios logueados
     return (
         <Routes>
-            {/* Si intenta ir a la raíz o al login estando logueado, lo mandamos a su panel */}
             <Route path="/" element={<Navigate to={rutaPorDefecto} replace />} />
             <Route path="/login" element={<Navigate to={rutaPorDefecto} replace />} />
 
@@ -60,7 +58,12 @@ function AppContent() {
 
             {/* Rutas Protegidas de Soporte */}
             <Route path="/soporte/bandeja" element={<SoporteLayout><PanelSoporte /></SoporteLayout>} />
-            <Route path="/soporte/nuevo" element={<SoporteLayout><FormularioTicket /></SoporteLayout>} />
+            
+            {/* CORRECCIÓN: Ajustamos esta ruta para que coincida con lo que tu compañero guardó en la BD */}
+            <Route path="/tickets/nuevo" element={<SoporteLayout><FormularioTicket /></SoporteLayout>} /> 
+            
+            {/* NUEVA RUTA: Agregamos la ruta del generador de documentos dentro del layout de soporte */}
+            <Route path="/documentos/crear" element={<SoporteLayout><GeneradorDocumentos /></SoporteLayout>} />
 
             {/* Rutas Protegidas de Empleado */}
             <Route path="/empleado/nuevo" element={<MainLayout><FormularioTicket /></MainLayout>} />
