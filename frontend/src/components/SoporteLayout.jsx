@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { 
     Box, Drawer, AppBar, Toolbar, List, Typography, Divider, 
     IconButton, ListItem, ListItemButton, ListItemIcon, Button,
-    Badge, Snackbar, Alert, Tooltip 
+    Badge, Snackbar, Alert, Tooltip, Menu, MenuItem, ListSubheader 
 } from '@mui/material';
 
 // Iconos
@@ -26,10 +26,50 @@ export default function SoporteLayout({ children }) {
     // Estados de Notificación de Soporte
     const [openAviso, setOpenAviso] = useState(false);
     const [mensajeAviso, setMensajeAviso] = useState('');
+    const [avisos, setAvisos] = useState([]);
 
-    const simularLlegadaAviso = () => {
-        setMensajeAviso("¡Atención! Ha llegado un nuevo Aviso Global del administrador.");
-        setOpenAviso(true);
+    // Estado para el menú flotante del historial (Campana)
+    const [anchorEl, setAnchorEl] = useState(null);
+    const openHistorial = Boolean(anchorEl);
+
+    // 1. Cargar avisos desde el Backend
+    useEffect(() => {
+        const fetchAvisos = async () => {
+            try {
+                const respuesta = await api.get('/v1/avisos/activos');
+                setAvisos(respuesta.data);
+            } catch (error) {
+                console.error("Error cargando avisos globales:", error);
+            }
+        };
+        if (user) fetchAvisos();
+    }, [user]);
+
+    // 2. LA MAGIA: Alerta automática cuando llega un aviso nuevo
+    useEffect(() => {
+        if (avisos.length > 0) {
+            const primerAviso = avisos[0]; // El más reciente
+            
+            // Revisamos cuál fue el último aviso que el navegador mostró automáticamente
+            const ultimoIdMostrado = localStorage.getItem('ultimo_aviso_mostrado_id');
+
+            // Si el ID es diferente, significa que es un aviso NUEVO que no ha visto
+            if (ultimoIdMostrado !== String(primerAviso.id)) {
+                setMensajeAviso(`📢 ${primerAviso.titulo}: ${primerAviso.mensaje}`);
+                setOpenAviso(true);
+                // Guardamos el ID para no volver a mostrárselo de golpe en el próximo render
+                localStorage.setItem('ultimo_aviso_mostrado_id', primerAviso.id);
+            }
+        }
+    }, [avisos]);
+
+    // Manejadores para abrir y cerrar el historial de la campana
+    const handleOpenHistorial = (event) => {
+        setAnchorEl(event.currentTarget);
+    };
+
+    const handleCloseHistorial = () => {
+        setAnchorEl(null);
     };
 
     const handleCloseAviso = () => {
@@ -153,7 +193,7 @@ export default function SoporteLayout({ children }) {
             {/* COMPONENTE DE AVISOS DE SOPORTE */}
             <Snackbar 
                 open={openAviso} 
-                autoHideDuration={6000} 
+                autoHideDuration={8000} 
                 onClose={handleCloseAviso}
                 anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
             >
