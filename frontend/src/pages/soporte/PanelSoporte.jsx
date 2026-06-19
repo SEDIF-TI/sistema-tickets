@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useContext } from 'react';
 import { 
     Typography, Box, Chip, Paper, Table, TableBody, 
     TableCell, TableContainer, TableHead, TableRow, Button,
@@ -10,10 +10,12 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import SearchIcon from '@mui/icons-material/Search';
 import DirectionsRunIcon from '@mui/icons-material/DirectionsRun';
 import { useWebSocket } from '../../context/WebSocketContext.jsx';
+import { AuthContext } from '../../context/AuthContext.jsx'; // <-- Nuevo import
 import api from '../../services/api';
 
 export default function PanelSoporte() {
     const { stompClient, isConnected } = useWebSocket();
+    const { user } = useContext(AuthContext); // <-- Extraemos al usuario logueado
     
     const [tickets, setTickets] = useState([]);
     const [cargando, setCargando] = useState(true);
@@ -28,6 +30,7 @@ export default function PanelSoporte() {
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [busqueda, setBusqueda] = useState('');
 
+    // 1er useEffect: Carga el histórico desde la BD
     useEffect(() => {
         const cargarTicketsHistoricos = async () => {
             try {
@@ -42,12 +45,18 @@ export default function PanelSoporte() {
         cargarTicketsHistoricos();
     }, []);
 
+    // 2do useEffect: Escucha los WebSockets en tiempo real con FILTRO
     useEffect(() => {
-        if (isConnected && stompClient && stompClient.connected) {
+        // Aseguramos que 'user' exista antes de escuchar
+        if (isConnected && stompClient && stompClient.connected && user) {
             try {
                 const suscripcion = stompClient.subscribe('/topic/tickets-soporte', (mensaje) => {
                     const nuevoTicket = JSON.parse(mensaje.body);
-                    setTickets((prev) => [nuevoTicket, ...prev]);
+                    
+                    // FILTRO MÁGICO: Solo lo agregamos si el ID coincide con el del técnico
+                    if (nuevoTicket.usuarioSoporteId === user.usuarioId) {
+                        setTickets((prev) => [nuevoTicket, ...prev]);
+                    }
                 });
                 return () => {
                     if (suscripcion) suscripcion.unsubscribe();
@@ -56,7 +65,7 @@ export default function PanelSoporte() {
                 console.error("Error en la suscripción WebSocket:", error);
             }
         }
-    }, [isConnected, stompClient]);
+    }, [isConnected, stompClient, user]); // <-- user agregado a las dependencias
 
     const handleAtenderTicket = async (ticket) => {
         try {
@@ -194,76 +203,82 @@ export default function PanelSoporte() {
                                     </TableCell>
                                 </TableRow>
                             ) : (
-                                ticketsPaginados.map((ticket) => (
-                                    <TableRow key={ticket.id} hover sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
-                                        <TableCell component="th" scope="row" sx={{ fontWeight: 'bold' }}>
-                                            {ticket.id}
-                                        </TableCell>
-                                        
-                                        <TableCell>{ticket.fechaCreacion ? new Date(ticket.fechaCreacion).toLocaleString() : 'N/A'}</TableCell>
-                                        
-                                        <TableCell>{ticket.fechaFin ? new Date(ticket.fechaFin).toLocaleString() : '--/--/----'}</TableCell>
-                                        
-                                        <TableCell>{ticket.solicitante || 'Usuario'}</TableCell>
-                                        <TableCell>{ticket.departamento || 'Área'}</TableCell>
-                                        
-                                        <TableCell align="center">
-                                            <Button 
-                                                variant="outlined" 
-                                                size="small" 
-                                                onClick={() => handleOpenDetalle(ticket)}
-                                                startIcon={<VisibilityIcon />} 
-                                                sx={{ textTransform: 'none', borderRadius: 2 }}
-                                            >
-                                                Ver Ticket
-                                            </Button>
-                                        </TableCell>
+                                ticketsPaginados.map((ticket, index) => {
+                                    // 🪄 Magia: Calculamos el número de fila consecutivo
+                                    const numeroFila = page * rowsPerPage + index + 1;
 
-                                        <TableCell>
-                                            <Chip 
-                                                label={ticket.estado || ticket.estatus || 'Abierto'} 
-                                                size="small" 
-                                                sx={{ 
-                                                    fontWeight: 'bold', 
-                                                    borderRadius: 1,
-                                                    backgroundColor: 
-                                                        (ticket.estatus === 'RESUELTO' || ticket.estatus === 'CERRADO') ? 'primary.dark' : 
-                                                        (ticket.estatus === 'EN PROCESO') ? 'primary.light' : 
-                                                        '#e0e0e0', // Gris neutral para abierto
-                                                    color: (ticket.estatus === 'ABIERTO' || ticket.estatus === 'ASIGNADO') ? 'text.primary' : 'white'
-                                                }}
-                                            />
-                                        </TableCell>
-                                        
-                                        <TableCell align="center">
-                                            {(ticket.estatus === 'ASIGNADO' || ticket.estatus === 'ABIERTO') && (
-                                                <IconButton 
-                                                    onClick={() => handleAtenderTicket(ticket)} 
-                                                    title="Voy en camino"
-                                                    sx={{ color: 'primary.light' }}
-                                                >
-                                                    <DirectionsRunIcon />
-                                                </IconButton>
-                                            )}
+                                    return (
+                                        <TableRow key={ticket.id} hover sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
+                                            <TableCell component="th" scope="row" sx={{ fontWeight: 'bold' }}>
+                                                {/* Reemplazamos ticket.id por nuestra variable consecutiva */}
+                                                {numeroFila}
+                                            </TableCell>
                                             
-                                            {ticket.estatus === 'EN PROCESO' && (
-                                                <IconButton 
-                                                    onClick={() => handleOpenResolucion(ticket)} 
-                                                    title="Resolver Ticket"
-                                                    sx={{ color: 'primary.main' }}
-                                                >
-                                                    <CheckCircleIcon />
-                                                </IconButton>
-                                            )}
+                                            <TableCell>{ticket.fechaCreacion ? new Date(ticket.fechaCreacion).toLocaleString() : 'N/A'}</TableCell>
                                             
-                                            {(ticket.estatus === 'RESUELTO' || ticket.estatus === 'CERRADO') && (
-                                                <Typography variant="caption" color="textSecondary" sx={{ fontWeight: 'bold' }}>
-                                                    Finalizado
-                                                </Typography>
-                                            )}
-                                        </TableCell>
-                                    </TableRow>
-                                ))
+                                            <TableCell>{ticket.fechaFin ? new Date(ticket.fechaFin).toLocaleString() : '--/--/----'}</TableCell>
+                                            
+                                            <TableCell>{ticket.solicitante || 'Usuario'}</TableCell>
+                                            <TableCell>{ticket.departamento || 'Área'}</TableCell>
+                                            
+                                            <TableCell align="center">
+                                                <Button 
+                                                    variant="outlined" 
+                                                    size="small" 
+                                                    onClick={() => handleOpenDetalle(ticket)}
+                                                    startIcon={<VisibilityIcon />} 
+                                                    sx={{ textTransform: 'none', borderRadius: 2 }}
+                                                >
+                                                    Ver Ticket
+                                                </Button>
+                                            </TableCell>
+
+                                            <TableCell>
+                                                <Chip 
+                                                    label={ticket.estado || ticket.estatus || 'Abierto'} 
+                                                    size="small" 
+                                                    sx={{ 
+                                                        fontWeight: 'bold', 
+                                                        borderRadius: 1,
+                                                        backgroundColor: 
+                                                            (ticket.estatus === 'RESUELTO' || ticket.estatus === 'CERRADO') ? 'primary.dark' : 
+                                                            (ticket.estatus === 'EN PROCESO') ? 'primary.light' : 
+                                                            '#e0e0e0', // Gris neutral para abierto
+                                                        color: (ticket.estatus === 'ABIERTO' || ticket.estatus === 'ASIGNADO') ? 'text.primary' : 'white'
+                                                    }}
+                                                />
+                                            </TableCell>
+                                            
+                                            <TableCell align="center">
+                                                {(ticket.estatus === 'ASIGNADO' || ticket.estatus === 'ABIERTO') && (
+                                                    <IconButton 
+                                                        onClick={() => handleAtenderTicket(ticket)} 
+                                                        title="Voy en camino"
+                                                        sx={{ color: 'primary.light' }}
+                                                    >
+                                                        <DirectionsRunIcon />
+                                                    </IconButton>
+                                                )}
+                                                
+                                                {ticket.estatus === 'EN PROCESO' && (
+                                                    <IconButton 
+                                                        onClick={() => handleOpenResolucion(ticket)} 
+                                                        title="Resolver Ticket"
+                                                        sx={{ color: 'primary.main' }}
+                                                    >
+                                                        <CheckCircleIcon />
+                                                    </IconButton>
+                                                )}
+                                                
+                                                {(ticket.estatus === 'RESUELTO' || ticket.estatus === 'CERRADO') && (
+                                                    <Typography variant="caption" color="textSecondary" sx={{ fontWeight: 'bold' }}>
+                                                        Finalizado
+                                                    </Typography>
+                                                )}
+                                            </TableCell>
+                                        </TableRow>
+                                    );
+                                })
                             )}
                         </TableBody>
                     </Table>

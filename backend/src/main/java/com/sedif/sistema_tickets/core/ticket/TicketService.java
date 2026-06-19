@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -43,8 +44,8 @@ public class TicketService {
         nuevoTicket.setTitulo(request.titulo());
         nuevoTicket.setDescripcion(request.descripcion());
         nuevoTicket.setSede(request.sede());
-        nuevoTicket.setUsuarioArea(usuario);
-        nuevoTicket.setEstatus(estatusAbierto);
+        nuevoTicket.setUsuarioArea(usuario); 
+        nuevoTicket.setEstatus(estatusAbierto); 
         nuevoTicket.setFechaCreacion(LocalDateTime.now());
         nuevoTicket.setCreadoPor(usuario.getCorreo());
         
@@ -54,16 +55,23 @@ public class TicketService {
                            : "NORMAL"; 
         nuevoTicket.setPrioridad(prioridad);
 
-        // 5. Asignación automática mediante balanceador
-        Usuario soporteAsignado = resolverAsignacion(usuario);
-        if (soporteAsignado != null) {
-            nuevoTicket.setUsuarioSoporte(soporteAsignado);
-            System.out.println("DEBUG: Ticket #" + nuevoTicket.getId() + " asignado a técnico: " + soporteAsignado.getNombre());
+        // 5. LÓGICA UNIFICADA DE ASIGNACIÓN (Auto-asignación vs Balanceador)
+        if (usuario.getRol() != null && "SOPORTE".equals(usuario.getRol().getNombre())) {
+            // REGLA: Si quien levanta el ticket es de soporte, se lo auto-asigna
+            nuevoTicket.setUsuarioSoporte(usuario);
+            System.out.println("DEBUG: Ticket auto-asignado al técnico creador: " + usuario.getNombre());
         } else {
-            System.err.println("WARNING: Ticket creado sin técnico asignado.");
+            // REGLA: Si es un empleado de otra área, usamos el balanceador de cargas
+            Usuario soporteAsignado = resolverAsignacion(usuario);
+            if (soporteAsignado != null) {
+                nuevoTicket.setUsuarioSoporte(soporteAsignado);
+                System.out.println("DEBUG: Ticket #" + nuevoTicket.getId() + " asignado por balanceador a: " + soporteAsignado.getNombre());
+            } else {
+                System.err.println("WARNING: Ticket creado sin técnico asignado.");
+            }
         }
 
-        // 6. Persistencia
+        // 6. Persistencia (¡Se guarda una sola vez!)
         Ticket ticketGuardado = ticketRepository.save(nuevoTicket);
 
         // 7. Notificación automática por Telegram
@@ -82,17 +90,21 @@ public class TicketService {
             }
         }
 
+        // 8. Retorno final correcto
         return ticketGuardado;
     }
 
     private Usuario resolverAsignacion(Usuario usuarioArea) {
         if (usuarioArea.getArea() != null && usuarioArea.getArea().getSoporteFijo() != null) {
             Usuario fijo = usuarioArea.getArea().getSoporteFijo();
+            // Validamos que el soporte fijo siga activo y disponible
             if (Boolean.TRUE.equals(fijo.getActivo()) && Boolean.TRUE.equals(fijo.getDisponibleSoporte())) {
                 return fijo;
             }
         }
+
         return usuarioRepository.findAll().stream()
+                // Comparamos el nombre del rol en la entidad, ya no usamos Enum
                 .filter(u -> u.getRol() != null && "SOPORTE".equals(u.getRol().getNombre()) && Boolean.TRUE.equals(u.getDisponibleSoporte()))
                 .min((u1, u2) -> {
                     long carga1 = ticketRepository.countByUsuarioSoporteAndEstatusNombre(u1, "ABIERTO");
@@ -232,4 +244,21 @@ public class TicketService {
 
         return ticket;
     }    
+
+    @Transactional(readOnly = true)
+    public List<TicketResponse> obtenerTicketsParaBandeja(String correoUsuario) {
+        Usuario usuario = usuarioRepository.findByCorreo(correoUsuario)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
+
+        // Si es soporte, le damos SOLO los tickets que se le asignaron por el balanceador o él mismo
+        if (usuario.getRol() != null && "SOPORTE".equals(usuario.getRol().getNombre())) {
+            return ticketRepository.findByUsuarioSoporteId(usuario.getId())
+                    .stream()
+                    .map(this::mapearATicketResponse)
+                    .toList();
+        }
+        
+        // Si es Administrador, le damos todos
+        return obtenerTodosLosTickets();
+    }
 }
