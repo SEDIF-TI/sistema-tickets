@@ -7,6 +7,9 @@ import {
 import { userService } from '../../services/userService';
 import { areaService } from '../../services/areaService';
 
+// IMPORTAMOS EL NUEVO MODAL (Ajusta la ruta si lo guardaste en otra carpeta)
+import ModalCredenciales from '../../components/ModalCredenciales'; 
+
 const rolesDisponibles = [
     { id: 4, nombre: 'ADMINISTRADOR' },
     { id: 5, nombre: 'SOPORTE' },
@@ -28,8 +31,13 @@ const AdminUsuariosPage = () => {
     const [areas, setAreas] = useState([]);
     const [busqueda, setBusqueda] = useState('');
     
+    // Estados para los modales
     const [openModal, setOpenModal] = useState(false);
     const [formData, setFormData] = useState(estadoInicial);
+    
+    // Estados para el Modal de Credenciales
+    const [openModalCredenciales, setOpenModalCredenciales] = useState(false);
+    const [datosImpresion, setDatosImpresion] = useState(null);
 
     const cargarDatos = async () => {
         try {
@@ -77,21 +85,39 @@ const AdminUsuariosPage = () => {
                 ...formData,
                 areaId: Number(formData.areaId),
                 rolId: Number(formData.rolId),
-                // ¡AQUÍ ESTÁ LA MAGIA! Inyectamos el valor que pide el backend a la fuerza
                 disponibleSoporte: false 
             };
 
             if (formData.id) {
+                // Actualizar usuario existente
                 await userService.update(formData.id, payload);
                 alert("Usuario actualizado con éxito.");
+                setOpenModal(false);
+                setFormData(estadoInicial);
+                cargarDatos();
             } else {
+                // Crear usuario nuevo
                 const response = await userService.create(payload);
-                alert(`Usuario creado con éxito.\nContraseña temporal: ${response.data.passwordTemporalTexto}\n\nPor favor, entregue esta contraseña al empleado.`);
+                
+                // Buscamos los nombres del Rol y Área para la credencial
+                const nombreRol = rolesDisponibles.find(r => r.id === formData.rolId)?.nombre || '';
+                const nombreArea = areas.find(a => a.id === formData.areaId)?.nombre || '';
+
+                // Preparamos los datos para imprimir
+                setDatosImpresion({
+                    nombre: formData.nombre,
+                    correo: formData.correo,
+                    rol: nombreRol,
+                    area: nombreArea,
+                    password: response.data.passwordTemporalTexto // El dato que viene de Spring Boot
+                });
+
+                // Cerramos el formulario y abrimos el modal de éxito
+                setOpenModal(false);
+                setFormData(estadoInicial);
+                cargarDatos(); 
+                setOpenModalCredenciales(true);
             }
-            
-            setOpenModal(false);
-            setFormData(estadoInicial);
-            cargarDatos(); 
             
         } catch (error) {
             const mensajeBackend = (error.response && typeof error.response.data === 'string') 
@@ -186,7 +212,6 @@ const AdminUsuariosPage = () => {
             <Dialog open={openModal} onClose={() => setOpenModal(false)} maxWidth="sm" fullWidth>
                 <DialogTitle>{formData.id ? "Editar Usuario" : "Registrar Nuevo Usuario"}</DialogTitle>
                 <DialogContent>
-                    {/* AQUI ESTÁ EL CAMBIO PRINCIPAL: Se agregó || '' a los value de los TextField */}
                     <TextField margin="dense" label="Nombre Completo" name="nombre" fullWidth value={formData.nombre || ''} onChange={handleChange} />
                     <TextField margin="dense" label="Correo Electrónico" name="correo" type="email" fullWidth value={formData.correo || ''} onChange={handleChange} />
                     <TextField margin="dense" label="Nombre de Usuario (Login)" name="username" fullWidth value={formData.username || ''} onChange={handleChange} disabled={!!formData.id} />
@@ -223,6 +248,14 @@ const AdminUsuariosPage = () => {
                     <Button onClick={handleGuardar} variant="contained" color="primary">Guardar Usuario</Button>
                 </DialogActions>
             </Dialog>
+
+            {/* AQUI AGREGAMOS NUESTRO NUEVO COMPONENTE DE IMPRESIÓN */}
+            <ModalCredenciales 
+                open={openModalCredenciales} 
+                onClose={() => setOpenModalCredenciales(false)} 
+                usuarioData={datosImpresion} 
+            />
+
         </Box>
     );
 };

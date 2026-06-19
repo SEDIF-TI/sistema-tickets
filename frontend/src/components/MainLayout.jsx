@@ -1,78 +1,159 @@
-import { useContext } from 'react';
-import { AuthContext } from '../context/AuthContext.jsx';
-import { getIcon } from '../util/iconMapper.js';
+import React, { useContext } from 'react';
+import { Box, Drawer, AppBar, Toolbar, List, Typography, ListItem, ListItemButton, ListItemIcon, Button, Tooltip, IconButton } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
-import { 
-    Box, 
-    Drawer, 
-    AppBar, 
-    Toolbar, 
-    List, 
-    Typography, 
-    ListItem, 
-    ListItemButton, 
-    ListItemIcon, 
-    Tooltip,
-    Divider
-} from '@mui/material';
+import { AuthContext } from '../context/AuthContext.jsx';
 
-// Imports de iconos corregidos (sin duplicados)
-import LogoutIcon from '@mui/icons-material/Logout';
-import InfoIcon from '@mui/icons-material/Info';
+// Iconos
+import ExitToAppIcon from '@mui/icons-material/ExitToApp';
+import DashboardIcon from '@mui/icons-material/Dashboard';
+import GroupIcon from '@mui/icons-material/Group';
+import HistoryIcon from '@mui/icons-material/History';
+import DomainIcon from '@mui/icons-material/Domain';
+import AddCircleIcon from '@mui/icons-material/AddCircle';
+import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 
-const drawerWidth = 240;
+const drawerWidth = 65; 
+const COLOR_GUINDA = '#801A36';
 
 export default function MainLayout({ children }) {
     const { user, logout } = useContext(AuthContext);
     const navigate = useNavigate();
 
-    // Ahora las vistas vienen dinámicamente desde la base de datos
-    const vistas = user?.vistas || [];
+    const handleLogout = () => {
+        logout();
+        navigate('/login');
+    };
+
+    // Identificamos el rol exacto del usuario activo
+    const userRole = user?.rol || user?.role || user?.rolNombre || '';
+    const cleanRole = userRole.replace('ROLE_', '').toUpperCase();
+
+    // --- NUEVA BARRERA VISUAL ---
+    // Verificamos si el usuario está castigado en su primer inicio de sesión
+    const estaBloqueado = user?.passwordTemporal;
 
     return (
         <Box sx={{ display: 'flex' }}>
-            <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
+            {/* BARRA SUPERIOR */}
+            <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1, bgcolor: COLOR_GUINDA }}>
                 <Toolbar sx={{ display: 'flex', justifyContent: 'space-between' }}>
                     <Typography variant="h6" noWrap component="div" sx={{ fontWeight: 'bold' }}>
                         SEDIF - Sistema de Tickets
                     </Typography>
-                    <LogoutIcon onClick={() => { logout(); navigate('/login'); }} sx={{ cursor: 'pointer' }} />
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <Typography variant="body2" sx={{ textTransform: 'uppercase' }}>
+                            {user?.nombre || 'Usuario'} | {cleanRole}
+                        </Typography>
+
+                        {/* Ocultamos el botón de ir al perfil si ya está encerrado obligatoriamente en él */}
+                        {!estaBloqueado && (
+                            <Tooltip title="Mi Perfil">
+                                <IconButton color="inherit" onClick={() => navigate('/perfil')}>
+                                    <AccountCircleIcon />
+                                </IconButton>
+                            </Tooltip>
+                        )}
+
+                        <Button color="inherit" onClick={handleLogout} startIcon={<ExitToAppIcon />}>
+                            Salir
+                        </Button>
+                    </Box>
                 </Toolbar>
             </AppBar>
 
-            <Drawer
-                variant="permanent"
-                sx={{
-                    width: drawerWidth,
-                    flexShrink: 0,
-                    [`& .MuiDrawer-paper`]: { width: drawerWidth, boxSizing: 'border-box', mt: 8 },
-                }}
-            >
-                <List>
-                    {vistas.map((vista, index) => {
-                        // LA MAGIA: Si getIcon falla, usa el icono de interrogación
-                        const Icono = getIcon(vista.icono) || InfoIcon;
+            {/* MENÚ LATERAL (Solo se dibuja si NO está bloqueado) */}
+            {!estaBloqueado && (
+                <Drawer
+                    variant="permanent"
+                    sx={{
+                        width: drawerWidth,
+                        flexShrink: 0,
+                        '& .MuiDrawer-paper': {
+                            width: drawerWidth,
+                            boxSizing: 'border-box',
+                            overflowX: 'hidden',
+                            backgroundColor: '#ffffff',
+                            borderRight: '1px solid #e0e0e0'
+                        },
+                    }}
+                >
+                    <Toolbar /> 
+                    
+                    <List sx={{ pt: 2 }}>
                         
-                        return (
-                            <ListItem key={index} disablePadding sx={{ display: 'block' }}>
-                                <Tooltip title={vista.nombre} placement="right">
-                                    <ListItemButton 
-                                        onClick={() => navigate(vista.ruta)} 
-                                        sx={{ justifyContent: 'center', py: 2 }}
-                                    >
-                                        <ListItemIcon sx={{ minWidth: 0, justifyContent: 'center' }}>
-                                            <Icono sx={{ color: '#5c0a28' }} />
-                                        </ListItemIcon>
-                                    </ListItemButton>
-                                </Tooltip>
-                            </ListItem>
-                        );
-                    })}
-                </List>
-                <Divider />
-            </Drawer>
+                        {/* ---------------- MENÚ EXCLUSIVO DE ADMINISTRADOR ---------------- */}
+                        {cleanRole === 'ADMINISTRADOR' && (
+                            <>
+                                <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
+                                    <Tooltip title="Dashboard" placement="right" arrow>
+                                        <ListItemButton onClick={() => navigate('/admin/dashboard')} sx={{ justifyContent: 'center', px: 2.5, py: 1.5 }}>
+                                            <ListItemIcon sx={{ minWidth: 0, justifyContent: 'center', color: COLOR_GUINDA }}>
+                                                <DashboardIcon />
+                                            </ListItemIcon>
+                                        </ListItemButton>
+                                    </Tooltip>
+                                </ListItem>
 
-            <Box component="main" sx={{ flexGrow: 1, p: 3, mt: 8 }}>
+                                <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
+                                    <Tooltip title="Usuarios" placement="right" arrow>
+                                        <ListItemButton onClick={() => navigate('/admin/usuarios')} sx={{ justifyContent: 'center', px: 2.5, py: 1.5 }}>
+                                            <ListItemIcon sx={{ minWidth: 0, justifyContent: 'center', color: COLOR_GUINDA }}>
+                                                <GroupIcon />
+                                            </ListItemIcon>
+                                        </ListItemButton>
+                                    </Tooltip>
+                                </ListItem>
+
+                                <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
+                                    <Tooltip title="Áreas y Departamentos" placement="right" arrow>
+                                        <ListItemButton onClick={() => navigate('/admin/areas')} sx={{ justifyContent: 'center', px: 2.5, py: 1.5 }}>
+                                            <ListItemIcon sx={{ minWidth: 0, justifyContent: 'center', color: COLOR_GUINDA }}>
+                                                <DomainIcon />
+                                            </ListItemIcon>
+                                        </ListItemButton>
+                                    </Tooltip>
+                                </ListItem>
+                            </>
+                        )}
+
+                        {/* ---------------- MENÚ EXCLUSIVO DE EMPLEADO ---------------- */}
+                        {cleanRole === 'EMPLEADO' && (
+                            <>
+                                <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
+                                    <Tooltip title="Levantar Nuevo Ticket" placement="right" arrow>
+                                        <ListItemButton onClick={() => navigate('/empleado/nuevo')} sx={{ justifyContent: 'center', px: 2.5, py: 1.5 }}>
+                                            <ListItemIcon sx={{ minWidth: 0, justifyContent: 'center', color: COLOR_GUINDA }}>
+                                                <AddCircleIcon />
+                                            </ListItemIcon>
+                                        </ListItemButton>
+                                    </Tooltip>
+                                </ListItem>
+                            </>
+                        )}
+
+                        {/* ---------------- MENÚ COMPARTIDO (AMBOS LO VEN) ---------------- */}
+                        <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
+                            <Tooltip title={cleanRole === 'ADMINISTRADOR' ? "Bitácora Global" : "Mis Tickets"} placement="right" arrow>
+                                <ListItemButton onClick={() => navigate('/empleado/historial')} sx={{ justifyContent: 'center', px: 2.5, py: 1.5 }}>
+                                    <ListItemIcon sx={{ minWidth: 0, justifyContent: 'center', color: COLOR_GUINDA }}>
+                                        <HistoryIcon />
+                                    </ListItemIcon>
+                                </ListItemButton>
+                            </Tooltip>
+                        </ListItem>
+
+                    </List>
+                </Drawer>
+            )}
+
+            {/* CONTENIDO PRINCIPAL */}
+            <Box component="main" sx={{ 
+                flexGrow: 1, 
+                p: 0, 
+                mt: 8, 
+                // Si el cajón izquierdo no existe, le damos el 100% del ancho a la pantalla
+                width: estaBloqueado ? '100%' : `calc(100% - ${drawerWidth}px)` 
+            }}>
                 {children}
             </Box>
         </Box>

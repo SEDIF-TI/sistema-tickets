@@ -27,9 +27,11 @@ import DashboardPage from './pages/admin/DashboardPage.jsx';
 import GeneradorDocumentos from './components/GeneradorDocumentos.jsx'; 
 
 // 1. EL POLICÍA DE TRÁNSITO (AppContent)
+// 1. EL POLICÍA DE TRÁNSITO (AppContent)
 function AppContent() {
     const { user } = useContext(AuthContext);
 
+    // Nivel 1: Si no hay sesión, al Login
     if (!user) {
         return (
             <Routes>
@@ -39,9 +41,24 @@ function AppContent() {
         );
     }
 
+    // Obtenemos el rol limpio para tomar decisiones
     const userRole = user.rol || user.role || user.rolNombre || '';
     const cleanRole = userRole.replace('ROLE_', '').toUpperCase();
 
+    // ---> LA SOLUCIÓN: Elegimos dinámicamente el marco visual según el rol <---
+    const LayoutDelUsuario = cleanRole === 'SOPORTE' ? SoporteLayout : MainLayout;
+
+    // Nivel 2: EL CANDADO. Si la contraseña es temporal, lo encerramos en el perfil.
+    if (user.passwordTemporal) {
+        return (
+            <Routes>
+                <Route path="/perfil" element={<LayoutDelUsuario><PerfilPage /></LayoutDelUsuario>} />
+                <Route path="*" element={<Navigate to="/perfil" replace />} />
+            </Routes>
+        );
+    }
+
+    // Nivel 3: Navegación normal si ya cambió su contraseña
     let rutaPorDefecto = '/empleado/historial'; 
     if (cleanRole === 'ADMINISTRADOR') rutaPorDefecto = '/admin/dashboard';
     if (cleanRole === 'SOPORTE') rutaPorDefecto = '/soporte/bandeja';
@@ -69,8 +86,9 @@ function AppContent() {
             <Route path="/empleado/nuevo" element={<MainLayout><FormularioTicket /></MainLayout>} />
             <Route path="/empleado/historial" element={<MainLayout><TicketsPage /></MainLayout>} />
 
-            {/* Ruta del Nuevo Perfil */}
-            <Route path="/perfil" element={<MainLayout><PerfilPage /></MainLayout>} />
+            {/* ---> RUTA DEL PERFIL DINÁMICA <--- */}
+            {/* Ahora respeta el marco de quien lo visite sin borrarle sus opciones */}
+            <Route path="/perfil" element={<LayoutDelUsuario><PerfilPage /></LayoutDelUsuario>} />
 
             {/* Cualquier otra ruta inventada lo regresa a su panel */}
             <Route path="*" element={<Navigate to={rutaPorDefecto} replace />} />

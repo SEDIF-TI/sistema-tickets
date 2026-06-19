@@ -1,4 +1,4 @@
-import { useContext, useState } from 'react';
+import React, { useContext, useState } from 'react';
 import { AuthContext } from '../context/AuthContext.jsx';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -6,20 +6,24 @@ import {
     IconButton, ListItem, ListItemButton, ListItemIcon, Button,
     Badge, Snackbar, Alert, Tooltip 
 } from '@mui/material';
+
+// Iconos
 import LogoutIcon from '@mui/icons-material/Logout';
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import AddCircleIcon from '@mui/icons-material/AddCircle';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import DescriptionIcon from '@mui/icons-material/Description';
+import AccountCircleIcon from '@mui/icons-material/AccountCircle'; // NUEVO ÍCONO DE PERFIL
 
-const drawerWidth = 70; // 1. Ancho del menú
+// Sincronizamos las medidas y colores con el MainLayout
+const drawerWidth = 65; 
+const COLOR_GUINDA = '#801A36';
 
 export default function SoporteLayout({ children }) {
-    // 2. Herramientas de navegación y sesión
     const { user, logout } = useContext(AuthContext);
     const navigate = useNavigate();
     
-    // 3. Estados de la notificación
+    // Estados de Notificación de Soporte
     const [openAviso, setOpenAviso] = useState(false);
     const [mensajeAviso, setMensajeAviso] = useState('');
 
@@ -32,100 +36,121 @@ export default function SoporteLayout({ children }) {
         setOpenAviso(false);
     };
 
+    const handleLogout = () => {
+        logout();
+        navigate('/login');
+    };
+
+    // Identificadores de Rol y Seguridad
+    const userRole = user?.rol || user?.role || user?.rolNombre || '';
+    const cleanRole = userRole.replace('ROLE_', '').toUpperCase();
+    const estaBloqueado = user?.passwordTemporal; // BARRERA VISUAL
+
     return (
         <Box sx={{ display: 'flex' }}>
             
-            {/* 4. BARRA SUPERIOR (AppBar) */}
-            <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
+            {/* BARRA SUPERIOR */}
+            <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1, bgcolor: COLOR_GUINDA }}>
                 <Toolbar sx={{ display: 'flex', justifyContent: 'space-between' }}>
                     <Typography variant="h6" noWrap component="div" sx={{ fontWeight: 'bold' }}>
                         SEDIF - Sistema de Tickets
                     </Typography>
 
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                        {/* Campana */}
-                        <IconButton color="inherit" onClick={simularLlegadaAviso}>
-                            <Badge badgeContent={1} color="error">
-                                <NotificationsIcon />
-                            </Badge>
-                        </IconButton>
+                        {/* Campana (Se oculta si está bloqueado en el perfil) */}
+                        {!estaBloqueado && (
+                            <IconButton color="inherit" onClick={simularLlegadaAviso}>
+                                <Badge badgeContent={1} color="error">
+                                    <NotificationsIcon />
+                                </Badge>
+                            </IconButton>
+                        )}
 
-                        {/* Usuario y Salir */}
-                        <Typography variant="body2">
-                            {user?.nombre || 'Usuario'} | {user?.rol || 'SOPORTE'}
+                        <Typography variant="body2" sx={{ textTransform: 'uppercase' }}>
+                            {user?.nombre || 'Usuario'} | {cleanRole}
                         </Typography>
-                        <Button 
-                            color="inherit" 
-                            startIcon={<LogoutIcon />} 
-                            onClick={() => { logout(); navigate('/login'); }}
-                        >
+
+                        {/* ---> NUEVO BOTÓN DE PERFIL <--- */}
+                        {!estaBloqueado && (
+                            <Tooltip title="Mi Perfil">
+                                <IconButton color="inherit" onClick={() => navigate('/perfil')}>
+                                    <AccountCircleIcon />
+                                </IconButton>
+                            </Tooltip>
+                        )}
+
+                        <Button color="inherit" onClick={handleLogout} startIcon={<LogoutIcon />}>
                             Salir
                         </Button>
                     </Box>
                 </Toolbar>
             </AppBar>
 
-            {/* 5. MENÚ LATERAL COLAPSADO (Drawer) */}
-            <Drawer 
-                variant="permanent" 
-                sx={{ 
-                    width: drawerWidth, 
-                    flexShrink: 0, 
-                    [`& .MuiDrawer-paper`]: { width: drawerWidth, overflowX: 'hidden' } 
-                }}
-            >
-                <Toolbar /> {/* Empuja los iconos hacia abajo para que la barra superior no los tape */}
-                <Divider />
-                <List>
-                    {/* Bloque del Botón: Mis Tickets */}
-                    <ListItem disablePadding sx={{ display: 'block' }}>
-                        <Tooltip title="Mis Tickets" placement="right">
-                            <ListItemButton 
-                                onClick={() => navigate('/soporte/bandeja')} // Navegación SPA interna segura
-                                sx={{ justifyContent: 'center', py: 2 }}
-                            >
-                                <ListItemIcon sx={{ minWidth: 0, justifyContent: 'center' }}>
-                                    <AssignmentIcon color="primary" />
-                                </ListItemIcon>
-                            </ListItemButton>
-                        </Tooltip>
-                    </ListItem>
-                    
-                    {/* Bloque del Botón: Levantar Ticket */}
-                    <ListItem disablePadding sx={{ display: 'block' }}>
-                        <Tooltip title="Levantar Ticket" placement="right">
-                            <ListItemButton 
-                                onClick={() => navigate('/soporte/nuevo')} // Mismo mecanismo para evitar recargas de página
-                                sx={{ justifyContent: 'center', py: 2 }}
-                            >
-                                <ListItemIcon sx={{ minWidth: 0, justifyContent: 'center' }}>
-                                    <AddCircleIcon color="primary" />
-                                </ListItemIcon>
-                            </ListItemButton>
-                        </Tooltip>
-                    </ListItem>
-                    {/* Bloque del Botón: Generar Documentos */}
-                    <ListItem disablePadding sx={{ display: 'block' }}>
-                        <Tooltip title="Generar Documento" placement="right">
-                            <ListItemButton 
-                                onClick={() => navigate('/documentos/crear')} // <-- ¡AQUÍ ESTÁ LA CORRECCIÓN!
-                                sx={{ justifyContent: 'center', py: 2 }}
-                            >
-                                <ListItemIcon sx={{ minWidth: 0, justifyContent: 'center' }}>
-                                    <DescriptionIcon color="primary" />
-                                </ListItemIcon>
-                            </ListItemButton>
-                        </Tooltip>
-                    </ListItem>
-                </List>
-            </Drawer>
+            {/* MENÚ LATERAL ULTRA COMPACTO (Solo se dibuja si NO está bloqueado) */}
+            {!estaBloqueado && (
+                <Drawer 
+                    variant="permanent" 
+                    sx={{ 
+                        width: drawerWidth, 
+                        flexShrink: 0, 
+                        '& .MuiDrawer-paper': { 
+                            width: drawerWidth, 
+                            boxSizing: 'border-box',
+                            overflowX: 'hidden',
+                            backgroundColor: '#ffffff',
+                            borderRight: '1px solid #e0e0e0'
+                        } 
+                    }}
+                >
+                    <Toolbar /> 
+                    <List sx={{ pt: 2 }}>
+                        {/* Mis Tickets */}
+                        <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
+                            <Tooltip title="Mis Tickets" placement="right" arrow>
+                                <ListItemButton onClick={() => navigate('/soporte/bandeja')} sx={{ justifyContent: 'center', px: 2.5, py: 1.5 }}>
+                                    <ListItemIcon sx={{ minWidth: 0, justifyContent: 'center', color: COLOR_GUINDA }}>
+                                        <AssignmentIcon />
+                                    </ListItemIcon>
+                                </ListItemButton>
+                            </Tooltip>
+                        </ListItem>
+                        
+                        {/* Levantar Ticket */}
+                        <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
+                            <Tooltip title="Levantar Ticket" placement="right" arrow>
+                                <ListItemButton onClick={() => navigate('/tickets/nuevo')} sx={{ justifyContent: 'center', px: 2.5, py: 1.5 }}>
+                                    <ListItemIcon sx={{ minWidth: 0, justifyContent: 'center', color: COLOR_GUINDA }}>
+                                        <AddCircleIcon />
+                                    </ListItemIcon>
+                                </ListItemButton>
+                            </Tooltip>
+                        </ListItem>
 
-            {/* 6. CONTENIDO PRINCIPAL (Children) */}
-            <Box component="main" sx={{ flexGrow: 1, p: 3, mt: 8 }}>
+                        {/* Generar Documentos */}
+                        <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
+                            <Tooltip title="Generar Documento" placement="right" arrow>
+                                <ListItemButton onClick={() => navigate('/documentos/crear')} sx={{ justifyContent: 'center', px: 2.5, py: 1.5 }}>
+                                    <ListItemIcon sx={{ minWidth: 0, justifyContent: 'center', color: COLOR_GUINDA }}>
+                                        <DescriptionIcon />
+                                    </ListItemIcon>
+                                </ListItemButton>
+                            </Tooltip>
+                        </ListItem>
+                    </List>
+                </Drawer>
+            )}
+
+            {/* CONTENIDO PRINCIPAL */}
+            <Box component="main" sx={{ 
+                flexGrow: 1, 
+                p: 0, 
+                mt: 8, 
+                width: estaBloqueado ? '100%' : `calc(100% - ${drawerWidth}px)`
+            }}>
                 {children}
             </Box>
 
-            {/* 7. COMPONENTE DE NOTIFICACIÓN (Snackbar) */}
+            {/* COMPONENTE DE AVISOS DE SOPORTE */}
             <Snackbar 
                 open={openAviso} 
                 autoHideDuration={6000} 
@@ -135,17 +160,13 @@ export default function SoporteLayout({ children }) {
                 <Alert 
                     onClose={handleCloseAviso} 
                     variant="filled" 
+                    icon={false}
                     sx={{ 
-                        minWidth: '400px', 
-                        padding: '20px 30px', 
-                        fontSize: '1.2rem', 
-                        mt: 6, 
-                        fontWeight: 'bold',
-                        backgroundColor: 'primary.main', 
-                        color: 'white',
-                        '& .MuiAlert-icon': { color: 'white', fontSize: '2rem', mr: 2 } 
+                        minWidth: '400px', padding: '20px 30px', fontSize: '1.2rem', mt: 6, fontWeight: 'bold',
+                        backgroundColor: COLOR_GUINDA, color: 'white'
                     }}
                 >
+                    <NotificationsIcon sx={{ mr: 2, verticalAlign: 'middle', fontSize: '2rem' }} />
                     {mensajeAviso}
                 </Alert>
             </Snackbar>
