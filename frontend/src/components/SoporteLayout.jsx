@@ -108,7 +108,7 @@ export default function SoporteLayout({ children }) {
                     <ListItem disablePadding sx={{ display: 'block' }}>
                         <Tooltip title="Generar Documento" placement="right">
                             <ListItemButton 
-                                onClick={() => navigate('/documentos')} 
+                                onClick={() => navigate('/documentos/crear')} // <-- ¡AQUÍ ESTÁ LA CORRECCIÓN!
                                 sx={{ justifyContent: 'center', py: 2 }}
                             >
                                 <ListItemIcon sx={{ minWidth: 0, justifyContent: 'center' }}>
