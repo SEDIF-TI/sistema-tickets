@@ -1,5 +1,4 @@
 package com.sedif.sistema_tickets.config;
-
 import com.sedif.sistema_tickets.core.auth.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
@@ -16,19 +15,15 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.http.HttpMethod;
 
 import java.util.List;
-
 @Configuration
 @EnableWebSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
-
     private final JwtAuthenticationFilter jwtAuthFilter;
-
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
-
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
@@ -43,46 +38,38 @@ public class SecurityConfig {
                 })
                 // Manejo cuando el token es inválido o no se ha proporcionado autenticación
                 .authenticationEntryPoint((request, response, authException) -> {
-                    response.setStatus(403); 
+                    response.setStatus(403);
                     response.getWriter().write("Acceso denegado: Autenticación requerida.");
                 })
             )
             .authorizeHttpRequests(auth -> auth
                 // Tus rutas públicas (login, ws, etc)
-                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll() 
+                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers("/api/v1/auth/**").permitAll()
                 .requestMatchers("/ws-tickets/**").permitAll()
                 .requestMatchers("/error").permitAll()
-                
                 // Tu regla para cambiar contraseña
                 .requestMatchers("/api/v1/admin/usuarios/password", "/api/usuarios/password").authenticated()
-                
                 // --- ¡ESTA ES LA LÍNEA QUE DEBES AGREGAR PARA SOLUCIONAR EL ERROR 403! ---
                 .requestMatchers("/api/v1/tickets/**").hasAnyAuthority("EMPLEADO", "ROLE_EMPLEADO", "SOPORTE", "ROLE_SOPORTE", "ADMINISTRADOR", "ROLE_ADMINISTRADOR")
-                
                 // Tu regla de administradores (siempre va al final de las reglas específicas)
                 .requestMatchers("/api/v1/admin/**").hasAnyAuthority("ADMINISTRADOR", "ROLE_ADMINISTRADOR")
-                
                 // Cualquier otra petición debe estar autenticada
                 .anyRequest().authenticated()
             )
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
-
         return http.build();
     }
-
     @Bean
     public org.springframework.web.cors.CorsConfigurationSource corsConfigurationSource() {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         CorsConfiguration config = new CorsConfiguration();
-        
         config.setAllowCredentials(true);
-        config.setAllowedOriginPatterns(List.of("*")); 
+        config.setAllowedOriginPatterns(List.of("*"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        
         source.registerCorsConfiguration("/**", config);
         return source;
     }
-}
+} 
