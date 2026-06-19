@@ -24,4 +24,12 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
 
     @Query("SELECT t.usuarioArea.area.nombre, COUNT(t) FROM Ticket t GROUP BY t.usuarioArea.area.nombre")
     List<Object[]> contarTicketsPorArea();
+
+    // ... lo que ya tienes ...
+
+    // NUEVO: Contar tickets según el nombre de su estatus (ej. "RESUELTO", "ABIERTO")
+    long countByEstatusNombreIgnoreCase(String nombreEstatus);
+
+    // NUEVO: Contar tickets que NO estén resueltos (pendientes)
+    long countByEstatusNombreNotIgnoreCase(String nombreEstatus);
 }
