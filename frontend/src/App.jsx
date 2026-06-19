@@ -11,10 +11,14 @@ import theme from './theme/theme.js';
 import { AuthContext, AuthProvider } from './context/AuthContext.jsx';
 import { WebSocketProvider } from './context/WebSocketContext.jsx';
 
-// Layouts y Páginas
+// Layouts y Páginas Base
 import LoginPage from './pages/LoginPage.jsx';
+import PrimerCambioPassword from './pages/PrimerCambioPassword.jsx'; // RECUPERADO
 import MainLayout from './components/MainLayout.jsx';
 import SoporteLayout from './components/SoporteLayout.jsx';
+import PerfilPage from './pages/PerfilPage.jsx';
+
+// Páginas de Roles
 import FormularioTicket from './pages/empleado/FormularioTicket';
 import TicketsPage from './pages/tickets/TicketsPage';
 import PanelSoporte from './pages/soporte/PanelSoporte.jsx';
@@ -72,6 +76,7 @@ function AppContent() {
             <Route path="/admin/dashboard" element={<MainLayout><DashboardPage /></MainLayout>} />
             <Route path="/admin/usuarios" element={<MainLayout><AdminUsuariosPage /></MainLayout>} />
             <Route path="/admin/areas" element={<MainLayout><AdminAreasPage /></MainLayout>} />
+            <Route path="/admin/avisos" element={<MainLayout><AdminAvisosPage /></MainLayout>} />
 
             {/* Rutas Protegidas de Soporte */}
             <Route path="/soporte/bandeja" element={<SoporteLayout><PanelSoporte /></SoporteLayout>} />

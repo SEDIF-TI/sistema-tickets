@@ -16,6 +16,8 @@ const drawerWidth = 65;
 const COLOR_GUINDA = '#801A36';
 
 export default function MainLayout({ children }) {
+    // 2. HERRAMIENTAS DE NAVEGACIÓN Y SESIÓN
+    // Extraemos los datos del usuario logueado y la función para cerrar sesión
     const { user, logout } = useContext(AuthContext);
     const navigate = useNavigate();
 
@@ -37,6 +39,8 @@ export default function MainLayout({ children }) {
             {/* BARRA SUPERIOR */}
             <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1, bgcolor: COLOR_GUINDA }}>
                 <Toolbar sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                    
+                    {/* Título de la aplicación */}
                     <Typography variant="h6" noWrap component="div" sx={{ fontWeight: 'bold' }}>
                         SEDIF - Sistema de Tickets
                     </Typography>
@@ -156,6 +160,17 @@ export default function MainLayout({ children }) {
             }}>
                 {children}
             </Box>
+
+            {/* ========================================== */}
+            {/* 10. ALERTA GIGANTE AUTOMÁTICA (Snackbar)   */}
+            {/* ========================================== */}
+            {/* Este componente flota sobre toda la interfaz de manera independiente */}
+            <Snackbar open={openAviso} autoHideDuration={8000} onClose={handleCloseAviso} anchorOrigin={{ vertical: 'top', horizontal: 'center' }}>
+                <Alert onClose={handleCloseAviso} variant="filled" sx={{ minWidth: '400px', padding: '20px 30px', fontSize: '1.2rem', mt: 6, fontWeight: 'bold', backgroundColor: 'primary.main', color: 'white', '& .MuiAlert-icon': { color: 'white', fontSize: '2rem', mr: 2 } }}>
+                    {mensajeAviso}
+                </Alert>
+            </Snackbar>
+            
         </Box>
     );
 }

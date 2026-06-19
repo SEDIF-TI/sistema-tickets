@@ -56,4 +56,12 @@ public class AvisoService {
                 .map(AvisoResponseRecord::desdeEntidad)
                 .toList();
     }
+
+    @Transactional
+    public void desactivarAviso(Long id) {
+        Aviso aviso = avisoRepository.findById(id)
+            .orElseThrow(() -> new IllegalArgumentException("Aviso no encontrado"));
+        aviso.setActivo(false);
+        avisoRepository.save(aviso);
+    }
 }
