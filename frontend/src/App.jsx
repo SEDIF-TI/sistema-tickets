@@ -23,8 +23,8 @@ import FormularioTicket from './pages/empleado/FormularioTicket';
 import TicketsPage from './pages/tickets/TicketsPage';
 import PanelSoporte from './pages/soporte/PanelSoporte.jsx';
 import AdminUsuariosPage from './pages/admin/AdminUsuariosPage.jsx';
+import AdminAvisosPage from './pages/admin/AdminAvisosPage.jsx';
 import AdminAreasPage from './pages/admin/AdminAreasPage';
-import PerfilPage from './pages/PerfilPage.jsx';
 import DashboardPage from './pages/admin/DashboardPage.jsx';
 
 // --- IMPORTACIÓN NUEVA (Asegúrate de que la ruta de la carpeta sea correcta) ---
@@ -82,7 +82,7 @@ function AppContent() {
             <Route path="/soporte/bandeja" element={<SoporteLayout><PanelSoporte /></SoporteLayout>} />
             
             {/* CORRECCIÓN: Ajustamos esta ruta para que coincida con lo que tu compañero guardó en la BD */}
-            <Route path="/tickets/nuevo" element={<SoporteLayout><FormularioTicket /></SoporteLayout>} /> 
+            <Route path="/tickets/nuevo" element={<MainLayout><FormularioTicket /></MainLayout>} /> 
             
             {/* NUEVA RUTA: Agregamos la ruta del generador de documentos dentro del layout de soporte */}
             <Route path="/documentos/crear" element={<SoporteLayout><GeneradorDocumentos /></SoporteLayout>} />

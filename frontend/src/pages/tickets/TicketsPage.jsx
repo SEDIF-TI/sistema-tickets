@@ -5,14 +5,22 @@ import CheckIcon from '@mui/icons-material/Check';
 import { useNavigate, useLocation } from 'react-router-dom';
 import api from '../../services/api';
 
+const COLOR_GUINDA = '#801A36';
+
 export default function TicketsPage() {
     const [historialTickets, setHistorialTickets] = useState([]);
     const navigate = useNavigate();
     const location = useLocation();
 
-    // Estados para la alerta (Snackbar)
     const [openSnackbar, setOpenSnackbar] = useState(false);
     const [snackbarMessage, setSnackbarMessage] = useState('');
+
+    // Función de formato compacto
+    const formatearFecha = (fecha) => {
+        if (!fecha) return '--/--/----';
+        const d = new Date(fecha);
+        return `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear().toString().slice(-2)} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+    };
 
     const cargarHistorial = async () => {
         try {
@@ -21,24 +29,6 @@ export default function TicketsPage() {
         } catch (error) {
             console.error("Error al cargar el historial:", error);
         }
-    };
-
-    useEffect(() => { 
-        cargarHistorial(); 
-        
-        // Verificamos si venimos del formulario con un mensaje de éxito
-        if (location.state && location.state.mensajeExito) {
-            setSnackbarMessage(location.state.mensajeExito);
-            setOpenSnackbar(true);
-            
-            // Limpiamos el historial de navegación para que la alerta no vuelva a salir si recargan la página (F5)
-            window.history.replaceState({}, document.title);
-        }
-    }, [location]);
-
-    const handleCloseSnackbar = (event, reason) => {
-        if (reason === 'clickaway') return;
-        setOpenSnackbar(false);
     };
 
     const handleFinalizarTicket = async (ticketId) => {
@@ -54,58 +44,27 @@ export default function TicketsPage() {
         }
     };
 
+    useEffect(() => { 
+        cargarHistorial(); 
+        if (location.state?.mensajeExito) {
+            setSnackbarMessage(location.state.mensajeExito);
+            setOpenSnackbar(true);
+            window.history.replaceState({}, document.title);
+        }
+    }, [location]);
+
     return (
-        <Box sx={{ p: { xs: 1, sm: 3 }, maxWidth: 1200, mx: 'auto' }}>
+        <Box sx={{ p: { xs: 1, sm: 3 }, maxWidth: 1300, mx: 'auto' }}>
             
-            {/* ALERTA FLOTANTE ESTILO INSTITUCIONAL (CENTRO ARRIBA) */}
-            <Snackbar 
-                open={openSnackbar} 
-                autoHideDuration={5000} // Se oculta sola después de 5 segundos
-                onClose={handleCloseSnackbar}
-                anchorOrigin={{ vertical: 'top', horizontal: 'center' }} // Centrado en la parte superior
-                sx={{ top: { xs: 20, sm: 80 } }} // Margen superior para que no choque con tu Navbar
-            >
-                <Alert 
-                    onClose={handleCloseSnackbar} 
-                    icon={<CheckIcon sx={{ color: 'white', fontSize: 28 }} />} // Usamos el icono que ya funciona
-                    sx={{ 
-                        backgroundColor: '#5c0a28', // Color vino institucional
-                        color: 'white',
-                        minWidth: { xs: '300px', sm: '600px' }, // Mucho más ancho, como en tu captura
-                        padding: '16px 24px',
-                        fontSize: '1.1rem',
-                        fontWeight: '600',
-                        borderRadius: '8px',
-                        boxShadow: '0px 10px 20px rgba(92, 10, 40, 0.4)', // Sombra para darle profundidad
-                        alignItems: 'center',
-                        '& .MuiAlert-action': {
-                            color: 'white', // La tachita de cerrar en color blanco
-                            padding: '0 8px'
-                        }
-                    }}
-                >
+            <Snackbar open={openSnackbar} autoHideDuration={5000} onClose={() => setOpenSnackbar(false)} anchorOrigin={{ vertical: 'top', horizontal: 'center' }}>
+                <Alert onClose={() => setOpenSnackbar(false)} sx={{ backgroundColor: COLOR_GUINDA, color: 'white' }}>
                     {snackbarMessage}
                 </Alert>
             </Snackbar>
 
-            <Box sx={{ 
-                display: 'flex', 
-                flexDirection: { xs: 'column', sm: 'row' }, 
-                justifyContent: 'space-between', 
-                alignItems: { xs: 'flex-start', sm: 'center' }, 
-                gap: 2, 
-                mb: 4 
-            }}>
-                <Typography variant="h4" sx={{ color: '#2c3e50', fontWeight: 'bold', fontSize: { xs: '1.8rem', sm: '2.125rem' } }}>
-                    Historial de Tickets
-                </Typography>
-                
-                <Button 
-                    variant="contained" 
-                    color="primary"
-                    startIcon={<AddIcon />} 
-                    onClick={() => navigate('/tickets/nuevo')}
-                >
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+                <Typography variant="h4" sx={{ fontWeight: 'bold', color: COLOR_GUINDA }}>Historial de Tickets</Typography>
+                <Button variant="contained" startIcon={<AddIcon />} onClick={() => navigate('/tickets/nuevo')} sx={{ bgcolor: COLOR_GUINDA }}>
                     Levantar Ticket
                 </Button>
             </Box>
@@ -113,52 +72,42 @@ export default function TicketsPage() {
             <TableContainer component={Paper} elevation={2} sx={{ borderRadius: 3, overflow: 'hidden' }}>
                 <Table>
                     <TableHead>
-                        <TableRow>
-                            <TableCell>ID</TableCell>
-                            <TableCell>Título</TableCell>
-                            <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>Descripción</TableCell>
-                            <TableCell>Estatus</TableCell>
-                            <TableCell align="center">Acción</TableCell>
+                        <TableRow sx={{ bgcolor: COLOR_GUINDA }}>
+                            <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>ID</TableCell>
+                            <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Solicitante</TableCell>
+                            <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Departamento</TableCell>
+                            <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Título</TableCell>
+                            <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Inicio</TableCell>
+                            <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Fin</TableCell>
+                            <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Estatus</TableCell>
+                            <TableCell sx={{ color: 'white', fontWeight: 'bold', textAlign: 'center' }}>Acción</TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>
                         {historialTickets.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
-                                    No hay tickets registrados en esta área.
-                                </TableCell>
+                                <TableCell colSpan={8} align="center" sx={{ py: 4 }}>No hay tickets registrados.</TableCell>
                             </TableRow>
                         ) : (
                             historialTickets.map((t) => (
                                 <TableRow key={t.id} hover>
-                                    <TableCell sx={{ color: '#64748b' }}>#{t.id}</TableCell>
-                                    <TableCell sx={{ fontWeight: '500' }}>{t.titulo}</TableCell>
-                                    <TableCell sx={{ display: { xs: 'none', md: 'table-cell' }, maxWidth: 250, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                        {t.descripcion}
-                                    </TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold' }}>#{t.id}</TableCell>
+                                    <TableCell>{t.solicitante}</TableCell>
+                                    <TableCell>{t.departamento}</TableCell>
+                                    <TableCell>{t.titulo}</TableCell>
+                                    <TableCell sx={{ whiteSpace: 'nowrap', fontSize: '0.85rem' }}>{formatearFecha(t.fechaCreacion)}</TableCell>
+                                    <TableCell sx={{ whiteSpace: 'nowrap', fontSize: '0.85rem' }}>{formatearFecha(t.fechaFin)}</TableCell>
                                     <TableCell>
                                         <Chip 
                                             label={t.estatus} 
-                                            color={t.estatus === 'CERRADO' ? 'success' : t.estatus === 'ABIERTO' ? 'warning' : 'default'} 
+                                            color={t.estatus === 'CERRADO' ? 'success' : 'warning'} 
                                             size="small" 
-                                            sx={{ fontWeight: 'bold' }}
+                                            sx={{ fontWeight: 'bold' }} 
                                         />
                                     </TableCell>
                                     <TableCell align="center">
-                                        {t.estatus !== 'CERRADO' ? (
-                                            <Button
-                                                variant="outlined"
-                                                color="primary" 
-                                                size="small"
-                                                startIcon={<CheckIcon />}
-                                                onClick={() => handleFinalizarTicket(t.id)}
-                                            >
-                                                Finalizar
-                                            </Button>
-                                        ) : (
-                                            <Typography variant="body2" sx={{ color: '#94a3b8', fontStyle: 'italic' }}>
-                                                Resuelto
-                                            </Typography>
+                                        {t.estatus !== 'CERRADO' && (
+                                            <Button size="small" variant="outlined" color="inherit" startIcon={<CheckIcon />} onClick={() => handleFinalizarTicket(t.id)}>Finalizar</Button>
                                         )}
                                     </TableCell>
                                 </TableRow>

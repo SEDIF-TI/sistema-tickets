@@ -1,4 +1,4 @@
-import { useEffect, useState, useContext } from 'react';
+import React, { useEffect, useState, useContext } from 'react';
 import { 
     Typography, Box, Chip, Paper, Table, TableBody, 
     TableCell, TableContainer, TableHead, TableRow, Button,
@@ -35,22 +35,21 @@ export default function PanelSoporte() {
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [busqueda, setBusqueda] = useState('');
 
-    // 1er useEffect: Carga el histórico desde la BD
+    const cargarTicketsHistoricos = async () => {
+        try {
+            const respuesta = await api.get('/v1/tickets'); 
+            setTickets(respuesta.data);
+        } catch (error) {
+            console.error("Error al cargar el histórico de tickets:", error);
+        } finally {
+            setCargando(false);
+        }
+    };
+
     useEffect(() => {
-        const cargarTicketsHistoricos = async () => {
-            try {
-                const respuesta = await api.get('/v1/tickets'); 
-                setTickets(respuesta.data);
-            } catch (error) {
-                console.error("Error al cargar el histórico de tickets:", error);
-            } finally {
-                setCargando(false);
-            }
-        };
         cargarTicketsHistoricos();
     }, []);
 
-    // 2do useEffect: Escucha los WebSockets en tiempo real con FILTRO
     useEffect(() => {
         if (isConnected && stompClient && stompClient.connected && user) {
             try {
@@ -69,7 +68,6 @@ export default function PanelSoporte() {
         }
     }, [isConnected, stompClient, user]); 
 
-    // Funciones de acción
     const handleAtenderTicket = async (ticket) => {
         try {
             await api.put(`/v1/tickets/${ticket.id}/atender`);
@@ -97,7 +95,6 @@ export default function PanelSoporte() {
         }
     };
 
-    // Controladores de Modales
     const handleOpenDetalle = (ticket) => {
         setTicketSeleccionado(ticket);
         setOpenDetalle(true);
@@ -118,11 +115,25 @@ export default function PanelSoporte() {
         setJustificacion('');
     };
 
-    // Paginación y Filtros
     const handleChangePage = (event, newPage) => setPage(newPage);
     const handleChangeRowsPerPage = (event) => {
         setRowsPerPage(parseInt(event.target.value, 10));
         setPage(0);
+    };
+
+    const formatearFecha = (fecha) => {
+        if (!fecha) return '--/--/----';
+        const d = new Date(fecha);
+        const pad = (n) => n.toString().padStart(2, '0');
+        return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear().toString().slice(-2)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    };
+
+    const getColorEstatus = (estatus) => {
+        const estado = (estatus || '').toUpperCase();
+        if (estado === 'CERRADO' || estado === 'RESUELTO') return 'default';
+        if (estado === 'EN PROCESO') return 'info';
+        if (estado === 'ABIERTO' || estado === 'ASIGNADO') return 'warning';
+        return 'primary';
     };
 
     const ticketsFiltrados = tickets.filter((ticket) => {
@@ -135,17 +146,8 @@ export default function PanelSoporte() {
 
     const ticketsPaginados = ticketsFiltrados.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
 
-    // Función auxiliar para colores limpios
-    const getColorEstatus = (estatus) => {
-        const estado = (estatus || '').toUpperCase();
-        if (estado === 'CERRADO' || estado === 'RESUELTO') return 'default';
-        if (estado === 'EN PROCESO') return 'info';
-        if (estado === 'ABIERTO' || estado === 'ASIGNADO') return 'warning';
-        return 'primary';
-    };
-
     return (
-        <Box sx={{ p: { xs: 2, md: 4 }, backgroundColor: '#f4f7f6', minHeight: '100vh' }}>
+        <Box sx={{ p: { xs: 2, md: 4 }, backgroundColor: '#f4f7f6', minHeight: '100vh', width: '100%' }}>
             
             {/* ENCABEZADO */}
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
@@ -155,10 +157,9 @@ export default function PanelSoporte() {
                 </Typography>
             </Box>
 
-            {/* CONTENEDOR PRINCIPAL */}
             <Paper elevation={3} sx={{ borderRadius: 2, overflow: 'hidden', mb: 4 }}>
                 
-                {/* BARRA DE HERRAMIENTAS */}
+                {/* BARRA DE BÚSQUEDA */}
                 <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', bgcolor: '#ffffff', borderBottom: '1px solid #e0e0e0' }}>
                     <Typography variant="body2" color="textSecondary">
                         Mostrando registros de soporte
@@ -189,11 +190,11 @@ export default function PanelSoporte() {
                         <TableHead>
                             <TableRow sx={{ bgcolor: COLOR_GUINDA }}>
                                 <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>ID</TableCell>
-                                <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Fecha Inicio</TableCell>
-                                <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Fecha Fin</TableCell>
                                 <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Solicitante</TableCell>
                                 <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Departamento</TableCell>
                                 <TableCell sx={{ color: 'white', fontWeight: 'bold', textAlign: 'center' }}>Detalles</TableCell>
+                                <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Inicio</TableCell>
+                                <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Fin</TableCell>
                                 <TableCell sx={{ color: 'white', fontWeight: 'bold', textAlign: 'center' }}>Estatus</TableCell>
                                 <TableCell sx={{ color: 'white', fontWeight: 'bold', textAlign: 'center' }}>Acciones</TableCell>
                             </TableRow>
@@ -203,7 +204,6 @@ export default function PanelSoporte() {
                                 <TableRow>
                                     <TableCell colSpan={8} align="center" sx={{ py: 6 }}>
                                         <CircularProgress sx={{ color: COLOR_GUINDA }} />
-                                        <Typography sx={{ mt: 2, color: 'textSecondary' }}>Cargando tickets...</Typography>
                                     </TableCell>
                                 </TableRow>
                             ) : ticketsFiltrados.length === 0 ? (
@@ -214,7 +214,6 @@ export default function PanelSoporte() {
                                 </TableRow>
                             ) : (
                                 ticketsPaginados.map((ticket, index) => {
-                                    // LA MAGIA DEL ID CONSECUTIVO (1, 2, 3...)
                                     const numeroFila = page * rowsPerPage + index + 1;
                                     const estatusLabel = ticket.estado || ticket.estatus || 'ABIERTO';
 
@@ -222,11 +221,7 @@ export default function PanelSoporte() {
                                         <TableRow key={ticket.id} hover sx={{ transition: '0.2s', '&:hover': { bgcolor: '#f9f9f9' } }}>
                                             <TableCell sx={{ fontWeight: 'bold' }}>{numeroFila}</TableCell>
                                             
-                                            {/* CORRECCIÓN DE FECHA: Usamos fechaCreacion */}
-                                            <TableCell>{ticket.fechaCreacion ? new Date(ticket.fechaCreacion).toLocaleString() : 'N/A'}</TableCell>
-                                            <TableCell>{ticket.fechaFin ? new Date(ticket.fechaFin).toLocaleString() : '--/--/----'}</TableCell>
-                                            
-                                            <TableCell>{ticket.solicitante || 'Usuario'}</TableCell>
+                                            <TableCell sx={{ fontWeight: '500' }}>{ticket.solicitante || 'Usuario'}</TableCell>
                                             <TableCell>{ticket.departamento || 'Área'}</TableCell>
                                             
                                             <TableCell align="center">
@@ -235,12 +230,15 @@ export default function PanelSoporte() {
                                                     size="small" 
                                                     onClick={() => handleOpenDetalle(ticket)}
                                                     startIcon={<VisibilityIcon />} 
-                                                    sx={{ color: COLOR_GUINDA, borderColor: COLOR_GUINDA, textTransform: 'none', borderRadius: 2, '&:hover': { borderColor: '#5e1026', bgcolor: 'rgba(128, 26, 54, 0.04)' } }}
+                                                    sx={{ color: COLOR_GUINDA, borderColor: COLOR_GUINDA, textTransform: 'none', borderRadius: 2 }}
                                                 >
                                                     Ver Ticket
                                                 </Button>
                                             </TableCell>
 
+                                            <TableCell sx={{ whiteSpace: 'nowrap', fontSize: '0.85rem' }}>{formatearFecha(ticket.fechaCreacion)}</TableCell>
+                                            <TableCell sx={{ whiteSpace: 'nowrap', fontSize: '0.85rem' }}>{formatearFecha(ticket.fechaFin)}</TableCell>
+                                            
                                             <TableCell align="center">
                                                 <Chip 
                                                     label={estatusLabel} 
@@ -258,7 +256,6 @@ export default function PanelSoporte() {
                                                         </IconButton>
                                                     </Tooltip>
                                                 )}
-                                                
                                                 {estatusLabel === 'EN PROCESO' && (
                                                     <Tooltip title="Resolver Ticket">
                                                         <IconButton onClick={() => handleOpenResolucion(ticket)} sx={{ color: '#2ecc71' }}>
@@ -266,7 +263,6 @@ export default function PanelSoporte() {
                                                         </IconButton>
                                                     </Tooltip>
                                                 )}
-                                                
                                                 {(estatusLabel === 'RESUELTO' || estatusLabel === 'CERRADO') && (
                                                     <Typography variant="body2" color="textSecondary" sx={{ fontWeight: 'bold' }}>
                                                         Finalizado
@@ -290,7 +286,6 @@ export default function PanelSoporte() {
                     onPageChange={handleChangePage}
                     onRowsPerPageChange={handleChangeRowsPerPage}
                     labelRowsPerPage="Mostrar registros:"
-                    labelDisplayedRows={({ from, to, count }) => `Mostrando ${from} a ${to} de ${count} entradas`}
                 />
             </Paper>
 
@@ -344,10 +339,8 @@ export default function PanelSoporte() {
                 </DialogTitle>
                 <DialogContent sx={{ mt: 2 }}>
                     <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-                        Estás a punto de marcar este ticket como resuelto. Ingresa el detalle del trabajo realizado para la bitácora del sistema.
+                        Estás a punto de marcar este ticket como resuelto. Ingresa el detalle del trabajo realizado.
                     </Typography>
-                    
-                    <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>Justificación Técnica *</Typography>
                     <TextField
                         autoFocus
                         margin="dense"
@@ -357,17 +350,13 @@ export default function PanelSoporte() {
                         value={justificacion}
                         onChange={(e) => setJustificacion(e.target.value)}
                         variant="outlined"
-                        placeholder="Ej. Se reemplazó el cartucho de tóner negro y se reinició la cola de impresión..."
+                        placeholder="Ej. Se reemplazó el cartucho de tóner negro..."
                         required
                     />
                 </DialogContent>
                 <DialogActions sx={{ p: 2 }}>
-                    <Button onClick={() => handleCloseResolucion()} color="inherit" sx={{ textTransform: 'none' }}>
-                        Cancelar
-                    </Button>
-                    <Button onClick={handleResolverTicket} variant="contained" sx={{ bgcolor: COLOR_GUINDA, '&:hover': { bgcolor: '#5e1026' }, textTransform: 'none' }}>
-                        Confirmar
-                    </Button>
+                    <Button onClick={handleCloseResolucion} color="inherit" sx={{ textTransform: 'none' }}>Cancelar</Button>
+                    <Button onClick={handleResolverTicket} variant="contained" sx={{ bgcolor: COLOR_GUINDA, textTransform: 'none' }}>Confirmar</Button>
                 </DialogActions>
             </Dialog>
 
