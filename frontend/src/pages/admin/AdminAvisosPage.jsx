@@ -1,118 +1,92 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
-    Box, Typography, Paper, TextField, Button, 
-    Table, TableBody, TableCell, TableContainer, 
-    TableHead, TableRow, CircularProgress, Chip, IconButton, Tooltip
+    Box, Typography, Paper, TextField, Button, Table, TableBody, 
+    TableCell, TableContainer, TableHead, TableRow, IconButton, 
+    Chip, Alert, CircularProgress 
 } from '@mui/material';
+
 import CampaignIcon from '@mui/icons-material/Campaign';
 import SendIcon from '@mui/icons-material/Send';
-import CancelIcon from '@mui/icons-material/Cancel';
+import DeleteIcon from '@mui/icons-material/Delete';
+import PostAddIcon from '@mui/icons-material/PostAdd';
+
 import api from '../../services/api';
 
+const COLOR_GUINDA = '#5c0a28'; // Sincronizado con tu theme.js
+
 export default function AdminAvisosPage() {
+    const [avisos, setAvisos] = useState([]);
     const [titulo, setTitulo] = useState('');
     const [mensaje, setMensaje] = useState('');
-    const [avisos, setAvisos] = useState([]);
-    const [cargando, setCargando] = useState(false);
+    const [cargando, setCargando] = useState(true);
+    const [enviando, setEnviando] = useState(false);
 
     const cargarAvisos = async () => {
         try {
-            const respuesta = await api.get('/v1/avisos/activos');
+            const respuesta = await api.get('/v1/avisos/activos'); 
             setAvisos(respuesta.data);
-        } catch (error) {
-            console.error("Error al cargar avisos:", error);
-        }
+        } catch (error) { console.error(error); } 
+        finally { setCargando(false); }
     };
 
-    useEffect(() => {
-        cargarAvisos();
-    }, []);
+    useEffect(() => { cargarAvisos(); }, []);
 
-    const handleCrearAviso = async (e) => {
+    const handlePublicar = async (e) => {
         e.preventDefault();
-        if (!titulo.trim() || !mensaje.trim()) return;
-
-        setCargando(true);
+        setEnviando(true);
         try {
-            await api.post('/v1/avisos', { titulo, mensaje });
-            setTitulo('');
-            setMensaje('');
-            cargarAvisos();
-        } catch (error) {
-            console.error("Error al crear aviso:", error);
-            alert("Hubo un error al publicar el aviso.");
-        } finally {
-            setCargando(false);
-        }
-    };
-
-    // --- NUEVA FUNCIÓN PARA FINALIZAR EL AVISO ---
-    const handleFinalizarAviso = async (id) => {
-        if(window.confirm("¿Estás seguro de finalizar este aviso? Ya no aparecerá en las campanas de los usuarios.")) {
-            try {
-                await api.put(`/v1/avisos/${id}/desactivar`);
-                cargarAvisos(); // Recargamos para que desaparezca de la lista de activos
-            } catch (error) {
-                console.error("Error al finalizar aviso:", error);
-                alert("Hubo un error al finalizar el aviso.");
-            }
-        }
+            await api.post('/v1/avisos', { titulo, mensaje, estado: 'ACTIVO' });
+            setTitulo(''); setMensaje(''); cargarAvisos();
+        } catch (error) { alert("Error al publicar"); }
+        finally { setEnviando(false); }
     };
 
     return (
-        <Box sx={{ width: '100%' }}>
-            <Typography variant="h4" fontWeight="bold" color="primary" sx={{ mb: 4, display: 'flex', alignItems: 'center', gap: 1 }}>
-                <CampaignIcon fontSize="large" /> Gestión de Avisos Globales
-            </Typography>
+        <Box sx={{ p: 3, width: '100%', boxSizing: 'border-box' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
+                <CampaignIcon sx={{ fontSize: 35, color: COLOR_GUINDA }} />
+                <Typography variant="h4" fontWeight="bold" sx={{ color: COLOR_GUINDA }}>
+                    Gestión de Avisos Globales
+                </Typography>
+            </Box>
 
-            <Paper elevation={3} sx={{ p: 3, mb: 4, borderRadius: 2 }}>
-                <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>Publicar Nuevo Aviso</Typography>
-                <form onSubmit={handleCrearAviso}>
-                    <TextField fullWidth label="Título del Aviso" variant="outlined" value={titulo} onChange={(e) => setTitulo(e.target.value)} required sx={{ mb: 2 }} />
-                    <TextField fullWidth label="Mensaje" variant="outlined" multiline rows={3} value={mensaje} onChange={(e) => setMensaje(e.target.value)} required sx={{ mb: 2 }} />
-                    <Button type="submit" variant="contained" color="primary" endIcon={cargando ? <CircularProgress size={20} color="inherit" /> : <SendIcon />} disabled={cargando}>
-                        Publicar a todos los usuarios
+            {/* Formulario */}
+            <Paper elevation={2} sx={{ p: 3, borderRadius: 2, mb: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                    <PostAddIcon color="action" />
+                    <Typography variant="h6" fontWeight="bold">Publicar Nuevo Aviso</Typography>
+                </Box>
+                <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start' }}>
+                    <TextField label="Título" sx={{ flex: 1 }} value={titulo} onChange={(e) => setTitulo(e.target.value)} />
+                    <TextField label="Mensaje" sx={{ flex: 2 }} value={mensaje} onChange={(e) => setMensaje(e.target.value)} />
+                    <Button variant="contained" onClick={handlePublicar} sx={{ bgcolor: COLOR_GUINDA, height: '56px', px: 4 }}>
+                        {enviando ? '...' : 'Publicar'}
                     </Button>
-                </form>
+                </Box>
             </Paper>
 
-            <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>Avisos Activos Publicados</Typography>
-            <TableContainer component={Paper} elevation={3} sx={{ borderRadius: 2 }}>
-                <Table>
-                    {/* --- CABECERA CON COLOR INSTITUCIONAL --- */}
-                    <TableHead sx={{ backgroundColor: '#5c0a28' }}>
+            {/* Tabla Estirada al 100% */}
+            <TableContainer component={Paper} elevation={2} sx={{ borderRadius: 2, width: '100%' }}>
+                <Table sx={{ width: '100%', tableLayout: 'fixed' }}>
+                    <TableHead sx={{ bgcolor: '#f8fafc' }}>
                         <TableRow>
-                            <TableCell sx={{ fontWeight: 'bold', color: 'white' }}>ID</TableCell>
-                            <TableCell sx={{ fontWeight: 'bold', color: 'white' }}>Título</TableCell>
-                            <TableCell sx={{ fontWeight: 'bold', color: 'white' }}>Mensaje</TableCell>
-                            <TableCell align="center" sx={{ fontWeight: 'bold', color: 'white' }}>Estado</TableCell>
-                            <TableCell align="center" sx={{ fontWeight: 'bold', color: 'white' }}>Acciones</TableCell>
+                            <TableCell sx={{ fontWeight: 'bold', width: '5%' }}>ID</TableCell>
+                            <TableCell sx={{ fontWeight: 'bold', width: '20%' }}>Título</TableCell>
+                            <TableCell sx={{ fontWeight: 'bold', width: '55%' }}>Mensaje</TableCell>
+                            <TableCell sx={{ fontWeight: 'bold', width: '10%', textAlign: 'center' }}>Estado</TableCell>
+                            <TableCell sx={{ fontWeight: 'bold', width: '10%', textAlign: 'center' }}>Acciones</TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>
-                        {avisos.length === 0 ? (
-                            <TableRow>
-                                <TableCell colSpan={5} align="center">No hay avisos activos.</TableCell>
+                        {avisos.map((aviso, index) => (
+                            <TableRow key={aviso.id} hover>
+                                <TableCell>{index + 1}</TableCell>
+                                <TableCell sx={{ fontWeight: 'bold' }}>{aviso.titulo}</TableCell>
+                                <TableCell>{aviso.mensaje}</TableCell>
+                                <TableCell align="center"><Chip label="ACTIVO" size="small" color="success" /></TableCell>
+                                <TableCell align="center"><IconButton color="error"><DeleteIcon /></IconButton></TableCell>
                             </TableRow>
-                        ) : (
-                            avisos.map((aviso) => (
-                                <TableRow key={aviso.id}>
-                                    <TableCell>{aviso.id}</TableCell>
-                                    <TableCell sx={{ fontWeight: 'bold' }}>{aviso.titulo}</TableCell>
-                                    <TableCell>{aviso.mensaje}</TableCell>
-                                    <TableCell align="center">
-                                        <Chip label="ACTIVO" color="success" size="small" sx={{ fontWeight: 'bold' }} />
-                                    </TableCell>
-                                    <TableCell align="center">
-                                        <Tooltip title="Finalizar Aviso">
-                                            <IconButton color="error" onClick={() => handleFinalizarAviso(aviso.id)}>
-                                                <CancelIcon />
-                                            </IconButton>
-                                        </Tooltip>
-                                    </TableCell>
-                                </TableRow>
-                            ))
-                        )}
+                        ))}
                     </TableBody>
                 </Table>
             </TableContainer>

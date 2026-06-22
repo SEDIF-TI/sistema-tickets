@@ -1,4 +1,4 @@
-import React, { useContext, useState } from 'react';
+import React, { useContext, useState, useEffect } from 'react';
 import { AuthContext } from '../context/AuthContext.jsx';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -7,15 +7,17 @@ import {
     Badge, Snackbar, Alert, Tooltip, Menu, MenuItem, ListSubheader 
 } from '@mui/material';
 
+// ---> CORRECCIÓN 1: Importamos la API para que no explote el useEffect <---
+import api from '../services/api';
+
 // Iconos
 import LogoutIcon from '@mui/icons-material/Logout';
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import AddCircleIcon from '@mui/icons-material/AddCircle';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import DescriptionIcon from '@mui/icons-material/Description';
-import AccountCircleIcon from '@mui/icons-material/AccountCircle'; // NUEVO ÍCONO DE PERFIL
+import AccountCircleIcon from '@mui/icons-material/AccountCircle'; 
 
-// Sincronizamos las medidas y colores con el MainLayout
 const drawerWidth = 65; 
 const COLOR_GUINDA = '#801A36';
 
@@ -45,19 +47,15 @@ export default function SoporteLayout({ children }) {
         if (user) fetchAvisos();
     }, [user]);
 
-    // 2. LA MAGIA: Alerta automática cuando llega un aviso nuevo
+    // 2. Alerta automática cuando llega un aviso nuevo
     useEffect(() => {
         if (avisos.length > 0) {
-            const primerAviso = avisos[0]; // El más reciente
-            
-            // Revisamos cuál fue el último aviso que el navegador mostró automáticamente
+            const primerAviso = avisos[0]; 
             const ultimoIdMostrado = localStorage.getItem('ultimo_aviso_mostrado_id');
 
-            // Si el ID es diferente, significa que es un aviso NUEVO que no ha visto
             if (ultimoIdMostrado !== String(primerAviso.id)) {
                 setMensajeAviso(`📢 ${primerAviso.titulo}: ${primerAviso.mensaje}`);
                 setOpenAviso(true);
-                // Guardamos el ID para no volver a mostrárselo de golpe en el próximo render
                 localStorage.setItem('ultimo_aviso_mostrado_id', primerAviso.id);
             }
         }
@@ -81,10 +79,9 @@ export default function SoporteLayout({ children }) {
         navigate('/login');
     };
 
-    // Identificadores de Rol y Seguridad
     const userRole = user?.rol || user?.role || user?.rolNombre || '';
     const cleanRole = userRole.replace('ROLE_', '').toUpperCase();
-    const estaBloqueado = user?.passwordTemporal; // BARRERA VISUAL
+    const estaBloqueado = user?.passwordTemporal; 
 
     return (
         <Box sx={{ display: 'flex' }}>
@@ -97,10 +94,11 @@ export default function SoporteLayout({ children }) {
                     </Typography>
 
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                        {/* Campana (Se oculta si está bloqueado en el perfil) */}
+                        
+                        {/* ---> CORRECCIÓN 2: Cambiamos el onClick para que abra el menú <--- */}
                         {!estaBloqueado && (
-                            <IconButton color="inherit" onClick={simularLlegadaAviso}>
-                                <Badge badgeContent={1} color="error">
+                            <IconButton color="inherit" onClick={handleOpenHistorial}>
+                                <Badge badgeContent={avisos.length} color="error">
                                     <NotificationsIcon />
                                 </Badge>
                             </IconButton>
@@ -110,7 +108,6 @@ export default function SoporteLayout({ children }) {
                             {user?.nombre || 'Usuario'} | {cleanRole}
                         </Typography>
 
-                        {/* ---> NUEVO BOTÓN DE PERFIL <--- */}
                         {!estaBloqueado && (
                             <Tooltip title="Mi Perfil">
                                 <IconButton color="inherit" onClick={() => navigate('/perfil')}>
@@ -126,7 +123,7 @@ export default function SoporteLayout({ children }) {
                 </Toolbar>
             </AppBar>
 
-            {/* MENÚ LATERAL ULTRA COMPACTO (Solo se dibuja si NO está bloqueado) */}
+            {/* MENÚ LATERAL ULTRA COMPACTO */}
             {!estaBloqueado && (
                 <Drawer 
                     variant="permanent" 
@@ -144,7 +141,6 @@ export default function SoporteLayout({ children }) {
                 >
                     <Toolbar /> 
                     <List sx={{ pt: 2 }}>
-                        {/* Mis Tickets */}
                         <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
                             <Tooltip title="Mis Tickets" placement="right" arrow>
                                 <ListItemButton onClick={() => navigate('/soporte/bandeja')} sx={{ justifyContent: 'center', px: 2.5, py: 1.5 }}>
@@ -155,7 +151,6 @@ export default function SoporteLayout({ children }) {
                             </Tooltip>
                         </ListItem>
                         
-                        {/* Levantar Ticket */}
                         <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
                             <Tooltip title="Levantar Ticket" placement="right" arrow>
                                 <ListItemButton onClick={() => navigate('/tickets/nuevo')} sx={{ justifyContent: 'center', px: 2.5, py: 1.5 }}>
@@ -166,7 +161,6 @@ export default function SoporteLayout({ children }) {
                             </Tooltip>
                         </ListItem>
 
-                        {/* Generar Documentos */}
                         <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
                             <Tooltip title="Generar Documento" placement="right" arrow>
                                 <ListItemButton onClick={() => navigate('/documentos/crear')} sx={{ justifyContent: 'center', px: 2.5, py: 1.5 }}>
@@ -190,7 +184,40 @@ export default function SoporteLayout({ children }) {
                 {children}
             </Box>
 
-            {/* COMPONENTE DE AVISOS DE SOPORTE */}
+            {/* ---> CORRECCIÓN 3: Agregamos el diseño del menú desplegable <--- */}
+            <Menu
+                anchorEl={anchorEl}
+                open={openHistorial}
+                onClose={handleCloseHistorial}
+                PaperProps={{
+                    elevation: 3,
+                    sx: { width: 320, maxHeight: 400, mt: 1.5, borderRadius: 2 }
+                }}
+            >
+                <ListSubheader sx={{ bgcolor: 'white', fontWeight: 'bold', color: COLOR_GUINDA, lineHeight: '40px' }}>
+                    Avisos Globales ({avisos.length})
+                </ListSubheader>
+                <Divider />
+                
+                {avisos.length === 0 ? (
+                    <MenuItem onClick={handleCloseHistorial} sx={{ py: 2 }}>
+                        <Typography variant="body2" color="textSecondary" sx={{ width: '100%', textAlign: 'center' }}>
+                            No hay avisos recientes
+                        </Typography>
+                    </MenuItem>
+                ) : (
+                    avisos.map((aviso) => (
+                        <MenuItem key={aviso.id} onClick={handleCloseHistorial} sx={{ whiteSpace: 'normal', py: 1.5, borderBottom: '1px solid #f0f0f0' }}>
+                            <Box>
+                                <Typography variant="subtitle2" fontWeight="bold">{aviso.titulo}</Typography>
+                                <Typography variant="body2" color="textSecondary">{aviso.mensaje}</Typography>
+                            </Box>
+                        </MenuItem>
+                    ))
+                )}
+            </Menu>
+
+            {/* COMPONENTE DE ALERTA FLOTANTE (SNACKBAR) */}
             <Snackbar 
                 open={openAviso} 
                 autoHideDuration={8000} 

@@ -1,9 +1,7 @@
 package com.sedif.sistema_tickets.core.ticket;
 
 import com.sedif.sistema_tickets.core.usuarios.Usuario;
-
 import java.time.LocalDateTime;
-
 import com.sedif.sistema_tickets.core.estatusticket.Estatus; 
 import com.sedif.sistema_tickets.util.audit.Auditable;
 import jakarta.persistence.*;
@@ -29,6 +27,10 @@ public class Ticket extends Auditable {
 
     @Column(name = "s_descripcion", nullable = false, columnDefinition = "TEXT")
     private String descripcion;
+    
+    // ---> NUEVO CAMPO: Guardará el nombre de quien físicamente tiene la falla
+    @Column(name = "s_solicitante_nombre", length = 100)
+    private String solicitanteNombre;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "fn_estadoticket_id", nullable = false)

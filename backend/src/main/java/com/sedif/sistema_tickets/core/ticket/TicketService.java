@@ -12,7 +12,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -28,40 +27,36 @@ public class TicketService {
     private final Map<String, TicketFiltroStrategy> estrategiasFiltro;
     private final BitacoraRepository bitacoraRepository;
 
-
     @Transactional
     public Ticket crearTicket(TicketRequestRecord request, String correoUsuario) {
-        // 1. Buscar al usuario solicitante
         Usuario usuario = usuarioRepository.findByCorreo(correoUsuario)
                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
 
-        // 2. Buscar Estatus (Estrategia de negocio)
         Estatus estatusAbierto = estatusRepository.findByNombre("ABIERTO")
                 .orElseThrow(() -> new IllegalStateException("Estatus ABIERTO no configurado en la base de datos"));
 
-        // 3. Construcción del Ticket
         Ticket nuevoTicket = new Ticket();
         nuevoTicket.setTitulo(request.titulo());
         nuevoTicket.setDescripcion(request.descripcion());
         nuevoTicket.setSede(request.sede());
+        
+        // ---> GUARDAMOS EL NOMBRE DEL SOLICITANTE FÍSICO
+        nuevoTicket.setSolicitanteNombre(request.solicitante()); 
+        
         nuevoTicket.setUsuarioArea(usuario); 
         nuevoTicket.setEstatus(estatusAbierto); 
         nuevoTicket.setFechaCreacion(LocalDateTime.now());
         nuevoTicket.setCreadoPor(usuario.getCorreo());
         
-        // 4. Asignación de Prioridad (Con validación robusta)
         String prioridad = (request.prioridad() != null && !request.prioridad().isBlank()) 
                            ? request.prioridad() 
                            : "NORMAL"; 
         nuevoTicket.setPrioridad(prioridad);
 
-        // 5. LÓGICA UNIFICADA DE ASIGNACIÓN (Auto-asignación vs Balanceador)
         if (usuario.getRol() != null && "SOPORTE".equals(usuario.getRol().getNombre())) {
-            // REGLA: Si quien levanta el ticket es de soporte, se lo auto-asigna
             nuevoTicket.setUsuarioSoporte(usuario);
             System.out.println("DEBUG: Ticket auto-asignado al técnico creador: " + usuario.getNombre());
         } else {
-            // REGLA: Si es un empleado de otra área, usamos el balanceador de cargas
             Usuario soporteAsignado = resolverAsignacion(usuario);
             if (soporteAsignado != null) {
                 nuevoTicket.setUsuarioSoporte(soporteAsignado);
@@ -71,15 +66,14 @@ public class TicketService {
             }
         }
 
-        // 6. Persistencia (¡Se guarda una sola vez!)
         Ticket ticketGuardado = ticketRepository.save(nuevoTicket);
 
-        // 7. Notificación automática por Telegram
         if (ticketGuardado.getUsuarioSoporte() != null && 
             ticketGuardado.getUsuarioSoporte().getTelegramChatId() != null) {
             
             String mensaje = "🚨 *NUEVO TICKET ASIGNADO* 🚨\n\n" +
                              "🆔 *ID:* #" + ticketGuardado.getId() + "\n" +
+                             "👤 *Solicitante:* " + (ticketGuardado.getSolicitanteNombre() != null ? ticketGuardado.getSolicitanteNombre() : "N/A") + "\n" +
                              "📌 *Título:* " + ticketGuardado.getTitulo();
             
             try {
@@ -90,21 +84,18 @@ public class TicketService {
             }
         }
 
-        // 8. Retorno final correcto
         return ticketGuardado;
     }
 
     private Usuario resolverAsignacion(Usuario usuarioArea) {
         if (usuarioArea.getArea() != null && usuarioArea.getArea().getSoporteFijo() != null) {
             Usuario fijo = usuarioArea.getArea().getSoporteFijo();
-            // Validamos que el soporte fijo siga activo y disponible
             if (Boolean.TRUE.equals(fijo.getActivo()) && Boolean.TRUE.equals(fijo.getDisponibleSoporte())) {
                 return fijo;
             }
         }
 
         return usuarioRepository.findAll().stream()
-                // Comparamos el nombre del rol en la entidad, ya no usamos Enum
                 .filter(u -> u.getRol() != null && "SOPORTE".equals(u.getRol().getNombre()) && Boolean.TRUE.equals(u.getDisponibleSoporte()))
                 .min((u1, u2) -> {
                     long carga1 = ticketRepository.countByUsuarioSoporteAndEstatusNombre(u1, "ABIERTO");
@@ -135,25 +126,27 @@ public class TicketService {
                 .toList();
     }
 
-    // Método privado para centralizar el mapeo y evitar repetir código
     private TicketResponse mapearATicketResponse(Ticket t) {
-        // 1. Manejo seguro de nulos para los nombres
         String nombreSolicitante = "Desconocido";
         String nombreDepartamento = "Sin área";
 
-        if (t.getUsuarioArea() != null) {
-            nombreSolicitante = t.getUsuarioArea().getNombre();
-            if (t.getUsuarioArea().getArea() != null) {
-                nombreDepartamento = t.getUsuarioArea().getArea().getNombre();
-            }
+        // ---> LOGICA DE PRIORIDAD PARA EL NOMBRE DEL SOLICITANTE
+        if (t.getSolicitanteNombre() != null && !t.getSolicitanteNombre().isBlank()) {
+            nombreSolicitante = t.getSolicitanteNombre(); // Prioridad 1: Nombre real de quien tiene la falla
+        } else if (t.getUsuarioArea() != null) {
+            nombreSolicitante = t.getUsuarioArea().getNombre(); // Prioridad 2: Fallback al dueño de la cuenta (Tickets viejos)
         }
 
-        // Buscamos si existe una justificación en la tabla Bitácora
+        if (t.getUsuarioArea() != null && t.getUsuarioArea().getArea() != null) {
+            nombreDepartamento = t.getUsuarioArea().getArea().getNombre();
+        }
+
         String justificacion = null;
         var historial = bitacoraRepository.findByTicketIdOrderByFechaCreacionDesc(t.getId());
         if (!historial.isEmpty()) {
             justificacion = historial.get(0).getJustificacion();
         }
+        
         return new TicketResponse(
                 t.getId(),
                 t.getTitulo(),
@@ -161,7 +154,7 @@ public class TicketService {
                 t.getSede(),
                 t.getFechaCreacion(),
                 t.getFechaFin(),
-                nombreSolicitante,
+                nombreSolicitante, 
                 nombreDepartamento,
                 t.getEstatus().getNombre(),
                 t.getUsuarioArea()!= null ? t.getUsuarioArea().getId() : null,
@@ -177,7 +170,6 @@ public class TicketService {
         Ticket ticket = ticketRepository.findById(ticketId)
                 .orElseThrow(() -> new IllegalArgumentException("Ticket no encontrado"));
 
-        // Seguridad: Filtro invisible por Área
         if (!ticket.getUsuarioArea().getArea().getId().equals(usuario.getArea().getId())) {
             throw new SecurityException("No tienes permiso: El ticket pertenece a otra área.");
         }
@@ -194,8 +186,6 @@ public class TicketService {
 
         if (empleado.getArea() == null) throw new IllegalStateException("Usuario sin área.");
 
-        // Aplicamos el filtro invisible de base de datos
-        // En tu método obtenerTicketsDeMiArea:
         return ticketRepository.findByUsuarioAreaAreaIdOrderByFechaCreacionDesc(empleado.getArea().getId())
                 .stream()
                 .map(this::mapearATicketResponse)
@@ -213,7 +203,6 @@ public class TicketService {
         ticket.setEstatus(estatusEnCamino);
         ticketRepository.save(ticket);
 
-        // Generamos el registro en la bitácora
         Bitacora bitacora = new Bitacora();
         bitacora.setTicket(ticket);
         bitacora.setEstatusRegistrado("EN PROCESO");
@@ -232,10 +221,9 @@ public class TicketService {
                 .orElseThrow(() -> new IllegalStateException("El estatus CERRADO no existe en la BD."));
 
         ticket.setEstatus(estatusResuelto);
-        ticket.setFechaFin(LocalDateTime.now()); // <-- SE ASIGNA LA HORA EXACTA DE RESOLUCIÓN
+        ticket.setFechaFin(LocalDateTime.now());
         ticketRepository.save(ticket);
 
-        // Guardamos la justificación técnica
         Bitacora bitacora = new Bitacora();
         bitacora.setTicket(ticket);
         bitacora.setEstatusRegistrado("CERRADO");
@@ -250,7 +238,6 @@ public class TicketService {
         Usuario usuario = usuarioRepository.findByCorreo(correoUsuario)
                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
 
-        // Si es soporte, le damos SOLO los tickets que se le asignaron por el balanceador o él mismo
         if (usuario.getRol() != null && "SOPORTE".equals(usuario.getRol().getNombre())) {
             return ticketRepository.findByUsuarioSoporteId(usuario.getId())
                     .stream()
@@ -258,7 +245,6 @@ public class TicketService {
                     .toList();
         }
         
-        // Si es Administrador, le damos todos
         return obtenerTodosLosTickets();
     }
 }
