@@ -2,10 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { 
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow, 
     Paper, Button, Typography, Chip, Dialog, DialogTitle, DialogContent, 
-    DialogActions, TextField, Box, Autocomplete 
+    DialogActions, TextField, Box, Autocomplete, Tabs, Tab, Switch, Tooltip
 } from '@mui/material';
 import { userService } from '../../services/userService';
 import { areaService } from '../../services/areaService';
+import api from '../../services/api'; // Importamos api directamente para la nueva petición PATCH
 
 // IMPORTAMOS EL NUEVO MODAL (Ajusta la ruta si lo guardaste en otra carpeta)
 import ModalCredenciales from '../../components/ModalCredenciales'; 
@@ -26,10 +27,15 @@ const estadoInicial = {
     activo: true 
 };
 
+const COLOR_GUINDA = '#801A36';
+
 const AdminUsuariosPage = () => {
     const [usuarios, setUsuarios] = useState([]);
     const [areas, setAreas] = useState([]);
     const [busqueda, setBusqueda] = useState('');
+    
+    // Estado para las Pestañas (Tabs)
+    const [tabIndex, setTabIndex] = useState(0);
     
     // Estados para los modales
     const [openModal, setOpenModal] = useState(false);
@@ -85,7 +91,7 @@ const AdminUsuariosPage = () => {
                 ...formData,
                 areaId: Number(formData.areaId),
                 rolId: Number(formData.rolId),
-                disponibleSoporte: false 
+                disponibleSoporte: false // Por defecto inician apagados
             };
 
             if (formData.id) {
@@ -109,7 +115,7 @@ const AdminUsuariosPage = () => {
                     correo: formData.correo,
                     rol: nombreRol,
                     area: nombreArea,
-                    password: response.data.passwordTemporalTexto // El dato que viene de Spring Boot
+                    password: response.data.passwordTemporalTexto
                 });
 
                 // Cerramos el formulario y abrimos el modal de éxito
@@ -143,19 +149,62 @@ const AdminUsuariosPage = () => {
         }
     };
 
-    const usuariosFiltrados = usuarios.filter(u => 
-        u.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-        u.correo.toLowerCase().includes(busqueda.toLowerCase()) ||
-        u.rolNombre.toLowerCase().includes(busqueda.toLowerCase())
-    );
+    // ---> NUEVA FUNCIÓN: Cambiar disponibilidad del técnico
+    const handleToggleDisponibilidad = async (usuario, isChecked) => {
+        try {
+            // Nota: Asegúrate de que tu DisponibilidadRequest en Java espere el campo 'disponibleSoporte' o el nombre que le hayas dado.
+            await api.patch(`/v1/admin/usuarios/${usuario.id}/disponibilidad`, {
+                disponibleSoporte: isChecked 
+            });
+            
+            // Actualizamos solo este usuario en el estado para evitar recargar toda la tabla
+            setUsuarios(prev => prev.map(u => 
+                u.id === usuario.id ? { ...u, disponibleSoporte: isChecked } : u
+            ));
+        } catch (error) {
+            console.error(error);
+            alert("Error al actualizar la disponibilidad del técnico.");
+        }
+    };
+
+    // ---> LÓGICA DE FILTRADO DOBLE (Búsqueda + Pestañas)
+    const usuariosFiltrados = usuarios.filter(u => {
+        const pasaBusqueda = u.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
+                             u.correo.toLowerCase().includes(busqueda.toLowerCase()) ||
+                             u.rolNombre.toLowerCase().includes(busqueda.toLowerCase());
+        
+        if (!pasaBusqueda) return false;
+
+        // Filtro por pestañas
+        if (tabIndex === 1) return u.rolNombre === 'SOPORTE';
+        if (tabIndex === 2) return u.rolNombre !== 'SOPORTE'; // Empleados y Administradores
+        
+        return true; // tabIndex === 0 (Todos)
+    });
 
     return (
-        <Box sx={{ p: 3 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                <Typography variant="h5">Gestión de Usuarios</Typography>
-                <Button variant="contained" color="primary" onClick={() => { setFormData(estadoInicial); setOpenModal(true); }}>
+        <Box sx={{ p: 3, maxWidth: 1300, mx: 'auto' }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                <Typography variant="h5" fontWeight="bold" color={COLOR_GUINDA}>
+                    Gestión de Usuarios
+                </Typography>
+                <Button variant="contained" onClick={() => { setFormData(estadoInicial); setOpenModal(true); }} sx={{ bgcolor: COLOR_GUINDA }}>
                     + Nuevo Usuario
                 </Button>
+            </Box>
+
+            {/* PESTAÑAS DE FILTRADO (Tabs) */}
+            <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+                <Tabs 
+                    value={tabIndex} 
+                    onChange={(e, newValue) => setTabIndex(newValue)} 
+                    textColor="inherit"
+                    TabIndicatorProps={{ style: { backgroundColor: COLOR_GUINDA } }}
+                >
+                    <Tab label="Todos los Usuarios" />
+                    <Tab label="Personal de Soporte" />
+                    <Tab label="Resto del Personal" />
+                </Tabs>
             </Box>
 
             <TextField
@@ -163,20 +212,21 @@ const AdminUsuariosPage = () => {
                 variant="outlined"
                 size="small"
                 fullWidth
-                sx={{ mb: 2 }}
+                sx={{ mb: 3 }}
                 value={busqueda}
                 onChange={(e) => setBusqueda(e.target.value)}
             />
 
-            <TableContainer component={Paper}>
-                <Table>
-                    <TableHead>
+            <TableContainer component={Paper} elevation={2}>
+                <Table sx={{ minWidth: 900 }}>
+                    <TableHead sx={{ bgcolor: '#f8fafc' }}>
                         <TableRow>
-                            <TableCell>Nombre</TableCell>
-                            <TableCell>Correo</TableCell>
-                            <TableCell>Rol</TableCell>
-                            <TableCell>Estado</TableCell>
-                            <TableCell>Acciones</TableCell>
+                            <TableCell sx={{ fontWeight: 'bold' }}>Nombre</TableCell>
+                            <TableCell sx={{ fontWeight: 'bold' }}>Correo</TableCell>
+                            <TableCell sx={{ fontWeight: 'bold' }}>Rol</TableCell>
+                            <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>Asignación de Tickets</TableCell>
+                            <TableCell sx={{ fontWeight: 'bold' }}>Estado</TableCell>
+                            <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>Acciones</TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>
@@ -185,11 +235,29 @@ const AdminUsuariosPage = () => {
                                 <TableCell>{u.nombre}</TableCell>
                                 <TableCell>{u.correo}</TableCell>
                                 <TableCell>{u.rolNombre}</TableCell>
+                                
+                                {/* NUEVA COLUMNA: ASIGNACIÓN */}
+                                <TableCell align="center">
+                                    {u.rolNombre === 'SOPORTE' ? (
+                                        <Tooltip title={u.disponibleSoporte ? "Recibiendo tickets automáticamente" : "Ignorado por el balanceador"}>
+                                            <Switch 
+                                                checked={u.disponibleSoporte || false}
+                                                onChange={(e) => handleToggleDisponibilidad(u, e.target.checked)}
+                                                color="success"
+                                                disabled={!u.activo} // Si está dado de baja, no se puede encender
+                                            />
+                                        </Tooltip>
+                                    ) : (
+                                        <Typography variant="body2" color="textSecondary">--</Typography>
+                                    )}
+                                </TableCell>
+
                                 <TableCell>
                                     {u.passwordTemporal && <Chip label="Clave Temporal" color="warning" size="small" sx={{ mr: 1, mb: 1 }} />}
                                     {!u.activo ? <Chip label="Inactivo" color="error" size="small" /> : <Chip label="Activo" color="success" size="small" />}
                                 </TableCell>
-                                <TableCell>
+                                
+                                <TableCell align="center">
                                     <Button size="small" onClick={() => handleEditar(u)}>Editar</Button>
                                     <Button size="small" color={u.activo ? "error" : "success"} onClick={() => handleToggleActivo(u)}>
                                         {u.activo ? "Baja" : "Reactivar"}
@@ -202,13 +270,16 @@ const AdminUsuariosPage = () => {
                         ))}
                         {usuariosFiltrados.length === 0 && (
                             <TableRow>
-                                <TableCell colSpan={5} align="center">No se encontraron usuarios.</TableCell>
+                                <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                                    <Typography color="textSecondary">No se encontraron usuarios en esta categoría.</Typography>
+                                </TableCell>
                             </TableRow>
                         )}
                     </TableBody>
                 </Table>
             </TableContainer>
 
+            {/* MODALES MANTENIDOS INTACTOS */}
             <Dialog open={openModal} onClose={() => setOpenModal(false)} maxWidth="sm" fullWidth>
                 <DialogTitle>{formData.id ? "Editar Usuario" : "Registrar Nuevo Usuario"}</DialogTitle>
                 <DialogContent>
@@ -241,15 +312,13 @@ const AdminUsuariosPage = () => {
                         )}
                         sx={{ mt: 1 }}
                     />
-
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={() => setOpenModal(false)} color="inherit">Cancelar</Button>
-                    <Button onClick={handleGuardar} variant="contained" color="primary">Guardar Usuario</Button>
+                    <Button onClick={handleGuardar} variant="contained" sx={{ bgcolor: COLOR_GUINDA }}>Guardar Usuario</Button>
                 </DialogActions>
             </Dialog>
 
-            {/* AQUI AGREGAMOS NUESTRO NUEVO COMPONENTE DE IMPRESIÓN */}
             <ModalCredenciales 
                 open={openModalCredenciales} 
                 onClose={() => setOpenModalCredenciales(false)} 

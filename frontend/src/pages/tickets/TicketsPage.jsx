@@ -1,19 +1,25 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import { Box, Button, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography, Chip, Snackbar, Alert } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import CheckIcon from '@mui/icons-material/Check';
 import { useNavigate, useLocation } from 'react-router-dom';
 import api from '../../services/api';
+import { AuthContext } from '../../context/AuthContext.jsx'; // <-- IMPORTAMOS EL CONTEXTO
 
 const COLOR_GUINDA = '#801A36';
 
 export default function TicketsPage() {
+    const { user } = useContext(AuthContext); // <-- OBTENEMOS EL USUARIO
     const [historialTickets, setHistorialTickets] = useState([]);
     const navigate = useNavigate();
     const location = useLocation();
 
     const [openSnackbar, setOpenSnackbar] = useState(false);
     const [snackbarMessage, setSnackbarMessage] = useState('');
+
+    // Determinamos el rol limpio para usarlo en validaciones
+    const userRole = user?.rol || user?.role || user?.rolNombre || '';
+    const cleanRole = userRole.replace('ROLE_', '').toUpperCase();
 
     // Función de formato compacto
     const formatearFecha = (fecha) => {
@@ -63,51 +69,76 @@ export default function TicketsPage() {
             </Snackbar>
 
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-                <Typography variant="h4" sx={{ fontWeight: 'bold', color: COLOR_GUINDA }}>Historial de Tickets</Typography>
-                <Button variant="contained" startIcon={<AddIcon />} onClick={() => navigate('/tickets/nuevo')} sx={{ bgcolor: COLOR_GUINDA }}>
-                    Levantar Ticket
-                </Button>
+                <Typography variant="h4" sx={{ fontWeight: 'bold', color: COLOR_GUINDA }}>
+                    {/* Título dinámico según el rol */}
+                    {cleanRole === 'ADMINISTRADOR' ? 'Bitácora Global de Tickets' : 'Historial de Tickets'}
+                </Typography>
+                
+                {/* RENDERIZADO CONDICIONAL: El administrador NO ve este botón */}
+                {cleanRole !== 'ADMINISTRADOR' && (
+                    <Button variant="contained" startIcon={<AddIcon />} onClick={() => navigate('/tickets/nuevo')} sx={{ bgcolor: COLOR_GUINDA }}>
+                        Levantar Ticket
+                    </Button>
+                )}
             </Box>
 
-            <TableContainer component={Paper} elevation={2} sx={{ borderRadius: 3, overflow: 'hidden' }}>
-                <Table>
+            <TableContainer component={Paper} elevation={3} sx={{ borderRadius: 2, overflow: 'hidden' }}>
+                {/* Se añade minWidth para evitar que se aplaste en pantallas chicas */}
+                <Table sx={{ minWidth: 900 }}>
                     <TableHead>
                         <TableRow sx={{ bgcolor: COLOR_GUINDA }}>
-                            <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>ID</TableCell>
-                            <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Solicitante</TableCell>
-                            <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Departamento</TableCell>
-                            <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Título</TableCell>
-                            <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Inicio</TableCell>
-                            <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Fin</TableCell>
-                            <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Estatus</TableCell>
-                            <TableCell sx={{ color: 'white', fontWeight: 'bold', textAlign: 'center' }}>Acción</TableCell>
+                            {/* Anchos fijos por columna para forzar la simetría visual */}
+                            <TableCell sx={{ color: 'white', fontWeight: 'bold', width: '5%' }}>ID</TableCell>
+                            <TableCell sx={{ color: 'white', fontWeight: 'bold', width: '15%' }}>Solicitante</TableCell>
+                            <TableCell sx={{ color: 'white', fontWeight: 'bold', width: '15%' }}>Departamento</TableCell>
+                            <TableCell sx={{ color: 'white', fontWeight: 'bold', width: '25%' }}>Título</TableCell>
+                            <TableCell sx={{ color: 'white', fontWeight: 'bold', width: '10%' }}>Inicio</TableCell>
+                            <TableCell sx={{ color: 'white', fontWeight: 'bold', width: '10%' }}>Fin</TableCell>
+                            <TableCell sx={{ color: 'white', fontWeight: 'bold', width: '10%', textAlign: 'center' }}>Estatus</TableCell>
+                            <TableCell sx={{ color: 'white', fontWeight: 'bold', width: '10%', textAlign: 'center' }}>Acción</TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>
                         {historialTickets.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={8} align="center" sx={{ py: 4 }}>No hay tickets registrados.</TableCell>
+                                <TableCell colSpan={8} align="center" sx={{ py: 6 }}>
+                                    <Typography color="textSecondary">No hay tickets registrados.</Typography>
+                                </TableCell>
                             </TableRow>
                         ) : (
                             historialTickets.map((t) => (
-                                <TableRow key={t.id} hover>
+                                <TableRow key={t.id} hover sx={{ transition: '0.2s', '&:hover': { bgcolor: '#f9f9f9' } }}>
                                     <TableCell sx={{ fontWeight: 'bold' }}>#{t.id}</TableCell>
-                                    <TableCell>{t.solicitante}</TableCell>
-                                    <TableCell>{t.departamento}</TableCell>
+                                    <TableCell sx={{ fontWeight: '500' }}>{t.solicitante || 'Usuario'}</TableCell>
+                                    <TableCell>{t.departamento || 'Área'}</TableCell>
                                     <TableCell>{t.titulo}</TableCell>
                                     <TableCell sx={{ whiteSpace: 'nowrap', fontSize: '0.85rem' }}>{formatearFecha(t.fechaCreacion)}</TableCell>
                                     <TableCell sx={{ whiteSpace: 'nowrap', fontSize: '0.85rem' }}>{formatearFecha(t.fechaFin)}</TableCell>
-                                    <TableCell>
+                                    <TableCell align="center">
                                         <Chip 
                                             label={t.estatus} 
-                                            color={t.estatus === 'CERRADO' ? 'success' : 'warning'} 
+                                            // Cambiamos el CERRADO a 'default' (gris) para que sea más profesional
+                                            color={t.estatus === 'CERRADO' ? 'default' : 'warning'} 
                                             size="small" 
-                                            sx={{ fontWeight: 'bold' }} 
+                                            sx={{ fontWeight: 'bold', minWidth: '80px' }} 
                                         />
                                     </TableCell>
                                     <TableCell align="center">
-                                        {t.estatus !== 'CERRADO' && (
-                                            <Button size="small" variant="outlined" color="inherit" startIcon={<CheckIcon />} onClick={() => handleFinalizarTicket(t.id)}>Finalizar</Button>
+                                        {/* Lógica de acciones según rol y estatus */}
+                                        {t.estatus !== 'CERRADO' ? (
+                                            cleanRole !== 'ADMINISTRADOR' ? (
+                                                <Button size="small" variant="outlined" color="inherit" startIcon={<CheckIcon />} onClick={() => handleFinalizarTicket(t.id)}>
+                                                    Finalizar
+                                                </Button>
+                                            ) : (
+                                                <Typography variant="body2" color="textSecondary" sx={{ fontStyle: 'italic' }}>
+                                                    En proceso
+                                                </Typography>
+                                            )
+                                        ) : (
+                                            <Typography variant="body2" color="textSecondary" sx={{ fontWeight: 'bold' }}>
+                                                Finalizado
+                                            </Typography>
                                         )}
                                     </TableCell>
                                 </TableRow>

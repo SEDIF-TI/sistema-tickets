@@ -11,6 +11,8 @@ import com.sedif.sistema_tickets.core.ticket.filtros.TicketFiltroStrategy;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+// ---> IMPORTACIÓN NECESARIA PARA WEBSOCKETS
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -26,6 +28,9 @@ public class TicketService {
     private final EstatusRepository estatusRepository;
     private final Map<String, TicketFiltroStrategy> estrategiasFiltro;
     private final BitacoraRepository bitacoraRepository;
+    
+    // ---> INYECTAMOS LA HERRAMIENTA DE EMISIÓN DE WEBSOCKETS
+    private final SimpMessagingTemplate messagingTemplate;
 
     @Transactional
     public Ticket crearTicket(TicketRequestRecord request, String correoUsuario) {
@@ -39,10 +44,6 @@ public class TicketService {
         nuevoTicket.setTitulo(request.titulo());
         nuevoTicket.setDescripcion(request.descripcion());
         nuevoTicket.setSede(request.sede());
-        
-        // ---> GUARDAMOS EL NOMBRE DEL SOLICITANTE FÍSICO
-        nuevoTicket.setSolicitanteNombre(request.solicitante()); 
-        
         nuevoTicket.setUsuarioArea(usuario); 
         nuevoTicket.setEstatus(estatusAbierto); 
         nuevoTicket.setFechaCreacion(LocalDateTime.now());
@@ -68,20 +69,30 @@ public class TicketService {
 
         Ticket ticketGuardado = ticketRepository.save(nuevoTicket);
 
+        // Notificación automática por Telegram
         if (ticketGuardado.getUsuarioSoporte() != null && 
             ticketGuardado.getUsuarioSoporte().getTelegramChatId() != null) {
             
             String mensaje = "🚨 *NUEVO TICKET ASIGNADO* 🚨\n\n" +
                              "🆔 *ID:* #" + ticketGuardado.getId() + "\n" +
-                             "👤 *Solicitante:* " + (ticketGuardado.getSolicitanteNombre() != null ? ticketGuardado.getSolicitanteNombre() : "N/A") + "\n" +
                              "📌 *Título:* " + ticketGuardado.getTitulo();
-            
             try {
                 telegramBot.enviarMensaje(ticketGuardado.getUsuarioSoporte().getTelegramChatId(), mensaje);
                 System.out.println("✅ [SISTEMA] Notificación de Telegram enviada con éxito.");
             } catch (Exception e) {
                 System.err.println("❌ [SISTEMA] Error al enviar notificación a Telegram: " + e.getMessage());
             }
+        } else {
+            System.out.println("⚠️ [SISTEMA] Telegram ignorado: El técnico asignado no tiene un ChatID vinculado.");
+        }
+
+        // ---> NUEVO: EMITIR EL EVENTO WEBSOCKET HACIA REACT
+        try {
+            TicketResponse responsePayload = mapearATicketResponse(ticketGuardado);
+            messagingTemplate.convertAndSend("/topic/tickets-soporte", responsePayload);
+            System.out.println("✅ [SISTEMA] WebSocket emitido al canal /topic/tickets-soporte");
+        } catch (Exception e) {
+            System.err.println("❌ [SISTEMA] Error al emitir por WebSocket: " + e.getMessage());
         }
 
         return ticketGuardado;
@@ -130,15 +141,11 @@ public class TicketService {
         String nombreSolicitante = "Desconocido";
         String nombreDepartamento = "Sin área";
 
-        // ---> LOGICA DE PRIORIDAD PARA EL NOMBRE DEL SOLICITANTE
-        if (t.getSolicitanteNombre() != null && !t.getSolicitanteNombre().isBlank()) {
-            nombreSolicitante = t.getSolicitanteNombre(); // Prioridad 1: Nombre real de quien tiene la falla
-        } else if (t.getUsuarioArea() != null) {
-            nombreSolicitante = t.getUsuarioArea().getNombre(); // Prioridad 2: Fallback al dueño de la cuenta (Tickets viejos)
-        }
-
-        if (t.getUsuarioArea() != null && t.getUsuarioArea().getArea() != null) {
-            nombreDepartamento = t.getUsuarioArea().getArea().getNombre();
+        if (t.getUsuarioArea() != null) {
+            nombreSolicitante = t.getUsuarioArea().getNombre();
+            if (t.getUsuarioArea().getArea() != null) {
+                nombreDepartamento = t.getUsuarioArea().getArea().getNombre();
+            }
         }
 
         String justificacion = null;
@@ -146,7 +153,6 @@ public class TicketService {
         if (!historial.isEmpty()) {
             justificacion = historial.get(0).getJustificacion();
         }
-        
         return new TicketResponse(
                 t.getId(),
                 t.getTitulo(),
@@ -154,7 +160,7 @@ public class TicketService {
                 t.getSede(),
                 t.getFechaCreacion(),
                 t.getFechaFin(),
-                nombreSolicitante, 
+                nombreSolicitante,
                 nombreDepartamento,
                 t.getEstatus().getNombre(),
                 t.getUsuarioArea()!= null ? t.getUsuarioArea().getId() : null,
@@ -176,7 +182,14 @@ public class TicketService {
     
         ticket.setEstatus(estatusRepository.findByNombre("CERRADO").orElseThrow());
         ticket.setFechaFin(LocalDateTime.now());
-        return ticketRepository.save(ticket);
+        Ticket ticketGuardado = ticketRepository.save(ticket);
+
+        // NUEVO: Emitir actualización de estado al frontend
+        try {
+            messagingTemplate.convertAndSend("/topic/tickets-soporte", mapearATicketResponse(ticketGuardado));
+        } catch (Exception e) {}
+
+        return ticketGuardado;
     }
 
     @Transactional(readOnly = true)
@@ -201,16 +214,21 @@ public class TicketService {
                 .orElseThrow(() -> new IllegalStateException("El estatus EN PROCESO no existe en la BD."));
 
         ticket.setEstatus(estatusEnCamino);
-        ticketRepository.save(ticket);
+        Ticket ticketGuardado = ticketRepository.save(ticket);
 
         Bitacora bitacora = new Bitacora();
-        bitacora.setTicket(ticket);
+        bitacora.setTicket(ticketGuardado);
         bitacora.setEstatusRegistrado("EN PROCESO");
         bitacora.setJustificacion("El técnico va en camino para atender el reporte.");
         bitacoraRepository.save(bitacora);
 
-        return ticket;
-    }
+        // NUEVO: Emitir actualización de estado al frontend
+        try {
+            messagingTemplate.convertAndSend("/topic/tickets-soporte", mapearATicketResponse(ticketGuardado));
+        } catch (Exception e) {}
+
+        return ticketGuardado;
+    }   
 
     @Transactional
     public Ticket resolverTicket(Long ticketId, String justificacion) {
@@ -221,17 +239,22 @@ public class TicketService {
                 .orElseThrow(() -> new IllegalStateException("El estatus CERRADO no existe en la BD."));
 
         ticket.setEstatus(estatusResuelto);
-        ticket.setFechaFin(LocalDateTime.now());
-        ticketRepository.save(ticket);
+        ticket.setFechaFin(LocalDateTime.now()); 
+        Ticket ticketGuardado = ticketRepository.save(ticket);
 
         Bitacora bitacora = new Bitacora();
-        bitacora.setTicket(ticket);
+        bitacora.setTicket(ticketGuardado);
         bitacora.setEstatusRegistrado("CERRADO");
         bitacora.setJustificacion(justificacion);
         bitacoraRepository.save(bitacora);
 
-        return ticket;
-    }    
+        // NUEVO: Emitir actualización de estado al frontend
+        try {
+            messagingTemplate.convertAndSend("/topic/tickets-soporte", mapearATicketResponse(ticketGuardado));
+        } catch (Exception e) {}
+
+        return ticketGuardado;
+    }  
 
     @Transactional(readOnly = true)
     public List<TicketResponse> obtenerTicketsParaBandeja(String correoUsuario) {
