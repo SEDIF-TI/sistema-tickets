@@ -50,13 +50,29 @@ export default function PanelSoporte() {
         cargarTicketsHistoricos();
     }, []);
 
-    useEffect(() => {
+useEffect(() => {
         if (isConnected && stompClient && stompClient.connected && user) {
             try {
                 const suscripcion = stompClient.subscribe('/topic/tickets-soporte', (mensaje) => {
-                    const nuevoTicket = JSON.parse(mensaje.body);
-                    if (nuevoTicket.usuarioSoporteId === user.usuarioId) {
-                        setTickets((prev) => [nuevoTicket, ...prev]);
+                    const ticketEntrante = JSON.parse(mensaje.body);
+                    
+                    // Solo procesamos si el ticket pertenece a este técnico
+                    // Validamos user.usuarioId y user.id por seguridad dependiendo de tu AuthContext
+                    const myId = user.usuarioId || user.id;
+                    
+                    if (ticketEntrante.usuarioSoporteId === myId) {
+                        setTickets((prev) => {
+                            // ¿El ticket ya está en la tabla?
+                            const existe = prev.some(t => t.id === ticketEntrante.id);
+                            
+                            if (existe) {
+                                // Si existe, lo mapeamos y reemplazamos sus datos para que cambie de color
+                                return prev.map(t => t.id === ticketEntrante.id ? ticketEntrante : t);
+                            } else {
+                                // Si no existe, lo ponemos hasta arriba de la fila
+                                return [ticketEntrante, ...prev];
+                            }
+                        });
                     }
                 });
                 return () => {
@@ -66,7 +82,7 @@ export default function PanelSoporte() {
                 console.error("Error en la suscripción WebSocket:", error);
             }
         }
-    }, [isConnected, stompClient, user]); 
+    }, [isConnected, stompClient, user]);
 
     const handleAtenderTicket = async (ticket) => {
         try {
@@ -149,7 +165,6 @@ export default function PanelSoporte() {
     return (
         <Box sx={{ p: { xs: 2, md: 4 }, backgroundColor: '#f4f7f6', minHeight: '100vh', width: '100%' }}>
             
-            {/* ENCABEZADO */}
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                 <Typography variant="h4" fontWeight="bold" sx={{ color: COLOR_GUINDA, display: 'flex', alignItems: 'center', gap: 1 }}>
                     <AssignmentIcon fontSize="large" />
@@ -159,7 +174,6 @@ export default function PanelSoporte() {
 
             <Paper elevation={3} sx={{ borderRadius: 2, overflow: 'hidden', mb: 4 }}>
                 
-                {/* BARRA DE BÚSQUEDA */}
                 <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', bgcolor: '#ffffff', borderBottom: '1px solid #e0e0e0' }}>
                     <Typography variant="body2" color="textSecondary">
                         Mostrando registros de soporte
@@ -184,7 +198,6 @@ export default function PanelSoporte() {
                     />
                 </Box>
 
-                {/* TABLA DE DATOS */}
                 <TableContainer>
                     <Table sx={{ minWidth: 800 }}>
                         <TableHead>
@@ -192,7 +205,6 @@ export default function PanelSoporte() {
                                 <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>ID</TableCell>
                                 <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Solicitante</TableCell>
                                 <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Departamento</TableCell>
-                                <TableCell sx={{ color: 'white', fontWeight: 'bold', textAlign: 'center' }}>Detalles</TableCell>
                                 <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Inicio</TableCell>
                                 <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Fin</TableCell>
                                 <TableCell sx={{ color: 'white', fontWeight: 'bold', textAlign: 'center' }}>Estatus</TableCell>
@@ -202,13 +214,13 @@ export default function PanelSoporte() {
                         <TableBody>
                             {cargando ? (
                                 <TableRow>
-                                    <TableCell colSpan={8} align="center" sx={{ py: 6 }}>
+                                    <TableCell colSpan={7} align="center" sx={{ py: 6 }}>
                                         <CircularProgress sx={{ color: COLOR_GUINDA }} />
                                     </TableCell>
                                 </TableRow>
                             ) : ticketsFiltrados.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={8} align="center" sx={{ py: 6 }}>
+                                    <TableCell colSpan={7} align="center" sx={{ py: 6 }}>
                                         <Typography color="textSecondary">No se encontraron tickets con esos criterios.</Typography>
                                     </TableCell>
                                 </TableRow>
@@ -220,22 +232,8 @@ export default function PanelSoporte() {
                                     return (
                                         <TableRow key={ticket.id} hover sx={{ transition: '0.2s', '&:hover': { bgcolor: '#f9f9f9' } }}>
                                             <TableCell sx={{ fontWeight: 'bold' }}>{numeroFila}</TableCell>
-                                            
                                             <TableCell sx={{ fontWeight: '500' }}>{ticket.solicitante || 'Usuario'}</TableCell>
                                             <TableCell>{ticket.departamento || 'Área'}</TableCell>
-                                            
-                                            <TableCell align="center">
-                                                <Button 
-                                                    variant="outlined" 
-                                                    size="small" 
-                                                    onClick={() => handleOpenDetalle(ticket)}
-                                                    startIcon={<VisibilityIcon />} 
-                                                    sx={{ color: COLOR_GUINDA, borderColor: COLOR_GUINDA, textTransform: 'none', borderRadius: 2 }}
-                                                >
-                                                    Ver Ticket
-                                                </Button>
-                                            </TableCell>
-
                                             <TableCell sx={{ whiteSpace: 'nowrap', fontSize: '0.85rem' }}>{formatearFecha(ticket.fechaCreacion)}</TableCell>
                                             <TableCell sx={{ whiteSpace: 'nowrap', fontSize: '0.85rem' }}>{formatearFecha(ticket.fechaFin)}</TableCell>
                                             
@@ -248,26 +246,53 @@ export default function PanelSoporte() {
                                                 />
                                             </TableCell>
                                             
+                                            {/* GRID PARA ALINEACIÓN PERFECTA DE BOTONES */}
                                             <TableCell align="center">
-                                                {(estatusLabel === 'ASIGNADO' || estatusLabel === 'ABIERTO') && (
-                                                    <Tooltip title="Voy en camino">
-                                                        <IconButton onClick={() => handleAtenderTicket(ticket)} sx={{ color: '#f39c12' }}>
-                                                            <DirectionsRunIcon />
-                                                        </IconButton>
-                                                    </Tooltip>
-                                                )}
-                                                {estatusLabel === 'EN PROCESO' && (
-                                                    <Tooltip title="Resolver Ticket">
-                                                        <IconButton onClick={() => handleOpenResolucion(ticket)} sx={{ color: '#2ecc71' }}>
-                                                            <CheckCircleIcon />
-                                                        </IconButton>
-                                                    </Tooltip>
-                                                )}
-                                                {(estatusLabel === 'RESUELTO' || estatusLabel === 'CERRADO') && (
-                                                    <Typography variant="body2" color="textSecondary" sx={{ fontWeight: 'bold' }}>
-                                                        Finalizado
-                                                    </Typography>
-                                                )}
+                                                <Box sx={{ 
+                                                    display: 'grid', 
+                                                    gridTemplateColumns: '85px 85px', /* Dos columnas de ancho idéntico y fijo */
+                                                    alignItems: 'center', 
+                                                    justifyContent: 'center',
+                                                    gap: 1 
+                                                }}>
+                                                    
+                                                    {/* Columna 1: Botón Ver */}
+                                                    <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                                                        <Button 
+                                                            variant="outlined" 
+                                                            size="small" 
+                                                            onClick={() => handleOpenDetalle(ticket)}
+                                                            startIcon={<VisibilityIcon />} 
+                                                            sx={{ color: COLOR_GUINDA, borderColor: COLOR_GUINDA, textTransform: 'none', borderRadius: 2 }}
+                                                        >
+                                                            Ver
+                                                        </Button>
+                                                    </Box>
+
+                                                    {/* Columna 2: Acción dinámica */}
+                                                    <Box sx={{ display: 'flex', justifyContent: 'flex-start', pl: 1 }}>
+                                                        {(estatusLabel === 'ASIGNADO' || estatusLabel === 'ABIERTO') && (
+                                                            <Tooltip title="Voy en camino">
+                                                                <IconButton onClick={() => handleAtenderTicket(ticket)} sx={{ color: '#f39c12' }}>
+                                                                    <DirectionsRunIcon />
+                                                                </IconButton>
+                                                            </Tooltip>
+                                                        )}
+                                                        {estatusLabel === 'EN PROCESO' && (
+                                                            <Tooltip title="Resolver Ticket">
+                                                                <IconButton onClick={() => handleOpenResolucion(ticket)} sx={{ color: '#2ecc71' }}>
+                                                                    <CheckCircleIcon />
+                                                                </IconButton>
+                                                            </Tooltip>
+                                                        )}
+                                                        {(estatusLabel === 'RESUELTO' || estatusLabel === 'CERRADO') && (
+                                                            <Typography variant="body2" color="textSecondary" sx={{ fontWeight: 'bold' }}>
+                                                                Finalizado
+                                                            </Typography>
+                                                        )}
+                                                    </Box>
+
+                                                </Box>
                                             </TableCell>
                                         </TableRow>
                                     );

@@ -1,6 +1,6 @@
 import React, { useState, useContext } from 'react';
 import { Box, Typography, Paper, TextField, Button, Alert, Divider, Grid } from '@mui/material';
-import { useNavigate } from 'react-router-dom'; // <-- 1. IMPORTAMOS EL NAVEGADOR
+import { useNavigate } from 'react-router-dom'; 
 import { AuthContext } from '../context/AuthContext';
 import api from '../services/api';
 
@@ -11,9 +11,12 @@ import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
 
 const COLOR_GUINDA = '#801A36';
 
+// ---> CONFIGURA AQUÍ EL USERNAME REAL DE TU BOT (EL QUE TE DIO BOTFATHER)
+const TELEGRAM_BOT_USERNAME = 'Notificaciones_SEDIF_bot'; 
+
 export default function PerfilPage() {
     const { user, marcarPasswordCambiada } = useContext(AuthContext);
-    const navigate = useNavigate(); // <-- 2. INICIALIZAMOS EL NAVEGADOR
+    const navigate = useNavigate(); 
     
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
@@ -41,15 +44,10 @@ export default function PerfilPage() {
         try {
             await api.put('/v1/admin/usuarios/password', { nuevaPassword: password });
             
-            // Si el usuario venía del bloqueo por contraseña temporal (primer inicio de sesión)
             if (user?.passwordTemporal) {
-                marcarPasswordCambiada(); // Rompemos el candado en el contexto
-                
-                // ¡AQUÍ ESTÁ LA MAGIA! 
-                // Los mandamos a la ruta raíz "/" para que App.jsx los lea limpios y los mande a su verdadero Dashboard
+                marcarPasswordCambiada(); 
                 navigate('/', { replace: true });
             } else {
-                // Si es un cambio de contraseña normal (desde su sesión ya activa), solo avisamos
                 setMensaje({ texto: '¡Contraseña actualizada con éxito!', tipo: 'success' });
                 setPassword('');
                 setConfirmPassword('');
@@ -61,7 +59,16 @@ export default function PerfilPage() {
     };
 
     const handleVincularTelegram = () => {
-        const urlBotTelegram = `https://t.me/SEDIF_Soporte_Bot?start=${user?.correo}`;
+        // ---> CORRECCIÓN: Extraemos el ID numérico compatible con Long.parseLong de Java
+        const userId = user?.id || user?.usuarioId || '';
+        
+        if (!userId) {
+            alert("No se pudo recuperar el ID de tu usuario. Intenta cerrar y abrir sesión.");
+            return;
+        }
+
+        // Construimos la URL limpia con el ID numérico
+        const urlBotTelegram = `https://t.me/${TELEGRAM_BOT_USERNAME}?start=${userId}`;
         window.open(urlBotTelegram, '_blank');
     };
 
