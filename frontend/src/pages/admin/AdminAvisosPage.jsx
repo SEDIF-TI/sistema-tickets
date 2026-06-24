@@ -12,7 +12,7 @@ import PostAddIcon from '@mui/icons-material/PostAdd';
 
 import api from '../../services/api';
 
-const COLOR_GUINDA = '#5c0a28'; // Sincronizado con tu theme.js
+const COLOR_GUINDA = '#5c0a28'; 
 
 export default function AdminAvisosPage() {
     const [avisos, setAvisos] = useState([]);
@@ -39,6 +39,24 @@ export default function AdminAvisosPage() {
             setTitulo(''); setMensaje(''); cargarAvisos();
         } catch (error) { alert("Error al publicar"); }
         finally { setEnviando(false); }
+    };
+
+// ---> FUNCIÓN PARA ELIMINAR / DESACTIVAR <---
+    const handleEliminar = async (id) => {
+        if (window.confirm('¿Estás seguro de que deseas eliminar este aviso global? Las pantallas de los usuarios se limpiarán en unos segundos.')) {
+            try {
+                // Opción A: Borrado físico (La que teníamos)
+                //await api.delete(`/v1/avisos/${id}`); 
+                
+                // Opción B (Si la Opción A te da error en consola, comenta la línea de arriba y descomenta la de abajo):
+                await api.put(`/v1/avisos/${id}`, { estado: 'INACTIVO' }); 
+
+                cargarAvisos(); // Refresca la tabla del administrador
+            } catch (error) {
+                alert("Ocurrió un error al eliminar el aviso. Revisa la consola para más detalles.");
+                console.error("Detalle del error:", error);
+            }
+        }
     };
 
     return (
@@ -84,7 +102,14 @@ export default function AdminAvisosPage() {
                                 <TableCell sx={{ fontWeight: 'bold' }}>{aviso.titulo}</TableCell>
                                 <TableCell>{aviso.mensaje}</TableCell>
                                 <TableCell align="center"><Chip label="ACTIVO" size="small" color="success" /></TableCell>
-                                <TableCell align="center"><IconButton color="error"><DeleteIcon /></IconButton></TableCell>
+                                
+                                {/* ---> SE AGREGA EL EVENTO onClick AL BOTÓN <--- */}
+                                <TableCell align="center">
+                                    <IconButton color="error" onClick={() => handleEliminar(aviso.id)}>
+                                        <DeleteIcon />
+                                    </IconButton>
+                                </TableCell>
+                                
                             </TableRow>
                         ))}
                     </TableBody>

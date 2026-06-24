@@ -42,9 +42,9 @@ export default function LoginPage() {
     };
 
     return (
-        <Container component="main" maxWidth="xs">
-            <Box sx={{ marginTop: 8, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <Paper elevation={3} sx={{ padding: 4, width: '100%', borderRadius: 2 }}>
+        <Container component="main" maxWidth="xs" sx={{ px: 2 }}> {/* px: 2 da un respiro en celulares */}
+            <Box sx={{ mt: 8, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <Paper elevation={3} sx={{ p: { xs: 3, md: 4 }, width: '100%', borderRadius: 3 }}>
                     <Typography component="h1" variant="h5" align="center" gutterBottom>
                         Sistema de Tickets
                     </Typography>

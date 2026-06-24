@@ -61,14 +61,23 @@ public class SecurityConfig {
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
+
     @Bean
     public org.springframework.web.cors.CorsConfigurationSource corsConfigurationSource() {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         CorsConfiguration config = new CorsConfiguration();
+        
         config.setAllowCredentials(true);
-        config.setAllowedOriginPatterns(List.of("*"));
+        
+        // 1. CAMBIO CLAVE: Ponemos tu puerto exacto de React en lugar del asterisco (*)
+        // Agregamos también el 5174 por si Vite llega a saltar de puerto en algún momento
+        config.setAllowedOrigins(List.of("http://localhost:5173", "http://localhost:5174")); 
+        
         config.setAllowedHeaders(List.of("*"));
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        
+        // 2. CAMBIO CLAVE: Agregamos "PATCH" para que no se rompa el interruptor de Telegram
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
+        
         source.registerCorsConfiguration("/**", config);
         return source;
     }

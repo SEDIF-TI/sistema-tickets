@@ -1,6 +1,5 @@
 import React, { useContext } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { Typography } from '@mui/material';
 
 // --- Material UI y Temas ---
 import { ThemeProvider } from '@mui/material/styles';
@@ -13,9 +12,7 @@ import { WebSocketProvider } from './context/WebSocketContext.jsx';
 
 // Layouts y Páginas Base
 import LoginPage from './pages/LoginPage.jsx';
-import PrimerCambioPassword from './pages/PrimerCambioPassword.jsx'; // RECUPERADO
 import MainLayout from './components/MainLayout.jsx';
-import SoporteLayout from './components/SoporteLayout.jsx';
 import PerfilPage from './pages/PerfilPage.jsx';
 
 // Páginas de Roles
@@ -27,15 +24,16 @@ import AdminAvisosPage from './pages/admin/AdminAvisosPage.jsx';
 import AdminAreasPage from './pages/admin/AdminAreasPage';
 import DashboardPage from './pages/admin/DashboardPage.jsx';
 
-// --- IMPORTACIÓN NUEVA (Asegúrate de que la ruta de la carpeta sea correcta) ---
+// Componentes Adicionales
 import GeneradorDocumentos from './components/GeneradorDocumentos.jsx'; 
 
-// 1. EL POLICÍA DE TRÁNSITO (AppContent)
-// 1. EL POLICÍA DE TRÁNSITO (AppContent)
+import '@fontsource/inter/400.css';
+import '@fontsource/inter/600.css';
+import '@fontsource/inter/700.css';
+
 function AppContent() {
     const { user } = useContext(AuthContext);
 
-    // Nivel 1: Si no hay sesión, al Login
     if (!user) {
         return (
             <Routes>
@@ -45,24 +43,18 @@ function AppContent() {
         );
     }
 
-    // Obtenemos el rol limpio para tomar decisiones
     const userRole = user.rol || user.role || user.rolNombre || '';
     const cleanRole = userRole.replace('ROLE_', '').toUpperCase();
 
-    // ---> LA SOLUCIÓN: Elegimos dinámicamente el marco visual según el rol <---
-    const LayoutDelUsuario = cleanRole === 'SOPORTE' ? SoporteLayout : MainLayout;
-
-    // Nivel 2: EL CANDADO. Si la contraseña es temporal, lo encerramos en el perfil.
     if (user.passwordTemporal) {
         return (
             <Routes>
-                <Route path="/perfil" element={<LayoutDelUsuario><PerfilPage /></LayoutDelUsuario>} />
+                <Route path="/perfil" element={<MainLayout><PerfilPage /></MainLayout>} />
                 <Route path="*" element={<Navigate to="/perfil" replace />} />
             </Routes>
         );
     }
 
-    // Nivel 3: Navegación normal si ya cambió su contraseña
     let rutaPorDefecto = '/empleado/historial'; 
     if (cleanRole === 'ADMINISTRADOR') rutaPorDefecto = '/admin/dashboard';
     if (cleanRole === 'SOPORTE') rutaPorDefecto = '/soporte/bandeja';
@@ -72,37 +64,27 @@ function AppContent() {
             <Route path="/" element={<Navigate to={rutaPorDefecto} replace />} />
             <Route path="/login" element={<Navigate to={rutaPorDefecto} replace />} />
 
-            {/* Rutas Protegidas de Admin */}
+            {/* Rutas de Administrador */}
             <Route path="/admin/dashboard" element={<MainLayout><DashboardPage /></MainLayout>} />
             <Route path="/admin/usuarios" element={<MainLayout><AdminUsuariosPage /></MainLayout>} />
             <Route path="/admin/areas" element={<MainLayout><AdminAreasPage /></MainLayout>} />
             <Route path="/admin/avisos" element={<MainLayout><AdminAvisosPage /></MainLayout>} />
 
-            {/* Rutas Protegidas de Soporte */}
-            <Route path="/soporte/bandeja" element={<SoporteLayout><PanelSoporte /></SoporteLayout>} />
-            
-            {/* CORRECCIÓN: Ajustamos esta ruta para que coincida con lo que tu compañero guardó en la BD */}
-            <Route path="/tickets/nuevo" element={<MainLayout><FormularioTicket /></MainLayout>} /> 
-            
-            {/* NUEVA RUTA: Agregamos la ruta del generador de documentos dentro del layout de soporte */}
-            <Route path="/documentos/crear" element={<SoporteLayout><GeneradorDocumentos /></SoporteLayout>} />
+            {/* ✅ RUTAS DE SOPORTE */}
+            <Route path="/soporte/bandeja" element={<MainLayout><PanelSoporte /></MainLayout>} />
+            <Route path="/documentos/crear" element={<MainLayout><GeneradorDocumentos /></MainLayout>} />
 
-            {/* Rutas Protegidas de Empleado */}
+            {/* ✅ RUTA COMPARTIDA (Soporte y Empleado la usan igual en tu BD) */}
+            <Route path="/tickets/nuevo" element={<MainLayout><FormularioTicket /></MainLayout>} /> 
+
+            {/* Rutas exclusivas de Empleado */}
             <Route path="/empleado/nuevo" element={<MainLayout><FormularioTicket /></MainLayout>} />
             <Route path="/empleado/historial" element={<MainLayout><TicketsPage /></MainLayout>} />
-
-            {/* ---> RUTA DEL PERFIL DINÁMICA <--- */}
-            {/* Ahora respeta el marco de quien lo visite sin borrarle sus opciones */}
-            <Route path="/perfil" element={<LayoutDelUsuario><PerfilPage /></LayoutDelUsuario>} />
-
-            {/* Cualquier otra ruta inventada lo regresa a su panel */}
-            <Route path="*" element={<Navigate to={rutaPorDefecto} replace />} />
         </Routes>
     );
 }
 
-// 2. LA ESTRUCTURA PRINCIPAL
-function App() {
+export default function App() {
     return (
         <ThemeProvider theme={theme}>
             <CssBaseline />
@@ -116,5 +98,3 @@ function App() {
         </ThemeProvider>
     );
 }
-
-export default App;

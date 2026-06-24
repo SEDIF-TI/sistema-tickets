@@ -1,7 +1,8 @@
-import React, { useContext } from 'react';
-import { Box, Drawer, AppBar, Toolbar, List, Typography, ListItem, ListItemButton, ListItemIcon, Button, Tooltip, IconButton } from '@mui/material';
+import React, { useContext, useEffect, useState } from 'react'; // <-- AGREGA useEffect y useState
+import { Box, Drawer, AppBar, Toolbar, List, Typography, ListItem, ListItemButton, ListItemIcon, Button, Tooltip, IconButton, CssBaseline, Snackbar, Alert } from '@mui/material'; // <-- AGREGA Snackbar y Alert
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext.jsx';
+import api from '../services/api'; // <-- IMPORTA TU API PARA CONSULTAR LOS AVISOS
 
 // Iconos
 import ExitToAppIcon from '@mui/icons-material/ExitToApp';
@@ -12,7 +13,8 @@ import DomainIcon from '@mui/icons-material/Domain';
 import AddCircleIcon from '@mui/icons-material/AddCircle';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import CampaignIcon from '@mui/icons-material/Campaign'; 
-import AssignmentIcon from '@mui/icons-material/Assignment'; // Ícono para Soporte
+import AssignmentIcon from '@mui/icons-material/Assignment'; 
+import DescriptionIcon from '@mui/icons-material/Description'; 
 
 const drawerWidth = 65; 
 const COLOR_GUINDA = '#801A36';
@@ -21,40 +23,99 @@ export default function MainLayout({ children }) {
     const { user, logout } = useContext(AuthContext);
     const navigate = useNavigate();
 
+    // ---> ESTADOS PARA LOS AVISOS GLOBALES <---
+    const [avisoActivo, setAvisoActivo] = useState(null);
+    const [openAviso, setOpenAviso] = useState(false);
+
     const handleLogout = () => {
         logout();
         navigate('/login');
     };
 
-    // Identificamos el rol exacto del usuario activo
     const userRole = user?.rol || user?.role || user?.rolNombre || '';
     const cleanRole = userRole.replace('ROLE_', '').toUpperCase();
-
-    // Verificamos si el usuario está bloqueado en su primer inicio de sesión
     const estaBloqueado = user?.passwordTemporal;
 
+    // ---> LÓGICA DE BÚSQUEDA CADA 30 SEGUNDOS <---
+    useEffect(() => {
+        if (!user || estaBloqueado) return;
+
+        const buscarAvisos = async () => {
+            try {
+                const response = await api.get('/v1/avisos/activos');
+                
+                if (response.data && response.data.length > 0) {
+                    setAvisoActivo(response.data[0]); 
+                    setOpenAviso(true);
+                } else {
+                    // ✅ SI YA NO HAY AVISOS, LO APAGAMOS Y LO QUITAMOS DE LA PANTALLA
+                    setAvisoActivo(null);
+                    setOpenAviso(false);
+                }
+            } catch (error) {
+                // ✅ SI EL BACKEND DEVUELVE ERROR (ej. 404 Not Found porque no hay avisos), TAMBIÉN LO APAGAMOS
+                setAvisoActivo(null);
+                setOpenAviso(false);
+            }
+        };
+
+        buscarAvisos();
+
+        const intervalo = setInterval(() => {
+            buscarAvisos();
+        }, 30000); // 30 segundos
+
+        return () => clearInterval(intervalo);
+    }, [user, estaBloqueado]);
+
+    // Función para que el usuario cierre el aviso (pero volverá a salir en 30s si sigue activo)
+    const handleCloseAviso = (event, reason) => {
+        if (reason === 'clickaway') return;
+        setOpenAviso(false);
+    };
+
     return (
-        <Box sx={{ display: 'flex' }}>
-            {/* BARRA SUPERIOR */}
-            <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1, bgcolor: COLOR_GUINDA }}>
+        <Box sx={{ display: 'flex', minHeight: '100vh', width: '100vw', bgcolor: '#f4f7f6', overflowX: 'hidden' }}>
+            <CssBaseline />
+
+            {/* ---> EL SNACKBAR QUE SALTARÁ CADA 30 SEGUNDOS <--- */}
+            {avisoActivo && (
+                <Snackbar 
+                    open={openAviso} 
+                    onClose={handleCloseAviso}
+                    // No le ponemos autoHideDuration para forzar al usuario a cerrarlo o leerlo
+                    anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+                    sx={{ mt: '65px', zIndex: 9999 }} // Se empuja hacia abajo para no tapar la AppBar superior
+                >
+                    <Alert 
+                        onClose={handleCloseAviso} 
+                        severity="warning" 
+                        variant="filled"
+                        sx={{ width: '100%', fontWeight: 'bold', fontSize: '1.05rem', boxShadow: 3 }}
+                    >
+                        {avisoActivo.titulo}: {avisoActivo.mensaje}
+                    </Alert>
+                </Snackbar>
+            )}
+
+            <AppBar position="fixed" sx={{ 
+                width: '100%', 
+                left: 0,
+                top: 0,
+                zIndex: (theme) => theme.zIndex.drawer + 1, 
+                bgcolor: COLOR_GUINDA,
+                borderRadius: '0 !important', 
+                boxShadow: 2, 
+                m: 0
+            }}>
                 <Toolbar sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    
-                    {/* Título de la aplicación */}
                     <Typography variant="h6" noWrap component="div" sx={{ fontWeight: 'bold' }}>
                         SEDIF - Sistema de Tickets
                     </Typography>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                        
-                        {/* NOTA: Si aquí tienes tu campanita de notificaciones, envuélvela así para que solo la vea Soporte: */}
-                        {/* {cleanRole === 'SOPORTE' && (
-                            <IconButton color="inherit"> ... </IconButton>
-                        )} */}
-
                         <Typography variant="body2" sx={{ textTransform: 'uppercase' }}>
                             {user?.nombre || 'Usuario'} | {cleanRole}
                         </Typography>
-
-                        {/* Ocultamos el botón de ir al perfil si ya está encerrado obligatoriamente en él */}
                         {!estaBloqueado && (
                             <Tooltip title="Mi Perfil">
                                 <IconButton color="inherit" onClick={() => navigate('/perfil')}>
@@ -62,7 +123,6 @@ export default function MainLayout({ children }) {
                                 </IconButton>
                             </Tooltip>
                         )}
-
                         <Button color="inherit" onClick={handleLogout} startIcon={<ExitToAppIcon />}>
                             Salir
                         </Button>
@@ -70,7 +130,6 @@ export default function MainLayout({ children }) {
                 </Toolbar>
             </AppBar>
 
-            {/* MENÚ LATERAL (Solo se dibuja si NO está bloqueado) */}
             {!estaBloqueado && (
                 <Drawer
                     variant="permanent"
@@ -82,142 +141,127 @@ export default function MainLayout({ children }) {
                             boxSizing: 'border-box',
                             overflowX: 'hidden',
                             backgroundColor: '#ffffff',
-                            borderRight: '1px solid #e0e0e0'
+                            borderRight: '1px solid #e0e0e0',
+                            borderRadius: '0 !important',
                         },
                     }}
                 >
                     <Toolbar /> 
-                    
                     <List sx={{ pt: 2 }}>
                         
-                        {/* ---------------- MENÚ EXCLUSIVO DE ADMINISTRADOR ---------------- */}
+                        {/* ---------------- MENU ADMINISTRADOR ---------------- */}
                         {cleanRole === 'ADMINISTRADOR' && (
                             <>
                                 <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
                                     <Tooltip title="Dashboard" placement="right" arrow>
                                         <ListItemButton onClick={() => navigate('/admin/dashboard')} sx={{ justifyContent: 'center', px: 2.5, py: 1.5 }}>
-                                            <ListItemIcon sx={{ minWidth: 0, justifyContent: 'center', color: COLOR_GUINDA }}>
-                                                <DashboardIcon />
-                                            </ListItemIcon>
+                                            <ListItemIcon sx={{ minWidth: 0, justifyContent: 'center', color: COLOR_GUINDA }}><DashboardIcon /></ListItemIcon>
                                         </ListItemButton>
                                     </Tooltip>
                                 </ListItem>
-
                                 <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
                                     <Tooltip title="Usuarios" placement="right" arrow>
                                         <ListItemButton onClick={() => navigate('/admin/usuarios')} sx={{ justifyContent: 'center', px: 2.5, py: 1.5 }}>
-                                            <ListItemIcon sx={{ minWidth: 0, justifyContent: 'center', color: COLOR_GUINDA }}>
-                                                <GroupIcon />
-                                            </ListItemIcon>
+                                            <ListItemIcon sx={{ minWidth: 0, justifyContent: 'center', color: COLOR_GUINDA }}><GroupIcon /></ListItemIcon>
                                         </ListItemButton>
                                     </Tooltip>
                                 </ListItem>
-
                                 <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
                                     <Tooltip title="Áreas y Departamentos" placement="right" arrow>
                                         <ListItemButton onClick={() => navigate('/admin/areas')} sx={{ justifyContent: 'center', px: 2.5, py: 1.5 }}>
-                                            <ListItemIcon sx={{ minWidth: 0, justifyContent: 'center', color: COLOR_GUINDA }}>
-                                                <DomainIcon />
-                                            </ListItemIcon>
+                                            <ListItemIcon sx={{ minWidth: 0, justifyContent: 'center', color: COLOR_GUINDA }}><DomainIcon /></ListItemIcon>
                                         </ListItemButton>
                                     </Tooltip>
                                 </ListItem>
-
                                 <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
                                     <Tooltip title="Avisos Globales" placement="right" arrow>
                                         <ListItemButton onClick={() => navigate('/admin/avisos')} sx={{ justifyContent: 'center', px: 2.5, py: 1.5 }}>
-                                            <ListItemIcon sx={{ minWidth: 0, justifyContent: 'center', color: COLOR_GUINDA }}>
-                                                <CampaignIcon />
-                                            </ListItemIcon>
+                                            <ListItemIcon sx={{ minWidth: 0, justifyContent: 'center', color: COLOR_GUINDA }}><CampaignIcon /></ListItemIcon>
                                         </ListItemButton>
                                     </Tooltip>
                                 </ListItem>
-
                                 <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
                                     <Tooltip title="Bitácora Global" placement="right" arrow>
                                         <ListItemButton onClick={() => navigate('/empleado/historial')} sx={{ justifyContent: 'center', px: 2.5, py: 1.5 }}>
-                                            <ListItemIcon sx={{ minWidth: 0, justifyContent: 'center', color: COLOR_GUINDA }}>
-                                                <HistoryIcon />
-                                            </ListItemIcon>
+                                            <ListItemIcon sx={{ minWidth: 0, justifyContent: 'center', color: COLOR_GUINDA }}><HistoryIcon /></ListItemIcon>
                                         </ListItemButton>
                                     </Tooltip>
                                 </ListItem>
                             </>
                         )}
 
-                        {/* ---------------- MENÚ EXCLUSIVO DE SOPORTE ---------------- */}
+                        {/* ---------------- MENU SOPORTE ---------------- */}
                         {cleanRole === 'SOPORTE' && (
                             <>
                                 <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
-                                    <Tooltip title="Tickets Asignados" placement="right" arrow>
+                                    <Tooltip title="Mis Tickets" placement="right" arrow>
                                         <ListItemButton onClick={() => navigate('/soporte/bandeja')} sx={{ justifyContent: 'center', px: 2.5, py: 1.5 }}>
-                                            <ListItemIcon sx={{ minWidth: 0, justifyContent: 'center', color: COLOR_GUINDA }}>
-                                                <AssignmentIcon />
-                                            </ListItemIcon>
+                                            <ListItemIcon sx={{ minWidth: 0, justifyContent: 'center', color: COLOR_GUINDA }}><AssignmentIcon /></ListItemIcon>
+                                        </ListItemButton>
+                                    </Tooltip>
+                                </ListItem>
+
+                                <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
+                                    <Tooltip title="Levantar Ticket" placement="right" arrow>
+                                        <ListItemButton onClick={() => navigate('/tickets/nuevo')} sx={{ justifyContent: 'center', px: 2.5, py: 1.5 }}>
+                                            <ListItemIcon sx={{ minWidth: 0, justifyContent: 'center', color: COLOR_GUINDA }}><AddCircleIcon /></ListItemIcon>
+                                        </ListItemButton>
+                                    </Tooltip>
+                                </ListItem>
+
+                                <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
+                                    <Tooltip title="Crear Documento" placement="right" arrow>
+                                        <ListItemButton onClick={() => navigate('/documentos/crear')} sx={{ justifyContent: 'center', px: 2.5, py: 1.5 }}>
+                                            <ListItemIcon sx={{ minWidth: 0, justifyContent: 'center', color: COLOR_GUINDA }}><DescriptionIcon /></ListItemIcon>
                                         </ListItemButton>
                                     </Tooltip>
                                 </ListItem>
                             </>
                         )}
 
-                        {/* ---------------- MENÚ EXCLUSIVO DE EMPLEADO ---------------- */}
+                        {/* ---------------- MENU EMPLEADO ---------------- */}
                         {cleanRole === 'EMPLEADO' && (
                             <>
                                 <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
                                     <Tooltip title="Levantar Nuevo Ticket" placement="right" arrow>
-                                        <ListItemButton onClick={() => navigate('/tickets/nuevo')} sx={{ justifyContent: 'center', px: 2.5, py: 1.5 }}>
-                                            <ListItemIcon sx={{ minWidth: 0, justifyContent: 'center', color: COLOR_GUINDA }}>
-                                                <AddCircleIcon />
-                                            </ListItemIcon>
+                                        <ListItemButton onClick={() => navigate('/empleado/nuevo')} sx={{ justifyContent: 'center', px: 2.5, py: 1.5 }}>
+                                            <ListItemIcon sx={{ minWidth: 0, justifyContent: 'center', color: COLOR_GUINDA }}><AddCircleIcon /></ListItemIcon>
                                         </ListItemButton>
                                     </Tooltip>
                                 </ListItem>
-
                                 <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
                                     <Tooltip title="Mis Tickets" placement="right" arrow>
                                         <ListItemButton onClick={() => navigate('/empleado/historial')} sx={{ justifyContent: 'center', px: 2.5, py: 1.5 }}>
-                                            <ListItemIcon sx={{ minWidth: 0, justifyContent: 'center', color: COLOR_GUINDA }}>
-                                                <HistoryIcon />
-                                            </ListItemIcon>
+                                            <ListItemIcon sx={{ minWidth: 0, justifyContent: 'center', color: COLOR_GUINDA }}><HistoryIcon /></ListItemIcon>
                                         </ListItemButton>
                                     </Tooltip>
                                 </ListItem>
                             </>
                         )}
-
                     </List>
                 </Drawer>
             )}
 
-            {/* CONTENIDO PRINCIPAL Y FOOTER */}
             <Box component="main" sx={{ 
                 flexGrow: 1, 
-                p: 0, 
-                mt: 8, 
-                width: estaBloqueado ? '100%' : `calc(100% - ${drawerWidth}px)`,
+                p: { xs: 2, md: 3 }, 
+                mt: '64px', 
+                width: '100%',
+                minHeight: 'calc(100vh - 64px)',
+                ml: estaBloqueado ? 0 : { xs: 0, md: `${drawerWidth}px` }, 
+                boxSizing: 'border-box',
                 display: 'flex',
                 flexDirection: 'column',
-                minHeight: 'calc(100vh - 64px)' // Resta la altura del AppBar para que el footer no quede flotando
+                overflowX: 'hidden'
             }}>
-                
-                {/* Zona de contenido (vistas) */}
                 <Box sx={{ flexGrow: 1 }}>
                     {children}
                 </Box>
-
-                {/* FOOTER DINÁMICO */}
-                <Box component="footer" sx={{ 
-                    py: 2, 
-                    textAlign: 'center', 
-                    bgcolor: '#ffffff', 
-                    borderTop: '1px solid #e0e0e0',
-                    mt: 'auto' // Empuja el footer siempre hacia abajo
-                }}>
+                <Box component="footer" sx={{ py: 2, textAlign: 'center', bgcolor: '#ffffff', borderTop: '1px solid #e0e0e0', mt: 'auto' }}>
                     <Typography variant="body2" color="textSecondary" sx={{ fontWeight: '500' }}>
                         &copy; {new Date().getFullYear()} SEDIF Puebla - Sistema de Tickets. Todos los derechos reservados.
                     </Typography>
                 </Box>
-
             </Box>
         </Box>
     );
