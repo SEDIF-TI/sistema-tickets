@@ -60,10 +60,10 @@ export default function TicketsPage() {
     }, [location]);
 
     return (
-        <Box sx={{ p: { xs: 1, sm: 3 }, maxWidth: 1300, mx: 'auto' }}>
+        <Box sx={{ px: { xs: 2, md: 4 }, py: 3, width: '100%', boxSizing: 'border-box' }}>
             
             <Snackbar open={openSnackbar} autoHideDuration={5000} onClose={() => setOpenSnackbar(false)} anchorOrigin={{ vertical: 'top', horizontal: 'center' }}>
-                <Alert onClose={() => setOpenSnackbar(false)} sx={{ backgroundColor: COLOR_GUINDA, color: 'white' }}>
+                <Alert onClose={() => setOpenSnackbar(false)} severity="info">
                     {snackbarMessage}
                 </Alert>
             </Snackbar>
@@ -82,9 +82,13 @@ export default function TicketsPage() {
                 )}
             </Box>
 
-            <TableContainer component={Paper} elevation={3} sx={{ borderRadius: 2, overflow: 'hidden' }}>
+            <TableContainer component={Paper} elevation={0} sx={{ 
+                border: '1px solid #e2e8f0', // Borde fino en lugar de sombra pesada
+                borderRadius: 2, 
+                overflow: 'hidden' 
+            }}>
                 {/* Se añade minWidth para evitar que se aplaste en pantallas chicas */}
-                <Table sx={{ minWidth: 900 }}>
+                <Table sx={{ minWidth: 1000 }}>
                     <TableHead>
                         <TableRow sx={{ bgcolor: COLOR_GUINDA }}>
                             {/* Anchos fijos por columna para forzar la simetría visual */}

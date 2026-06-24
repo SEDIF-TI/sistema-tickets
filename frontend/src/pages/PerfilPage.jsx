@@ -84,10 +84,10 @@ export default function PerfilPage() {
                 Mi Perfil y Configuración
             </Typography>
 
-            <Grid container spacing={4}>
+            <Grid container spacing={3}>
                 {/* COLUMNA IZQUIERDA: Cambio de Contraseña */}
                 <Grid item xs={12} md={mostrarTelegram ? 6 : 12}>
-                    <Paper elevation={3} sx={{ p: 4, borderRadius: 2, height: '100%' }}>
+                    <Paper elevation={3} sx={{ p: { xs: 2, md: 4 }, borderRadius: 2 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2, color: COLOR_GUINDA }}>
                             <LockResetIcon fontSize="large" />
                             <Typography variant="h6" fontWeight="bold">Credenciales</Typography>
@@ -112,7 +112,7 @@ export default function PerfilPage() {
                 {mostrarTelegram && (
                     <Grid item xs={12} md={6}>
                         {!user?.passwordTemporal ? (
-                            <Paper elevation={3} sx={{ p: 4, borderRadius: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
+                            <Paper elevation={3} sx={{ p: { xs: 2, md: 4 }, borderRadius: 2 }}>
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2, color: '#0088cc' }}>
                                     <NotificationsActiveIcon fontSize="large" />
                                     <Typography variant="h6" fontWeight="bold">Notificaciones</Typography>
