@@ -70,16 +70,22 @@ function AppContent() {
             <Route path="/admin/areas" element={<MainLayout><AdminAreasPage /></MainLayout>} />
             <Route path="/admin/avisos" element={<MainLayout><AdminAvisosPage /></MainLayout>} />
 
-            {/* ✅ RUTAS DE SOPORTE */}
+            {/* Rutas de Soporte */}
             <Route path="/soporte/bandeja" element={<MainLayout><PanelSoporte /></MainLayout>} />
             <Route path="/documentos/crear" element={<MainLayout><GeneradorDocumentos /></MainLayout>} />
 
-            {/* ✅ RUTA COMPARTIDA (Soporte y Empleado la usan igual en tu BD) */}
+            {/* Ruta Compartida de Tickets */}
             <Route path="/tickets/nuevo" element={<MainLayout><FormularioTicket /></MainLayout>} /> 
 
-            {/* Rutas exclusivas de Empleado */}
+            {/* Rutas de Empleado */}
             <Route path="/empleado/nuevo" element={<MainLayout><FormularioTicket /></MainLayout>} />
             <Route path="/empleado/historial" element={<MainLayout><TicketsPage /></MainLayout>} />
+
+            {/* ✅ CORRECCIÓN DE PERFIL FORZADO A MAINLAYOUT */}
+            <Route path="/perfil" element={<MainLayout><PerfilPage /></MainLayout>} />
+
+            {/* Cualquier otra ruta no registrada activa el rebote seguro */}
+            <Route path="*" element={<Navigate to={rutaPorDefecto} replace />} />
         </Routes>
     );
 }
