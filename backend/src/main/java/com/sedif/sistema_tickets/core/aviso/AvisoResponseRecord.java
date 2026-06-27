@@ -4,14 +4,16 @@ public record AvisoResponseRecord(
         Long id,
         String titulo,
         String mensaje,
-        Boolean activo
+        Boolean activo,
+        Long areaId
 ) {
     public static AvisoResponseRecord desdeEntidad(Aviso aviso) {
         return new AvisoResponseRecord(
                 aviso.getId(),
                 aviso.getTitulo(),
                 aviso.getMensaje(),
-                aviso.getActivo()
+                aviso.getActivo(),
+                aviso.getAreaId()
         );
     }
 }

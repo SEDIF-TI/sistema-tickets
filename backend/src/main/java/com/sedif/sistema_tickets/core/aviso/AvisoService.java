@@ -16,7 +16,6 @@ public class AvisoService {
 
     @Transactional
     public AvisoResponseRecord crearAvisoGlobal(AvisoRequestRecord request) {
-        // Validación manual estricta
         if (request == null || request.titulo() == null || request.titulo().isBlank()) {
             throw new IllegalArgumentException("El título del aviso es obligatorio.");
         }
@@ -27,23 +26,17 @@ public class AvisoService {
         Aviso nuevoAviso = new Aviso();
         nuevoAviso.setTitulo(request.titulo());
         nuevoAviso.setMensaje(request.mensaje());
-        // 'activo' ya es true por defecto en la entidad
-
-        // ----------------------------------------------------------------------
-        // NUEVO: EXTRACCIÓN DEL USUARIO DESDE EL CONTEXTO DE SEGURIDAD JWT
-        // ----------------------------------------------------------------------
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         
-        // Verificamos que exista una autenticación activa (que haya pasado el filtro)
+        // Si el frontend manda el estado activo, lo usamos; si no, true por defecto
+        nuevoAviso.setActivo(request.activo() != null ? request.activo() : true);
+        nuevoAviso.setAreaId(request.areaId());
+
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication != null && authentication.isAuthenticated()) {
-            // Extraemos el identificador (correo o username) que guardamos en el token
             String usuarioActual = authentication.getName();
-            
-            // Asumiendo que su clase Auditable tiene estos setters expuestos:
             nuevoAviso.setCreadoPor(usuarioActual);
             nuevoAviso.setModificadoPor(usuarioActual);
         }
-        // ----------------------------------------------------------------------
 
         Aviso avisoGuardado = avisoRepository.save(nuevoAviso);
         return AvisoResponseRecord.desdeEntidad(avisoGuardado);
@@ -57,11 +50,36 @@ public class AvisoService {
                 .toList();
     }
 
+    // ---> NUEVO: Obtener todos para el admin
+    @Transactional(readOnly = true)
+    public List<AvisoResponseRecord> obtenerTodos() {
+        return avisoRepository.findAllByOrderByIdDesc()
+                .stream()
+                .map(AvisoResponseRecord::desdeEntidad)
+                .toList();
+    }
+
+    // ---> NUEVO: Actualizar aviso (Para el interruptor)
     @Transactional
-    public void desactivarAviso(Long id) {
+    public AvisoResponseRecord actualizarAviso(Long id, AvisoRequestRecord request) {
         Aviso aviso = avisoRepository.findById(id)
             .orElseThrow(() -> new IllegalArgumentException("Aviso no encontrado"));
-        aviso.setActivo(false);
-        avisoRepository.save(aviso);
+        
+        // Aquí está el cambio: el backend ahora acepta y guarda el booleano y el área
+        aviso.setTitulo(request.titulo());
+        aviso.setMensaje(request.mensaje());
+        if (request.activo() != null) aviso.setActivo(request.activo());
+        aviso.setAreaId(request.areaId()); // Asegúrate de tener este setter en Aviso.java
+        
+        return AvisoResponseRecord.desdeEntidad(avisoRepository.save(aviso));
+    }
+
+    // ---> NUEVO: Eliminar físico de la base de datos
+    @Transactional
+    public void eliminarAvisoFisico(Long id) {
+        if (!avisoRepository.existsById(id)) {
+            throw new IllegalArgumentException("Aviso no encontrado");
+        }
+        avisoRepository.deleteById(id);
     }
 }

@@ -1,8 +1,8 @@
-import React, { useContext, useEffect, useState } from 'react'; // <-- AGREGA useEffect y useState
-import { Box, Drawer, AppBar, Toolbar, List, Typography, ListItem, ListItemButton, ListItemIcon, Button, Tooltip, IconButton, CssBaseline, Snackbar, Alert } from '@mui/material'; // <-- AGREGA Snackbar y Alert
+import React, { useContext, useEffect, useState } from 'react';
+import { Box, Drawer, AppBar, Toolbar, List, Typography, ListItem, ListItemButton, ListItemIcon, Button, Tooltip, IconButton, CssBaseline, Alert } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext.jsx';
-import api from '../services/api'; // <-- IMPORTA TU API PARA CONSULTAR LOS AVISOS
+import api from '../services/api';
 
 // Iconos
 import ExitToAppIcon from '@mui/icons-material/ExitToApp';
@@ -22,246 +22,142 @@ const COLOR_GUINDA = '#801A36';
 export default function MainLayout({ children }) {
     const { user, logout } = useContext(AuthContext);
     const navigate = useNavigate();
+    
+    // ---> ESTADOS PARA MÚLTIPLES AVISOS <---
+    const [avisosActivos, setAvisosActivos] = useState([]);
+    const [avisosOcultos, setAvisosOcultos] = useState([]); // Guarda los IDs que el usuario ya cerró
 
-    // ---> ESTADOS PARA LOS AVISOS GLOBALES <---
-    const [avisoActivo, setAvisoActivo] = useState(null);
-    const [openAviso, setOpenAviso] = useState(false);
-
-    const handleLogout = () => {
-        logout();
-        navigate('/login');
-    };
+    const handleLogout = () => { logout(); navigate('/login'); };
 
     const userRole = user?.rol || user?.role || user?.rolNombre || '';
     const cleanRole = userRole.replace('ROLE_', '').toUpperCase();
     const estaBloqueado = user?.passwordTemporal;
 
-    // ---> LÓGICA DE BÚSQUEDA CADA 30 SEGUNDOS <---
+    // Lógica para buscar avisos cada 30 segundos
+    // Lógica para buscar avisos cada 10 segundos
     useEffect(() => {
         if (!user || estaBloqueado) return;
 
         const buscarAvisos = async () => {
             try {
+                // Ajusta la ruta si tu api.js usa o no el /api
                 const response = await api.get('/v1/avisos/activos');
                 
-                if (response.data && response.data.length > 0) {
-                    setAvisoActivo(response.data[0]); 
-                    setOpenAviso(true);
-                } else {
-                    // ✅ SI YA NO HAY AVISOS, LO APAGAMOS Y LO QUITAMOS DE LA PANTALLA
-                    setAvisoActivo(null);
-                    setOpenAviso(false);
-                }
+                const paraMi = response.data.filter(a => {
+                    const esActivo = a.activo === true;
+                    
+                    // AHORA EL ADMINISTRADOR VE TODOS LOS AVISOS, SIN IMPORTAR EL ÁREA
+                    const esParaMi = !a.areaId || a.areaId === user?.areaId || cleanRole === 'ADMINISTRADOR';
+                    
+                    return esActivo && esParaMi;
+                });
+                
+                setAvisosActivos(paraMi);
             } catch (error) {
-                // ✅ SI EL BACKEND DEVUELVE ERROR (ej. 404 Not Found porque no hay avisos), TAMBIÉN LO APAGAMOS
-                setAvisoActivo(null);
-                setOpenAviso(false);
+                console.error("Error al buscar avisos:", error);
             }
         };
 
         buscarAvisos();
-
-        const intervalo = setInterval(() => {
-            buscarAvisos();
-        }, 30000); // 30 segundos
-
+        
+        // Bajamos el tiempo a 10 segundos (10000 ms) para que sea casi instantáneo
+        const intervalo = setInterval(buscarAvisos, 10000); 
         return () => clearInterval(intervalo);
-    }, [user, estaBloqueado]);
+    }, [user, estaBloqueado, cleanRole]);
 
-    // Función para que el usuario cierre el aviso (pero volverá a salir en 30s si sigue activo)
-    const handleCloseAviso = (event, reason) => {
-        if (reason === 'clickaway') return;
-        setOpenAviso(false);
+    // Función para ocultar un aviso específico cuando el usuario le da a la X
+    const handleCerrarAviso = (idAviso) => {
+        if (!avisosOcultos.includes(idAviso)) {
+            setAvisosOcultos([...avisosOcultos, idAviso]);
+        }
     };
+
+    // Calculamos qué avisos pintar (los activos menos los que el usuario ya cerró)
+    const avisosVisibles = avisosActivos.filter(aviso => !avisosOcultos.includes(aviso.id));
 
     return (
         <Box sx={{ display: 'flex', minHeight: '100vh', width: '100vw', bgcolor: '#f4f7f6', overflowX: 'hidden' }}>
             <CssBaseline />
 
-            {/* ---> EL SNACKBAR QUE SALTARÁ CADA 30 SEGUNDOS <--- */}
-            {avisoActivo && (
-                <Snackbar 
-                    open={openAviso} 
-                    onClose={handleCloseAviso}
-                    // No le ponemos autoHideDuration para forzar al usuario a cerrarlo o leerlo
-                    anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
-                    sx={{ mt: '65px', zIndex: 9999 }} // Se empuja hacia abajo para no tapar la AppBar superior
-                >
-                    <Alert 
-                        onClose={handleCloseAviso} 
-                        severity="warning" 
-                        variant="filled"
-                        sx={{ width: '100%', fontWeight: 'bold', fontSize: '1.05rem', boxShadow: 3 }}
-                    >
-                        {avisoActivo.titulo}: {avisoActivo.mensaje}
-                    </Alert>
-                </Snackbar>
+            {/* ---> CONTENEDOR DE ALERTAS APILADAS <--- */}
+            {avisosVisibles.length > 0 && (
+                <Box sx={{ 
+                    position: 'fixed', 
+                    top: '75px', // Debajo de la barra superior
+                    left: '50%', 
+                    transform: 'translateX(-50%)', 
+                    zIndex: 9999, 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    gap: 1.5, // Espacio entre avisos
+                    width: '90%', 
+                    maxWidth: '600px' 
+                }}>
+                    {avisosVisibles.map(aviso => (
+                        <Alert 
+                            key={aviso.id}
+                            severity="warning" 
+                            variant="filled" 
+                            onClose={() => handleCerrarAviso(aviso.id)} 
+                            sx={{ width: '100%', fontWeight: 'bold', boxShadow: 3 }}
+                        >
+                            {aviso.titulo}: {aviso.mensaje}
+                        </Alert>
+                    ))}
+                </Box>
             )}
 
-            <AppBar position="fixed" sx={{ 
-                width: '100%', 
-                left: 0,
-                top: 0,
-                zIndex: (theme) => theme.zIndex.drawer + 1, 
-                bgcolor: COLOR_GUINDA,
-                borderRadius: '0 !important', 
-                boxShadow: 2, 
-                m: 0
-            }}>
+            <AppBar position="fixed" sx={{ width: '100%', bgcolor: COLOR_GUINDA, borderRadius: '0 !important', boxShadow: 2, zIndex: 1300 }}>
                 <Toolbar sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="h6" noWrap component="div" sx={{ fontWeight: 'bold' }}>
-                        SEDIF - Sistema de Tickets
-                    </Typography>
+                    <Typography variant="h6" fontWeight="bold">SEDIF - Sistema de Tickets</Typography>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                        <Typography variant="body2" sx={{ textTransform: 'uppercase' }}>
-                            {user?.nombre || 'Usuario'} | {cleanRole}
-                        </Typography>
+                        <Typography variant="body2" sx={{ textTransform: 'uppercase' }}>{user?.nombre || 'Usuario'} | {cleanRole}</Typography>
                         {!estaBloqueado && (
-                            <Tooltip title="Mi Perfil">
-                                <IconButton color="inherit" onClick={() => navigate('/perfil')}>
-                                    <AccountCircleIcon />
-                                </IconButton>
-                            </Tooltip>
+                            <Tooltip title="Mi Perfil"><IconButton color="inherit" onClick={() => navigate('/perfil')}><AccountCircleIcon /></IconButton></Tooltip>
                         )}
-                        <Button color="inherit" onClick={handleLogout} startIcon={<ExitToAppIcon />}>
-                            Salir
-                        </Button>
+                        <Button color="inherit" onClick={handleLogout} startIcon={<ExitToAppIcon />}>Salir</Button>
                     </Box>
                 </Toolbar>
             </AppBar>
 
-            {!estaBloqueado && (
-                <Drawer
-                    variant="permanent"
-                    sx={{
-                        width: drawerWidth,
-                        flexShrink: 0,
-                        '& .MuiDrawer-paper': {
-                            width: drawerWidth,
-                            boxSizing: 'border-box',
-                            overflowX: 'hidden',
-                            backgroundColor: '#ffffff',
-                            borderRight: '1px solid #e0e0e0',
-                            borderRadius: '0 !important',
-                        },
-                    }}
-                >
+            {user && !estaBloqueado && (
+                <Drawer variant="permanent" sx={{ 
+                    width: drawerWidth, flexShrink: 0, 
+                    '& .MuiDrawer-paper': { width: drawerWidth, backgroundColor: '#ffffff', borderRight: '1px solid #e0e0e0', borderRadius: '0 !important' } 
+                }}>
                     <Toolbar /> 
                     <List sx={{ pt: 2 }}>
-                        
-                        {/* ---------------- MENU ADMINISTRADOR ---------------- */}
+                        {/* MENÚ ADMINISTRADOR */}
                         {cleanRole === 'ADMINISTRADOR' && (
                             <>
-                                <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
-                                    <Tooltip title="Dashboard" placement="right" arrow>
-                                        <ListItemButton onClick={() => navigate('/admin/dashboard')} sx={{ justifyContent: 'center', px: 2.5, py: 1.5 }}>
-                                            <ListItemIcon sx={{ minWidth: 0, justifyContent: 'center', color: COLOR_GUINDA }}><DashboardIcon /></ListItemIcon>
-                                        </ListItemButton>
-                                    </Tooltip>
-                                </ListItem>
-                                <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
-                                    <Tooltip title="Usuarios" placement="right" arrow>
-                                        <ListItemButton onClick={() => navigate('/admin/usuarios')} sx={{ justifyContent: 'center', px: 2.5, py: 1.5 }}>
-                                            <ListItemIcon sx={{ minWidth: 0, justifyContent: 'center', color: COLOR_GUINDA }}><GroupIcon /></ListItemIcon>
-                                        </ListItemButton>
-                                    </Tooltip>
-                                </ListItem>
-                                <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
-                                    <Tooltip title="Áreas y Departamentos" placement="right" arrow>
-                                        <ListItemButton onClick={() => navigate('/admin/areas')} sx={{ justifyContent: 'center', px: 2.5, py: 1.5 }}>
-                                            <ListItemIcon sx={{ minWidth: 0, justifyContent: 'center', color: COLOR_GUINDA }}><DomainIcon /></ListItemIcon>
-                                        </ListItemButton>
-                                    </Tooltip>
-                                </ListItem>
-                                <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
-                                    <Tooltip title="Avisos Globales" placement="right" arrow>
-                                        <ListItemButton onClick={() => navigate('/admin/avisos')} sx={{ justifyContent: 'center', px: 2.5, py: 1.5 }}>
-                                            <ListItemIcon sx={{ minWidth: 0, justifyContent: 'center', color: COLOR_GUINDA }}><CampaignIcon /></ListItemIcon>
-                                        </ListItemButton>
-                                    </Tooltip>
-                                </ListItem>
-                                <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
-                                    <Tooltip title="Bitácora Global" placement="right" arrow>
-                                        <ListItemButton onClick={() => navigate('/empleado/historial')} sx={{ justifyContent: 'center', px: 2.5, py: 1.5 }}>
-                                            <ListItemIcon sx={{ minWidth: 0, justifyContent: 'center', color: COLOR_GUINDA }}><HistoryIcon /></ListItemIcon>
-                                        </ListItemButton>
-                                    </Tooltip>
-                                </ListItem>
+                                <ListItem disablePadding><Tooltip title="Dashboard" placement="right"><ListItemButton onClick={() => navigate('/admin/dashboard')} sx={{ justifyContent: 'center' }}><ListItemIcon sx={{ color: COLOR_GUINDA }}><DashboardIcon /></ListItemIcon></ListItemButton></Tooltip></ListItem>
+                                <ListItem disablePadding><Tooltip title="Usuarios" placement="right"><ListItemButton onClick={() => navigate('/admin/usuarios')} sx={{ justifyContent: 'center' }}><ListItemIcon sx={{ color: COLOR_GUINDA }}><GroupIcon /></ListItemIcon></ListItemButton></Tooltip></ListItem>
+                                <ListItem disablePadding><Tooltip title="Áreas" placement="right"><ListItemButton onClick={() => navigate('/admin/areas')} sx={{ justifyContent: 'center' }}><ListItemIcon sx={{ color: COLOR_GUINDA }}><DomainIcon /></ListItemIcon></ListItemButton></Tooltip></ListItem>
+                                <ListItem disablePadding><Tooltip title="Avisos" placement="right"><ListItemButton onClick={() => navigate('/admin/avisos')} sx={{ justifyContent: 'center' }}><ListItemIcon sx={{ color: COLOR_GUINDA }}><CampaignIcon /></ListItemIcon></ListItemButton></Tooltip></ListItem>
+                                <ListItem disablePadding><Tooltip title="Bitácora Global" placement="right"><ListItemButton onClick={() => navigate('/admin/bitacora')} sx={{ justifyContent: 'center' }}><ListItemIcon sx={{ color: COLOR_GUINDA }}><HistoryIcon /></ListItemIcon></ListItemButton></Tooltip></ListItem>
                             </>
                         )}
-
-                        {/* ---------------- MENU SOPORTE ---------------- */}
+                        {/* MENÚ SOPORTE */}
                         {cleanRole === 'SOPORTE' && (
                             <>
-                                <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
-                                    <Tooltip title="Mis Tickets" placement="right" arrow>
-                                        <ListItemButton onClick={() => navigate('/soporte/bandeja')} sx={{ justifyContent: 'center', px: 2.5, py: 1.5 }}>
-                                            <ListItemIcon sx={{ minWidth: 0, justifyContent: 'center', color: COLOR_GUINDA }}><AssignmentIcon /></ListItemIcon>
-                                        </ListItemButton>
-                                    </Tooltip>
-                                </ListItem>
-
-                                <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
-                                    <Tooltip title="Levantar Ticket" placement="right" arrow>
-                                        <ListItemButton onClick={() => navigate('/tickets/nuevo')} sx={{ justifyContent: 'center', px: 2.5, py: 1.5 }}>
-                                            <ListItemIcon sx={{ minWidth: 0, justifyContent: 'center', color: COLOR_GUINDA }}><AddCircleIcon /></ListItemIcon>
-                                        </ListItemButton>
-                                    </Tooltip>
-                                </ListItem>
-
-                                <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
-                                    <Tooltip title="Crear Documento" placement="right" arrow>
-                                        <ListItemButton onClick={() => navigate('/documentos/crear')} sx={{ justifyContent: 'center', px: 2.5, py: 1.5 }}>
-                                            <ListItemIcon sx={{ minWidth: 0, justifyContent: 'center', color: COLOR_GUINDA }}><DescriptionIcon /></ListItemIcon>
-                                        </ListItemButton>
-                                    </Tooltip>
-                                </ListItem>
+                                <ListItem disablePadding><Tooltip title="Mis Tickets" placement="right"><ListItemButton onClick={() => navigate('/soporte/bandeja')} sx={{ justifyContent: 'center' }}><ListItemIcon sx={{ color: COLOR_GUINDA }}><AssignmentIcon /></ListItemIcon></ListItemButton></Tooltip></ListItem>
+                                <ListItem disablePadding><Tooltip title="Levantar Ticket" placement="right"><ListItemButton onClick={() => navigate('/tickets/nuevo')} sx={{ justifyContent: 'center' }}><ListItemIcon sx={{ color: COLOR_GUINDA }}><AddCircleIcon /></ListItemIcon></ListItemButton></Tooltip></ListItem>
+                                <ListItem disablePadding><Tooltip title="Crear Documento" placement="right"><ListItemButton onClick={() => navigate('/documentos/crear')} sx={{ justifyContent: 'center' }}><ListItemIcon sx={{ color: COLOR_GUINDA }}><DescriptionIcon /></ListItemIcon></ListItemButton></Tooltip></ListItem>
                             </>
                         )}
-
-                        {/* ---------------- MENU EMPLEADO ---------------- */}
+                        {/* MENÚ EMPLEADO */}
                         {cleanRole === 'EMPLEADO' && (
                             <>
-                                <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
-                                    <Tooltip title="Levantar Nuevo Ticket" placement="right" arrow>
-                                        <ListItemButton onClick={() => navigate('/empleado/nuevo')} sx={{ justifyContent: 'center', px: 2.5, py: 1.5 }}>
-                                            <ListItemIcon sx={{ minWidth: 0, justifyContent: 'center', color: COLOR_GUINDA }}><AddCircleIcon /></ListItemIcon>
-                                        </ListItemButton>
-                                    </Tooltip>
-                                </ListItem>
-                                <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
-                                    <Tooltip title="Mis Tickets" placement="right" arrow>
-                                        <ListItemButton onClick={() => navigate('/empleado/historial')} sx={{ justifyContent: 'center', px: 2.5, py: 1.5 }}>
-                                            <ListItemIcon sx={{ minWidth: 0, justifyContent: 'center', color: COLOR_GUINDA }}><HistoryIcon /></ListItemIcon>
-                                        </ListItemButton>
-                                    </Tooltip>
-                                </ListItem>
+                                <ListItem disablePadding><Tooltip title="Levantar Ticket" placement="right"><ListItemButton onClick={() => navigate('/tickets/nuevo')} sx={{ justifyContent: 'center' }}><ListItemIcon sx={{ color: COLOR_GUINDA }}><AddCircleIcon /></ListItemIcon></ListItemButton></Tooltip></ListItem>
+                                <ListItem disablePadding><Tooltip title="Mis Tickets" placement="right"><ListItemButton onClick={() => navigate('/empleado/historial')} sx={{ justifyContent: 'center' }}><ListItemIcon sx={{ color: COLOR_GUINDA }}><HistoryIcon /></ListItemIcon></ListItemButton></Tooltip></ListItem>
                             </>
                         )}
                     </List>
                 </Drawer>
             )}
 
-            <Box component="main" sx={{ 
-                flexGrow: 1, 
-                p: { xs: 2, md: 3 }, 
-                mt: '64px', 
-                width: '100%',
-                minHeight: 'calc(100vh - 64px)',
-                ml: estaBloqueado ? 0 : { xs: 0, md: `${drawerWidth}px` }, 
-                boxSizing: 'border-box',
-                display: 'flex',
-                flexDirection: 'column',
-                overflowX: 'hidden'
-            }}>
-                <Box sx={{ flexGrow: 1 }}>
-                    {children}
-                </Box>
-                <Box component="footer" sx={{ py: 2, textAlign: 'center', bgcolor: '#ffffff', borderTop: '1px solid #e0e0e0', mt: 'auto' }}>
-                    <Typography variant="body2" color="textSecondary" sx={{ fontWeight: '500' }}>
-                        &copy; {new Date().getFullYear()} SEDIF Puebla - Sistema de Tickets. Todos los derechos reservados.
-                    </Typography>
-                </Box>
+            <Box component="main" sx={{ flexGrow: 1, p: 3, mt: '64px', width: '100%', ml: `${drawerWidth}px` }}>
+                {children}
             </Box>
         </Box>
     );
