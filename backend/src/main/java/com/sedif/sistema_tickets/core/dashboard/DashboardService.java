@@ -2,6 +2,7 @@ package com.sedif.sistema_tickets.core.dashboard;
 
 import com.sedif.sistema_tickets.core.ticket.TicketRepository;
 import com.sedif.sistema_tickets.core.usuarios.UsuarioRepository;
+import com.sedif.sistema_tickets.core.aviso.AvisoRepository; // <-- Importante
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import java.util.List;
@@ -13,6 +14,7 @@ public class DashboardService {
     
     private final TicketRepository ticketRepository;
     private final UsuarioRepository usuarioRepository;
+    private final AvisoRepository avisoRepository; // ---> NUEVO: Inyectamos el repositorio de Avisos
 
     public DashboardResponse obtenerMetricas() {
         return DashboardResponse.builder()
@@ -23,11 +25,12 @@ public class DashboardService {
             .porArea(mapearGenerico(ticketRepository.contarTicketsPorArea()))
             .porIngeniero(mapearGenerico(ticketRepository.contarPorIngeniero()))
             .porPrioridad(mapearGenerico(ticketRepository.contarPorPrioridad()))
-            .porFecha(mapearFecha(ticketRepository.contarPorFecha())) // <-- ¡AQUÍ ESTÁ LA PIEZA FALTANTE!
+            .porFecha(mapearFecha(ticketRepository.contarPorFecha())) 
+            // ---> NUEVO: Mapeamos los avisos activos agrupados por área
+            .avisosPorArea(mapearGenerico(avisoRepository.contarAvisosActivosPorArea())) 
             .build();
     }
 
-    // Mapeo para Estatus, Área, Ingeniero, etc.
     private List<DashboardResponse.MetricaGenerica> mapearGenerico(List<Object[]> datos) {
         return datos.stream()
             .map(obj -> DashboardResponse.MetricaGenerica.builder()
@@ -37,13 +40,12 @@ public class DashboardService {
             .collect(Collectors.toList());
     }
 
-    // Mapeo exclusivo para las fechas
     private List<DashboardResponse.MetricaFecha> mapearFecha(List<Object[]> datos) {
         return datos.stream()
             .map(obj -> DashboardResponse.MetricaFecha.builder()
                 .fecha(obj[0] != null ? obj[0].toString() : "Sin fecha")
                 .total((Long) obj[1])
-                .resueltos(0L) // Puedes llenarlo después si quieres otra línea en la gráfica
+                .resueltos(0L) 
                 .build())
             .collect(Collectors.toList());
     }

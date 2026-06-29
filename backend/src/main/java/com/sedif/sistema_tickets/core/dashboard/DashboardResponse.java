@@ -12,10 +12,13 @@ public class DashboardResponse {
     private long totalBitacora;
     
     private List<MetricaGenerica> porEstatus;
-    private List<MetricaGenerica> porArea; // "Departamentos" en tu imagen
-    private List<MetricaGenerica> porPrioridad; // Usaremos esto para "Categorías" o Prioridad
+    private List<MetricaGenerica> porArea; 
+    private List<MetricaGenerica> porPrioridad; 
     private List<MetricaGenerica> porIngeniero;
     private List<MetricaFecha> porFecha;
+    
+    // ---> NUEVO: Lista para alimentar la nueva gráfica de avisos
+    private List<MetricaGenerica> avisosPorArea; 
 
     @Data
     @Builder

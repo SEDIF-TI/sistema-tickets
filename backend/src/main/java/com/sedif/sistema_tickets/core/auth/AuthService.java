@@ -19,7 +19,7 @@ import java.util.stream.Collectors;
 public class AuthService {
 
     private final UsuarioRepository usuarioRepository;
-    private final RolRepository rolRepository; // 1. Inyecta el repositorio de roles
+    private final RolRepository rolRepository; 
     private final JwtService jwtService;
     private final PasswordEncoder passwordEncoder;
 
@@ -47,10 +47,10 @@ public class AuthService {
             throw new IllegalArgumentException("Credenciales inválidas.");
         }
 
-        // 4. Generación del JWT en memoria (Sin tocar la base de datos)
+        // 4. Generación del JWT en memoria
         String tokenJwt = jwtService.generarToken(usuario);
 
-        // NUEVO: Transformar las Vistas de la base de datos a VistaDTO
+        // Transformar las Vistas de la base de datos a VistaDTO
         List<VistaDTO> vistasPermitidas = new ArrayList<>();
     
         if (usuario.getRol() != null && usuario.getRol().getVistas() != null) {
@@ -60,36 +60,35 @@ public class AuthService {
                     .collect(Collectors.toList());
         }
 
+        // CORRECCIÓN CRÍTICA: Extraer el ID desde el objeto completo 'area' de forma segura
+        Long idDelArea = (usuario.getArea() != null) ? usuario.getArea().getId() : null;
+
         return new AuthResponseRecord(
                 usuario.getId(),
                 usuario.getNombre(),
                 usuario.getRol().getNombre(),
                 tokenJwt,
                 "Autenticación exitosa.",
-                vistasPermitidas // Ahora enviamos una lista vacía si no hay vistas, evitando el error
+                vistasPermitidas, 
+                idDelArea // <-- Enviamos el ID extraído de la relación muchos a uno
         );
     }
 
-    // Agréguelo dentro de su clase AuthService
-
     public String registrarUsuario(RegistroRequest request) {
-        // 1. Validar que el usuario o correo no estén repetidos
         if (usuarioRepository.findByCorreoOrUsername(request.correo(), request.username()).isPresent()) {
             throw new IllegalArgumentException("Error: El correo o nombre de usuario ya están registrados.");
         }
 
-        // 2. Busca el rol en la base de datos usando el ID que viene en el request
         Rol rol = rolRepository.findById(request.rolId())
                 .orElseThrow(() -> new IllegalArgumentException("Rol no encontrado con ID: " + request.rolId()));
 
-        // 3. Mapeo a la entidad
         Usuario nuevoUsuario = new Usuario();
         nuevoUsuario.setNombre(request.nombre());
         nuevoUsuario.setCorreo(request.correo());
         nuevoUsuario.setUsername(request.username());
         nuevoUsuario.setPassword(passwordEncoder.encode(request.password()));
         
-        nuevoUsuario.setRol(rol); // 4. Asigna el objeto Rol encontrado
+        nuevoUsuario.setRol(rol); 
         nuevoUsuario.setActivo(true);
         nuevoUsuario.setDisponibleSoporte(false);
 
