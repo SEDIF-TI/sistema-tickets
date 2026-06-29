@@ -9,5 +9,6 @@ public record AuthResponseRecord(
         String rol,
         String token,
         String mensaje,
-        List<VistaDTO> vistas // <-- Nueva propiedad para enviar el menú
+        List<VistaDTO> vistas, // <-- Nueva propiedad para enviar el menú
+        Long areaId
 ) {}

@@ -27,7 +27,10 @@ public class Aviso extends Auditable {
     @Column(name = "b_activo", nullable = false)
     private Boolean activo = true;
 
-    // ---> NUEVO: Campo para el área destino (Null = Global)
     @Column(name = "pn_area_id", nullable = true)
     private Long areaId; 
+
+    // ---> NUEVO: Campo para controlar la baja lógica
+    @Column(name = "b_eliminado", nullable = false)
+    private Boolean eliminado = false; 
 }

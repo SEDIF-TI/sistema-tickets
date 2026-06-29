@@ -22,7 +22,7 @@ import PanelSoporte from './pages/soporte/PanelSoporte.jsx';
 import AdminUsuariosPage from './pages/admin/AdminUsuariosPage.jsx';
 import AdminAvisosPage from './pages/admin/AdminAvisosPage.jsx';
 import AdminAreasPage from './pages/admin/AdminAreasPage';
-import DashboardPage from './pages/admin/DashboardPage.jsx';
+import DashboardPage from './pages/admin/DashboardPage.jsx'; 
 
 // Componentes Adicionales
 import GeneradorDocumentos from './components/GeneradorDocumentos.jsx'; 
@@ -69,6 +69,9 @@ function AppContent() {
             <Route path="/admin/usuarios" element={<MainLayout><AdminUsuariosPage /></MainLayout>} />
             <Route path="/admin/areas" element={<MainLayout><AdminAreasPage /></MainLayout>} />
             <Route path="/admin/avisos" element={<MainLayout><AdminAvisosPage /></MainLayout>} />
+            
+            {/* ---> CORRECCIÓN: Ruta de Bitácora agregada para evitar el rebote */}
+            <Route path="/admin/bitacora" element={<MainLayout><TicketsPage /></MainLayout>} />
 
             {/* Rutas de Soporte */}
             <Route path="/soporte/bandeja" element={<MainLayout><PanelSoporte /></MainLayout>} />
@@ -81,10 +84,8 @@ function AppContent() {
             <Route path="/empleado/nuevo" element={<MainLayout><FormularioTicket /></MainLayout>} />
             <Route path="/empleado/historial" element={<MainLayout><TicketsPage /></MainLayout>} />
 
-            {/* ✅ CORRECCIÓN DE PERFIL FORZADO A MAINLAYOUT */}
             <Route path="/perfil" element={<MainLayout><PerfilPage /></MainLayout>} />
 
-            {/* Cualquier otra ruta no registrada activa el rebote seguro */}
             <Route path="*" element={<Navigate to={rutaPorDefecto} replace />} />
         </Routes>
     );

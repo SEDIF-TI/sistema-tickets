@@ -23,9 +23,8 @@ export default function MainLayout({ children }) {
     const { user, logout } = useContext(AuthContext);
     const navigate = useNavigate();
     
-    // ---> ESTADOS PARA MÚLTIPLES AVISOS <---
     const [avisosActivos, setAvisosActivos] = useState([]);
-    const [avisosOcultos, setAvisosOcultos] = useState([]); // Guarda los IDs que el usuario ya cerró
+    const [avisosOcultos, setAvisosOcultos] = useState([]); 
 
     const handleLogout = () => { logout(); navigate('/login'); };
 
@@ -33,65 +32,60 @@ export default function MainLayout({ children }) {
     const cleanRole = userRole.replace('ROLE_', '').toUpperCase();
     const estaBloqueado = user?.passwordTemporal;
 
-    // Lógica para buscar avisos cada 30 segundos
-    // Lógica para buscar avisos cada 10 segundos
+    // Lógica para buscar y sincronizar avisos de forma segura
     useEffect(() => {
         if (!user || estaBloqueado) return;
 
         const buscarAvisos = async () => {
             try {
-                // Ajusta la ruta si tu api.js usa o no el /api
                 const response = await api.get('/v1/avisos/activos');
                 
-                const paraMi = response.data.filter(a => {
+                // ✅ PROTECCIÓN: Si el backend falla o devuelve texto/HTML, se asigna un array vacío
+                const datosAvisos = Array.isArray(response.data) ? response.data : [];
+                
+                const paraMi = datosAvisos.filter(a => {
                     const esActivo = a.activo === true;
-                    
-                    // AHORA EL ADMINISTRADOR VE TODOS LOS AVISOS, SIN IMPORTAR EL ÁREA
+                    // El administrador visualiza todo alcance, los usuarios filtran por su areaId mapeado
                     const esParaMi = !a.areaId || a.areaId === user?.areaId || cleanRole === 'ADMINISTRADOR';
-                    
                     return esActivo && esParaMi;
                 });
                 
                 setAvisosActivos(paraMi);
+                
+                // ✅ REAPARICIÓN REPETITIVA: Cada ciclo de 30 segundos limpia los descartes locales
+                setAvisosOcultos([]); 
             } catch (error) {
                 console.error("Error al buscar avisos:", error);
+                setAvisosActivos([]);
             }
         };
 
         buscarAvisos();
         
-        // Bajamos el tiempo a 10 segundos (10000 ms) para que sea casi instantáneo
-        const intervalo = setInterval(buscarAvisos, 10000); 
+        // Polling programado estrictamente a 30 segundos (30000 ms)
+        const intervalo = setInterval(buscarAvisos, 30000); 
         return () => clearInterval(intervalo);
     }, [user, estaBloqueado, cleanRole]);
 
-    // Función para ocultar un aviso específico cuando el usuario le da a la X
     const handleCerrarAviso = (idAviso) => {
         if (!avisosOcultos.includes(idAviso)) {
             setAvisosOcultos([...avisosOcultos, idAviso]);
         }
     };
 
-    // Calculamos qué avisos pintar (los activos menos los que el usuario ya cerró)
     const avisosVisibles = avisosActivos.filter(aviso => !avisosOcultos.includes(aviso.id));
 
     return (
         <Box sx={{ display: 'flex', minHeight: '100vh', width: '100vw', bgcolor: '#f4f7f6', overflowX: 'hidden' }}>
             <CssBaseline />
 
-            {/* ---> CONTENEDOR DE ALERTAS APILADAS <--- */}
+            {/* Contenedor Flotante de Múltiples Alertas Apiladas */}
             {avisosVisibles.length > 0 && (
                 <Box sx={{ 
-                    position: 'fixed', 
-                    top: '75px', // Debajo de la barra superior
-                    left: '50%', 
-                    transform: 'translateX(-50%)', 
-                    zIndex: 9999, 
-                    display: 'flex', 
-                    flexDirection: 'column', 
-                    gap: 1.5, // Espacio entre avisos
-                    width: '90%', 
-                    maxWidth: '600px' 
+                    position: 'fixed', top: '75px', left: '50%', 
+                    transform: 'translateX(-50%)', zIndex: 9999, 
+                    display: 'flex', flexDirection: 'column', gap: 1.5, 
+                    width: '90%', maxWidth: '600px' 
                 }}>
                     {avisosVisibles.map(aviso => (
                         <Alert 
@@ -107,7 +101,7 @@ export default function MainLayout({ children }) {
                 </Box>
             )}
 
-            <AppBar position="fixed" sx={{ width: '100%', bgcolor: COLOR_GUINDA, borderRadius: '0 !important', boxShadow: 2, zIndex: 1300 }}>
+            <AppBar position="fixed" sx={{ width: '100%', left: 0, top: 0, bgcolor: COLOR_GUINDA, borderRadius: '0 !important', boxShadow: 2, zIndex: 1300 }}>
                 <Toolbar sx={{ display: 'flex', justifyContent: 'space-between' }}>
                     <Typography variant="h6" fontWeight="bold">SEDIF - Sistema de Tickets</Typography>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>

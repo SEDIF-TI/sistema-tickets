@@ -8,7 +8,7 @@ import {
 } from 'recharts';
 import api from '../../services/api';
 
-// Iconos para simular los de tu diseño
+// Iconos
 import HeadsetMicIcon from '@mui/icons-material/HeadsetMic';
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import GroupIcon from '@mui/icons-material/Group';
@@ -17,37 +17,19 @@ import LocalOfferIcon from '@mui/icons-material/LocalOffer';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import EngineeringIcon from '@mui/icons-material/Engineering';
 import DomainIcon from '@mui/icons-material/Domain';
+import CampaignIcon from '@mui/icons-material/Campaign'; // <-- Nuevo icono para Avisos
 
-// Color Guinda Institucional exacto al del diseño
 const COLOR_GUINDA = '#801A36'; 
 const COLORS_PIE = ['#2ecc71', '#e74c3c', '#3498db', '#f1c40f', '#9b59b6'];
 
-// Componente de Tarjeta que replica exactamente tu diseño original
 const MockupCard = ({ titulo, icono: Icono, children }) => (
     <Box sx={{ 
-        bgcolor: 'white', 
-        borderRadius: 1, 
-        overflow: 'hidden', 
-        border: '1px solid #e0e0e0',
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        boxShadow: '0px 2px 4px rgba(0,0,0,0.05)'
+        bgcolor: 'white', borderRadius: 1, overflow: 'hidden', border: '1px solid #e0e0e0',
+        height: '100%', display: 'flex', flexDirection: 'column', boxShadow: '0px 2px 4px rgba(0,0,0,0.05)'
     }}>
-        <Box sx={{ 
-            bgcolor: COLOR_GUINDA, 
-            color: 'white', 
-            py: 1, 
-            px: 2, 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center', 
-            gap: 1 
-        }}>
+        <Box sx={{ bgcolor: COLOR_GUINDA, color: 'white', py: 1, px: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
             {Icono && <Icono fontSize="small" />}
-            <Typography variant="subtitle2" sx={{ fontSize: '0.85rem' }}>
-                {titulo}
-            </Typography>
+            <Typography variant="subtitle2" sx={{ fontSize: '0.85rem' }}>{titulo}</Typography>
         </Box>
         <Box sx={{ p: 2, flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
             {children}
@@ -74,23 +56,9 @@ export default function DashboardPage() {
 
     return (
         <Box sx={{ p: 3, backgroundColor: '#f0f2f5', minHeight: '100vh' }}>
-            
-            {/* SISTEMA DE CSS GRID PARA FORZAR LA ESTRUCTURA */}
-            <Box sx={{ 
-                display: 'grid', 
-                gridTemplateColumns: 'repeat(12, 1fr)', 
-                gap: 3 
-            }}>
+            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 3 }}>
 
-                {/* 1. BANNER PRINCIPAL (Ocupa las 12 columnas) */}
-                <Box sx={{ 
-                    gridColumn: 'span 12', 
-                    bgcolor: COLOR_GUINDA, 
-                    color: 'white', 
-                    p: 3, 
-                    borderRadius: 1,
-                    textAlign: 'center' 
-                }}>
+                <Box sx={{ gridColumn: 'span 12', bgcolor: COLOR_GUINDA, color: 'white', p: 3, borderRadius: 1, textAlign: 'center' }}>
                     <Typography variant="h5" fontWeight="bold" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
                         <HeadsetMicIcon /> Bienvenido al Sistema de Soporte Técnico
                     </Typography>
@@ -99,22 +67,31 @@ export default function DashboardPage() {
                     </Typography>
                 </Box>
 
-               
+                {/* NUEVA GRÁFICA DE AVISOS (Ocupa 12 columnas arriba de los estatus) */}
+                <Box sx={{ gridColumn: 'span 12' }}>
+                    <MockupCard titulo="Alcance de Avisos Activos" icono={CampaignIcon}>
+                        <ResponsiveContainer width="100%" height={250}>
+                            <BarChart data={data.avisosPorArea || []} margin={{ top: 20, right: 30, left: 0, bottom: 5 }} layout="vertical">
+                                <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
+                                <XAxis type="number" />
+                                <YAxis dataKey="nombre" type="category" width={150} tick={{fontSize: 12}} />
+                                <Tooltip cursor={{fill: '#f5f5f5'}} />
+                                <Bar dataKey="cantidad" name="Avisos Activos" fill="#f1c40f" barSize={30} radius={[0, 4, 4, 0]}>
+                                    <LabelList dataKey="cantidad" position="right" style={{ fontSize: '12px', fontWeight: 'bold' }} />
+                                </Bar>
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </MockupCard>
+                </Box>
 
-                {/* 3. TÍTULOS POR ESTATUS (12 columnas) */}
+                {/* TÍTULOS POR ESTATUS */}
                 <Box sx={{ gridColumn: 'span 12' }}>
                     <MockupCard titulo="Tickets por Estatus" icono={ListAltIcon}>
                         <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, alignItems: 'center' }}>
                             <Box sx={{ width: { xs: '100%', md: '50%' }, height: 300 }}>
                                 <ResponsiveContainer width="100%" height="100%">
                                     <PieChart>
-                                        <Pie 
-                                            data={data.porEstatus || []} 
-                                            innerRadius={70} 
-                                            outerRadius={110} 
-                                            dataKey="cantidad" 
-                                            nameKey="nombre"
-                                        >
+                                        <Pie data={data.porEstatus || []} innerRadius={70} outerRadius={110} dataKey="cantidad" nameKey="nombre">
                                             {(data.porEstatus || []).map((_, i) => <Cell key={i} fill={COLORS_PIE[i % COLORS_PIE.length]} />)}
                                         </Pie>
                                         <Tooltip />
@@ -140,17 +117,12 @@ export default function DashboardPage() {
                     </MockupCard>
                 </Box>
 
-                {/* 4. CATEGORÍA Y FECHAS (6 y 6 columnas) */}
+                {/* CATEGORÍA Y FECHAS */}
                 <Box sx={{ gridColumn: { xs: 'span 12', md: 'span 6' } }}>
                     <MockupCard titulo="Tickets por Categoría" icono={LocalOfferIcon}>
                         <ResponsiveContainer width="100%" height={350}>
                             <PieChart>
-                                <Pie 
-                                    data={data.porPrioridad || []} 
-                                    outerRadius={120} 
-                                    dataKey="cantidad" 
-                                    nameKey="nombre"
-                                >
+                                <Pie data={data.porPrioridad || []} outerRadius={120} dataKey="cantidad" nameKey="nombre">
                                     {(data.porPrioridad || []).map((_, i) => <Cell key={i} fill={COLORS_PIE[i % COLORS_PIE.length]} />)}
                                 </Pie>
                                 <Tooltip />
@@ -175,7 +147,7 @@ export default function DashboardPage() {
                     </MockupCard>
                 </Box>
 
-                {/* 5. INGENIEROS (12 columnas) */}
+                {/* INGENIEROS */}
                 <Box sx={{ gridColumn: 'span 12' }}>
                     <MockupCard titulo="Tickets realizados por Ingeniero" icono={EngineeringIcon}>
                         <ResponsiveContainer width="100%" height={300}>
@@ -193,7 +165,7 @@ export default function DashboardPage() {
                     </MockupCard>
                 </Box>
 
-                {/* 6. DEPARTAMENTOS (12 columnas) */}
+                {/* DEPARTAMENTOS */}
                 <Box sx={{ gridColumn: 'span 12' }}>
                     <MockupCard titulo="Tickets por departamento" icono={DomainIcon}>
                         <ResponsiveContainer width="100%" height={350}>
