@@ -15,8 +15,12 @@ export const AuthProvider = ({ children }) => {
 
     const login = async (identificador, password) => {
         const response = await api.post('/v1/auth/login', { identificador, password });
-        const userData = response.data; // Contiene: id, nombre, rolNombre, tokenJwt, mensaje, vistasPermitidas, areaId
+        const userData = response.data; 
         
+        // ---> NUEVA LÍNEA CRÍTICA: Traducción del nombre de la variable <---
+        // El backend envía "vistas", nosotros lo guardamos como "vistasPermitidas"
+        userData.vistasPermitidas = userData.vistas || [];
+
         // --- DECODIFICADOR DE TOKENS JWT ---
         if (userData.tokenJwt) {
             try {
@@ -34,7 +38,6 @@ export const AuthProvider = ({ children }) => {
             }
         }
 
-        // Almacenamos el objeto completo incluyendo la propiedad areaId
         localStorage.setItem('user', JSON.stringify(userData));
         setUser(userData);
         return userData;

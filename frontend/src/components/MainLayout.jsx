@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext.jsx';
 import api from '../services/api';
 
-// Iconos
+// Importación de todos los iconos disponibles en tu sistema
 import ExitToAppIcon from '@mui/icons-material/ExitToApp';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import GroupIcon from '@mui/icons-material/Group';
@@ -19,6 +19,18 @@ import DescriptionIcon from '@mui/icons-material/Description';
 const drawerWidth = 65; 
 const COLOR_GUINDA = '#801A36';
 
+// ✅ DICCIONARIO DE ÍCONOS: Vincula el texto de la Base de Datos con el componente de Material UI
+const iconMap = {
+    'DashboardIcon': DashboardIcon,
+    'GroupIcon': GroupIcon,
+    'HistoryIcon': HistoryIcon,
+    'DomainIcon': DomainIcon,
+    'AddCircleIcon': AddCircleIcon,
+    'CampaignIcon': CampaignIcon,
+    'AssignmentIcon': AssignmentIcon,
+    'DescriptionIcon': DescriptionIcon
+};
+
 export default function MainLayout({ children }) {
     const { user, logout } = useContext(AuthContext);
     const navigate = useNavigate();
@@ -32,27 +44,21 @@ export default function MainLayout({ children }) {
     const cleanRole = userRole.replace('ROLE_', '').toUpperCase();
     const estaBloqueado = user?.passwordTemporal;
 
-    // Lógica para buscar y sincronizar avisos de forma segura
     useEffect(() => {
         if (!user || estaBloqueado) return;
 
         const buscarAvisos = async () => {
             try {
                 const response = await api.get('/v1/avisos/activos');
-                
-                // ✅ PROTECCIÓN: Si el backend falla o devuelve texto/HTML, se asigna un array vacío
                 const datosAvisos = Array.isArray(response.data) ? response.data : [];
                 
                 const paraMi = datosAvisos.filter(a => {
                     const esActivo = a.activo === true;
-                    // El administrador visualiza todo alcance, los usuarios filtran por su areaId mapeado
                     const esParaMi = !a.areaId || a.areaId === user?.areaId || cleanRole === 'ADMINISTRADOR';
                     return esActivo && esParaMi;
                 });
                 
                 setAvisosActivos(paraMi);
-                
-                // ✅ REAPARICIÓN REPETITIVA: Cada ciclo de 30 segundos limpia los descartes locales
                 setAvisosOcultos([]); 
             } catch (error) {
                 console.error("Error al buscar avisos:", error);
@@ -61,8 +67,6 @@ export default function MainLayout({ children }) {
         };
 
         buscarAvisos();
-        
-        // Polling programado estrictamente a 30 segundos (30000 ms)
         const intervalo = setInterval(buscarAvisos, 30000); 
         return () => clearInterval(intervalo);
     }, [user, estaBloqueado, cleanRole]);
@@ -79,7 +83,6 @@ export default function MainLayout({ children }) {
         <Box sx={{ display: 'flex', minHeight: '100vh', width: '100vw', bgcolor: '#f4f7f6', overflowX: 'hidden' }}>
             <CssBaseline />
 
-            {/* Contenedor Flotante de Múltiples Alertas Apiladas */}
             {avisosVisibles.length > 0 && (
                 <Box sx={{ 
                     position: 'fixed', top: '75px', left: '50%', 
@@ -121,31 +124,28 @@ export default function MainLayout({ children }) {
                 }}>
                     <Toolbar /> 
                     <List sx={{ pt: 2 }}>
-                        {/* MENÚ ADMINISTRADOR */}
-                        {cleanRole === 'ADMINISTRADOR' && (
-                            <>
-                                <ListItem disablePadding><Tooltip title="Dashboard" placement="right"><ListItemButton onClick={() => navigate('/admin/dashboard')} sx={{ justifyContent: 'center' }}><ListItemIcon sx={{ color: COLOR_GUINDA }}><DashboardIcon /></ListItemIcon></ListItemButton></Tooltip></ListItem>
-                                <ListItem disablePadding><Tooltip title="Usuarios" placement="right"><ListItemButton onClick={() => navigate('/admin/usuarios')} sx={{ justifyContent: 'center' }}><ListItemIcon sx={{ color: COLOR_GUINDA }}><GroupIcon /></ListItemIcon></ListItemButton></Tooltip></ListItem>
-                                <ListItem disablePadding><Tooltip title="Áreas" placement="right"><ListItemButton onClick={() => navigate('/admin/areas')} sx={{ justifyContent: 'center' }}><ListItemIcon sx={{ color: COLOR_GUINDA }}><DomainIcon /></ListItemIcon></ListItemButton></Tooltip></ListItem>
-                                <ListItem disablePadding><Tooltip title="Avisos" placement="right"><ListItemButton onClick={() => navigate('/admin/avisos')} sx={{ justifyContent: 'center' }}><ListItemIcon sx={{ color: COLOR_GUINDA }}><CampaignIcon /></ListItemIcon></ListItemButton></Tooltip></ListItem>
-                                <ListItem disablePadding><Tooltip title="Bitácora Global" placement="right"><ListItemButton onClick={() => navigate('/admin/bitacora')} sx={{ justifyContent: 'center' }}><ListItemIcon sx={{ color: COLOR_GUINDA }}><HistoryIcon /></ListItemIcon></ListItemButton></Tooltip></ListItem>
-                            </>
-                        )}
-                        {/* MENÚ SOPORTE */}
-                        {cleanRole === 'SOPORTE' && (
-                            <>
-                                <ListItem disablePadding><Tooltip title="Mis Tickets" placement="right"><ListItemButton onClick={() => navigate('/soporte/bandeja')} sx={{ justifyContent: 'center' }}><ListItemIcon sx={{ color: COLOR_GUINDA }}><AssignmentIcon /></ListItemIcon></ListItemButton></Tooltip></ListItem>
-                                <ListItem disablePadding><Tooltip title="Levantar Ticket" placement="right"><ListItemButton onClick={() => navigate('/tickets/nuevo')} sx={{ justifyContent: 'center' }}><ListItemIcon sx={{ color: COLOR_GUINDA }}><AddCircleIcon /></ListItemIcon></ListItemButton></Tooltip></ListItem>
-                                <ListItem disablePadding><Tooltip title="Crear Documento" placement="right"><ListItemButton onClick={() => navigate('/documentos/crear')} sx={{ justifyContent: 'center' }}><ListItemIcon sx={{ color: COLOR_GUINDA }}><DescriptionIcon /></ListItemIcon></ListItemButton></Tooltip></ListItem>
-                            </>
-                        )}
-                        {/* MENÚ EMPLEADO */}
-                        {cleanRole === 'EMPLEADO' && (
-                            <>
-                                <ListItem disablePadding><Tooltip title="Levantar Ticket" placement="right"><ListItemButton onClick={() => navigate('/tickets/nuevo')} sx={{ justifyContent: 'center' }}><ListItemIcon sx={{ color: COLOR_GUINDA }}><AddCircleIcon /></ListItemIcon></ListItemButton></Tooltip></ListItem>
-                                <ListItem disablePadding><Tooltip title="Mis Tickets" placement="right"><ListItemButton onClick={() => navigate('/empleado/historial')} sx={{ justifyContent: 'center' }}><ListItemIcon sx={{ color: COLOR_GUINDA }}><HistoryIcon /></ListItemIcon></ListItemButton></Tooltip></ListItem>
-                            </>
-                        )}
+                        
+                        {/* ✅ RENDERIZADO COMPLETAMENTE DINÁMICO DESDE LA BASE DE DATOS */}
+                        {(user?.vistasPermitidas || []).map((vista, index) => {
+                            // Buscamos el componente del icono; si no existe en el mapa, usamos DescriptionIcon por defecto
+                            const IconoDinamico = iconMap[vista.icono] || DescriptionIcon;
+
+                            return (
+                                <ListItem key={index} disablePadding>
+                                    <Tooltip title={vista.nombre} placement="right">
+                                        <ListItemButton 
+                                            onClick={() => navigate(vista.ruta)} 
+                                            sx={{ justifyContent: 'center' }}
+                                        >
+                                            <ListItemIcon sx={{ color: COLOR_GUINDA }}>
+                                                <IconoDinamico />
+                                            </ListItemIcon>
+                                        </ListItemButton>
+                                    </Tooltip>
+                                </ListItem>
+                            );
+                        })}
+
                     </List>
                 </Drawer>
             )}
