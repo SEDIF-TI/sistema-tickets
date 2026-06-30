@@ -1,196 +1,206 @@
-import React, { useState, useContext } from 'react';
+import React, { useState } from 'react';
 import { 
-    Box, Paper, Typography, TextField, Button, 
-    Tabs, Tab, Grid, IconButton, Divider, CircularProgress 
+    Box, Typography, Paper, Tabs, Tab, TextField, Button, Grid, IconButton, Table, TableBody, TableCell, TableContainer, TableHead, TableRow 
 } from '@mui/material';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
-import AddCircleIcon from '@mui/icons-material/AddCircle';
 import DeleteIcon from '@mui/icons-material/Delete';
-import InventoryIcon from '@mui/icons-material/Inventory';
-import EmailIcon from '@mui/icons-material/Email';
-import { AuthContext } from '../context/AuthContext';
-import api from '../services/api'; 
+import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
+import api from '../services/api';
+
+const COLOR_GUINDA = '#801A36';
 
 export default function GeneradorDocumentos() {
-    const { user } = useContext(AuthContext);
-    const [cargando, setCargando] = useState(false);
-
-    // ==========================================
-    // ESTADO PARA LAS PESTAÑAS (0 = Memo, 1 = Requisición)
-    // ==========================================
     const [tabIndex, setTabIndex] = useState(0);
-    const handleTabChange = (event, newValue) => {
-        setTabIndex(newValue);
+
+    const [dictamen, setDictamen] = useState({
+        folioTicket: '', equipoEvaluado: '', fallaReportada: '', diagnostico: '', conclusion: '' 
+    });
+
+    const [memorandum, setMemorandum] = useState({
+        para: '', de: 'Área de Soporte Técnico', asunto: '', cuerpo: ''
+    });
+
+    // ---> CAMBIO: listaArticulos ahora es un arreglo de objetos <---
+    const [requisicion, setRequisicion] = useState({
+        areaSolicitante: 'Soporte Técnico',
+        fechaRequerida: '',
+        justificacion: '',
+        listaArticulos: [{ cantidad: '', unidad: '', descripcion: '' }] 
+    });
+
+    const handleChangeDictamen = (e) => setDictamen({ ...dictamen, [e.target.name]: e.target.value });
+    const handleChangeMemo = (e) => setMemorandum({ ...memorandum, [e.target.name]: e.target.value });
+    const handleChangeRequisicion = (e) => setRequisicion({ ...requisicion, [e.target.name]: e.target.value });
+
+    // --- FUNCIONES PARA LA TABLA DINÁMICA DE REQUISICIÓN ---
+    const handleAddArticulo = () => {
+        setRequisicion({
+            ...requisicion,
+            listaArticulos: [...requisicion.listaArticulos, { cantidad: '', unidad: '', descripcion: '' }]
+        });
     };
 
-    // ==========================================
-    // FUNCIÓN MAESTRA PARA DESCARGAR EL PDF
-    // ==========================================
-    const procesarDescargaPDF = (data, nombreArchivo) => {
-        // 1. Creamos un objeto Blob con los datos binarios del backend
-        const blob = new Blob([data], { type: 'application/pdf' });
-        // 2. Creamos una URL temporal para ese archivo
-        const url = window.URL.createObjectURL(blob);
-        // 3. Creamos un enlace <a> invisible
-        const link = document.createElement('a');
-        link.href = url;
-        link.setAttribute('download', nombreArchivo);
-        // 4. Simulamos que el usuario le da clic al enlace para descargar
-        document.body.appendChild(link);
-        link.click();
-        // 5. Limpiamos la basura
-        link.parentNode.removeChild(link);
-        window.URL.revokeObjectURL(url);
+    const handleRemoveArticulo = (index) => {
+        const nuevaLista = [...requisicion.listaArticulos];
+        nuevaLista.splice(index, 1);
+        setRequisicion({ ...requisicion, listaArticulos: nuevaLista });
     };
 
-    // ==========================================
-    // ESTADOS Y LÓGICA: MEMORÁNDUM
-    // ==========================================
-    const [memoDestinatario, setMemoDestinatario] = useState('');
-    const [memoRemitente, setMemoRemitente] = useState('Área de Soporte Técnico');
-    const [memoAsunto, setMemoAsunto] = useState('');
-    const [memoCuerpo, setMemoCuerpo] = useState('');
+    const handleChangeArticulo = (index, campo, valor) => {
+        const nuevaLista = [...requisicion.listaArticulos];
+        nuevaLista[index][campo] = valor;
+        setRequisicion({ ...requisicion, listaArticulos: nuevaLista });
+    };
 
-    const handleGenerarMemo = async (e) => {
-        e.preventDefault();
-        setCargando(true);
+    const solicitarPdf = async (endpoint, payload, nombreArchivo) => {
         try {
-            // Reemplaza '/v1/documentos/memorandum' con la ruta real de tu controlador Spring Boot
-            const response = await api.post('/v1/documentos/memorandum', {
-                destinatario: memoDestinatario,
-                remitente: memoRemitente,
-                asunto: memoAsunto,
-                cuerpo: memoCuerpo
-            }, { 
-                responseType: 'blob' // ¡CRÍTICO! Le dice a Axios que espere un archivo, no un JSON
-            });
-
-            procesarDescargaPDF(response.data, `Memorandum_${new Date().getTime()}.pdf`);
-            
+            const response = await api.post(`/v1/documentos/${endpoint}`, payload, { responseType: 'blob' });
+            const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', nombreArchivo);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
         } catch (error) {
-            console.error("Error al generar PDF de Memorándum:", error);
-            alert("Error al contactar con el servidor para generar el PDF.");
-        } finally {
-            setCargando(false);
-        }
-    };
-
-    // ==========================================
-    // ESTADOS Y LÓGICA: REQUISICIÓN DE MATERIALES
-    // ==========================================
-    const [reqSolicitante, setReqSolicitante] = useState(user?.nombre || '');
-    const [reqJustificacion, setReqJustificacion] = useState('');
-    const [articulos, setArticulos] = useState([{ cantidad: 1, unidad: 'Pieza', descripcion: '' }]);
-
-    const agregarArticulo = () => setArticulos([...articulos, { cantidad: 1, unidad: 'Pieza', descripcion: '' }]);
-    const eliminarArticulo = (index) => setArticulos(articulos.filter((_, i) => i !== index));
-    const actualizarArticulo = (index, campo, valor) => {
-        const nuevosArticulos = [...articulos];
-        nuevosArticulos[index][campo] = valor;
-        setArticulos(nuevosArticulos);
-    };
-
-    const handleGenerarRequisicion = async (e) => {
-        e.preventDefault();
-        setCargando(true);
-        try {
-            // Reemplaza '/v1/documentos/requisicion' con la ruta real de tu controlador Spring Boot
-            const response = await api.post('/v1/documentos/requisicion', {
-                solicitante: reqSolicitante,
-                justificacion: reqJustificacion,
-                articulos: articulos
-            }, { 
-                responseType: 'blob' // ¡CRÍTICO! 
-            });
-
-            procesarDescargaPDF(response.data, `Requisicion_${new Date().getTime()}.pdf`);
-            
-        } catch (error) {
-            console.error("Error al generar PDF de Requisición:", error);
-            alert("Error al contactar con el servidor para generar el PDF.");
-        } finally {
-            setCargando(false);
+            console.error("Error al generar el PDF:", error);
+            alert("Hubo un error al generar el documento. Verifica que el backend esté listo.");
         }
     };
 
     return (
-        <Box sx={{ width: '100%', maxWidth: 900, margin: '0 auto' }}>
-            <Typography variant="h4" fontWeight="bold" color="primary" sx={{ mb: 3 }}>
+        <Box sx={{ p: 3, maxWidth: 1000, mx: 'auto' }}>
+            <Typography variant="h5" fontWeight="bold" sx={{ color: COLOR_GUINDA, mb: 3 }}>
                 Generador de Documentos Oficiales
             </Typography>
 
-            <Paper elevation={3} sx={{ mb: 3, borderRadius: 2 }}>
-                <Tabs value={tabIndex} onChange={handleTabChange} indicatorColor="primary" textColor="primary" variant="fullWidth">
-                    <Tab icon={<EmailIcon />} label="Memorándum" iconPosition="start" sx={{ fontWeight: 'bold' }} />
-                    <Tab icon={<InventoryIcon />} label="Requisición de Material" iconPosition="start" sx={{ fontWeight: 'bold' }} />
+            <Paper sx={{ mb: 3, borderRadius: 2, overflow: 'hidden' }}>
+                <Tabs 
+                    value={tabIndex} 
+                    onChange={(e, newValue) => setTabIndex(newValue)} 
+                    centered 
+                    TabIndicatorProps={{ style: { backgroundColor: COLOR_GUINDA } }}
+                    sx={{ '& .Mui-selected': { color: `${COLOR_GUINDA} !important`, fontWeight: 'bold' } }}
+                >
+                    <Tab label="Dictamen Técnico" />
+                    <Tab label="Memorándum" />
+                    <Tab label="Requisición de Material" />
                 </Tabs>
             </Paper>
 
-            {/* VISTA 1: MEMORÁNDUM */}
+            {/* PESTAÑA 0: DICTAMEN TÉCNICO */}
             {tabIndex === 0 && (
-                <Paper elevation={3} sx={{ p: 4, borderRadius: 2 }}>
-                    <form onSubmit={handleGenerarMemo}>
-                        <Grid container spacing={3}>
-                            <Grid item xs={12} sm={6}>
-                                <TextField fullWidth label="Para (Destinatario) *" required value={memoDestinatario} onChange={(e) => setMemoDestinatario(e.target.value)} disabled={cargando} />
-                            </Grid>
-                            <Grid item xs={12} sm={6}>
-                                <TextField fullWidth label="De (Remitente) *" required value={memoRemitente} onChange={(e) => setMemoRemitente(e.target.value)} disabled={cargando} />
-                            </Grid>
-                            <Grid item xs={12}>
-                                <TextField fullWidth label="Asunto *" required value={memoAsunto} onChange={(e) => setMemoAsunto(e.target.value)} disabled={cargando} />
-                            </Grid>
-                            <Grid item xs={12}>
-                                <TextField fullWidth label="Cuerpo del Mensaje *" required multiline rows={8} value={memoCuerpo} onChange={(e) => setMemoCuerpo(e.target.value)} disabled={cargando} />
-                            </Grid>
-                            <Grid item xs={12} sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-                                <Button type="submit" variant="contained" disabled={cargando} sx={{ bgcolor: '#5c0a28', '&:hover': { bgcolor: '#42071c' } }} startIcon={cargando ? <CircularProgress size={20} color="inherit" /> : <PictureAsPdfIcon />}>
-                                    {cargando ? 'Generando...' : 'Generar PDF'}
-                                </Button>
-                            </Grid>
+                <Paper sx={{ p: 4, borderRadius: 2 }}>
+                    <Typography variant="h6" sx={{ mb: 3, color: COLOR_GUINDA }}>Detalles del Dictamen</Typography>
+                    <Grid container spacing={3}>
+                        <Grid item xs={12} sm={6}>
+                            <TextField fullWidth label="Folio del Ticket Asociado" name="folioTicket" value={dictamen.folioTicket} onChange={handleChangeDictamen} />
                         </Grid>
-                    </form>
+                        <Grid item xs={12} sm={6}>
+                            <TextField fullWidth label="Equipo / Activo Evaluado" name="equipoEvaluado" value={dictamen.equipoEvaluado} onChange={handleChangeDictamen} />
+                        </Grid>
+                        <Grid item xs={12}>
+                            <TextField fullWidth label="Falla Reportada" name="fallaReportada" value={dictamen.fallaReportada} onChange={handleChangeDictamen} />
+                        </Grid>
+                        <Grid item xs={12}>
+                            <TextField fullWidth multiline rows={4} label="Diagnóstico Técnico Detallado" name="diagnostico" value={dictamen.diagnostico} onChange={handleChangeDictamen} />
+                        </Grid>
+                        <Grid item xs={12}>
+                            <TextField fullWidth multiline rows={2} label="Conclusión / Estado Final (Max 200 caracteres)" name="conclusion" value={dictamen.conclusion} onChange={handleChangeDictamen} inputProps={{ maxLength: 200 }} helperText={`${dictamen.conclusion.length}/200`} />
+                        </Grid>
+                        <Grid item xs={12} sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
+                            <Button variant="contained" onClick={() => solicitarPdf('dictamen', dictamen, `Dictamen_${dictamen.folioTicket}.pdf`)} startIcon={<PictureAsPdfIcon />} sx={{ bgcolor: COLOR_GUINDA, px: 4, py: 1.5 }}>Generar PDF</Button>
+                        </Grid>
+                    </Grid>
                 </Paper>
             )}
 
-            {/* VISTA 2: REQUISICIÓN DE MATERIALES */}
+            {/* PESTAÑA 1: MEMORÁNDUM */}
             {tabIndex === 1 && (
-                <Paper elevation={3} sx={{ p: 4, borderRadius: 2 }}>
-                    <form onSubmit={handleGenerarRequisicion}>
-                        <Grid container spacing={3}>
-                            <Grid item xs={12} sm={6}>
-                                <TextField fullWidth label="Área Solicitante" disabled value="Soporte Técnico" />
-                            </Grid>
-                            <Grid item xs={12} sm={6}>
-                                <TextField fullWidth label="Nombre del Solicitante *" required value={reqSolicitante} onChange={(e) => setReqSolicitante(e.target.value)} disabled={cargando} />
-                            </Grid>
-                            <Grid item xs={12}>
-                                <TextField fullWidth label="Justificación de la Compra/Petición *" required value={reqJustificacion} onChange={(e) => setReqJustificacion(e.target.value)} disabled={cargando} />
-                            </Grid>
-                            <Grid item xs={12}>
-                                <Divider sx={{ my: 1 }} />
-                                <Typography variant="h6" fontWeight="bold" color="primary" sx={{ mb: 2, mt: 1 }}>Lista de Artículos</Typography>
-                            </Grid>
-                            {articulos.map((articulo, index) => (
-                                <Grid item xs={12} key={index}>
-                                    <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                                        <TextField label="Cant." type="number" required sx={{ width: '100px' }} inputProps={{ min: 1 }} value={articulo.cantidad} onChange={(e) => actualizarArticulo(index, 'cantidad', e.target.value)} disabled={cargando} />
-                                        <TextField label="Unidad" required placeholder="Pieza, Metro, Caja..." sx={{ width: '150px' }} value={articulo.unidad} onChange={(e) => actualizarArticulo(index, 'unidad', e.target.value)} disabled={cargando} />
-                                        <TextField label="Descripción del Artículo" required fullWidth value={articulo.descripcion} onChange={(e) => actualizarArticulo(index, 'descripcion', e.target.value)} disabled={cargando} />
-                                        <IconButton color="error" onClick={() => eliminarArticulo(index)} disabled={articulos.length === 1 || cargando}><DeleteIcon /></IconButton>
-                                    </Box>
-                                </Grid>
-                            ))}
-                            <Grid item xs={12}>
-                                <Button variant="outlined" startIcon={<AddCircleIcon />} onClick={agregarArticulo} disabled={cargando} sx={{ mt: 1 }}>Agregar Artículo</Button>
-                            </Grid>
-                            <Grid item xs={12} sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
-                                <Button type="submit" variant="contained" disabled={cargando} sx={{ bgcolor: '#5c0a28', '&:hover': { bgcolor: '#42071c' } }} startIcon={cargando ? <CircularProgress size={20} color="inherit" /> : <PictureAsPdfIcon />}>
-                                    {cargando ? 'Generando...' : 'Generar Requisición (PDF)'}
-                                </Button>
-                            </Grid>
+                <Paper sx={{ p: 4, borderRadius: 2 }}>
+                    <Typography variant="h6" sx={{ mb: 3, color: COLOR_GUINDA }}>Redactar Memorándum</Typography>
+                    <Grid container spacing={3}>
+                        <Grid item xs={12} sm={6}>
+                            <TextField fullWidth required label="Para (Destinatario)" name="para" value={memorandum.para} onChange={handleChangeMemo} />
                         </Grid>
-                    </form>
+                        <Grid item xs={12} sm={6}>
+                            <TextField fullWidth required label="De (Remitente)" name="de" value={memorandum.de} onChange={handleChangeMemo} />
+                        </Grid>
+                        <Grid item xs={12}>
+                            <TextField fullWidth required label="Asunto" name="asunto" value={memorandum.asunto} onChange={handleChangeMemo} />
+                        </Grid>
+                        <Grid item xs={12}>
+                            <TextField fullWidth required multiline rows={6} label="Cuerpo del Mensaje" name="cuerpo" value={memorandum.cuerpo} onChange={handleChangeMemo} />
+                        </Grid>
+                        <Grid item xs={12} sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
+                            <Button variant="contained" onClick={() => solicitarPdf('memorandum', memorandum, `Memo.pdf`)} startIcon={<PictureAsPdfIcon />} sx={{ bgcolor: COLOR_GUINDA, px: 4, py: 1.5 }}>Generar PDF</Button>
+                        </Grid>
+                    </Grid>
+                </Paper>
+            )}
+
+            {/* PESTAÑA 2: REQUISICIÓN DE MATERIAL (CON TABLA DINÁMICA) */}
+            {tabIndex === 2 && (
+                <Paper sx={{ p: 4, borderRadius: 2 }}>
+                    <Typography variant="h6" sx={{ mb: 3, color: COLOR_GUINDA }}>Solicitud de Insumos</Typography>
+                    <Grid container spacing={3}>
+                        <Grid item xs={12} sm={6}>
+                            <TextField fullWidth label="Área Solicitante" name="areaSolicitante" value={requisicion.areaSolicitante} onChange={handleChangeRequisicion} />
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <TextField fullWidth type="date" label="Fecha Requerida" name="fechaRequerida" InputLabelProps={{ shrink: true }} value={requisicion.fechaRequerida} onChange={handleChangeRequisicion} />
+                        </Grid>
+                        <Grid item xs={12}>
+                            <TextField fullWidth label="Justificación de la compra" name="justificacion" value={requisicion.justificacion} onChange={handleChangeRequisicion} />
+                        </Grid>
+                        
+                        {/* SECCIÓN DE LA TABLA DINÁMICA */}
+                        <Grid item xs={12}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1, mt: 2 }}>
+                                <Typography variant="subtitle1" fontWeight="bold">Artículos Requeridos</Typography>
+                                <Button size="small" startIcon={<AddCircleOutlineIcon />} onClick={handleAddArticulo} color="primary">Agregar Fila</Button>
+                            </Box>
+                            
+                            <TableContainer component={Paper} variant="outlined">
+                                <Table size="small">
+                                    <TableHead sx={{ bgcolor: '#f5f5f5' }}>
+                                        <TableRow>
+                                            <TableCell width="15%">Cantidad</TableCell>
+                                            <TableCell width="20%">Unidad</TableCell>
+                                            <TableCell width="55%">Descripción</TableCell>
+                                            <TableCell width="10%" align="center">Acción</TableCell>
+                                        </TableRow>
+                                    </TableHead>
+                                    <TableBody>
+                                        {requisicion.listaArticulos.map((articulo, index) => (
+                                            <TableRow key={index}>
+                                                <TableCell>
+                                                    <TextField size="small" type="number" fullWidth value={articulo.cantidad} onChange={(e) => handleChangeArticulo(index, 'cantidad', e.target.value)} />
+                                                </TableCell>
+                                                <TableCell>
+                                                    <TextField size="small" placeholder="Ej: Pieza, Caja" fullWidth value={articulo.unidad} onChange={(e) => handleChangeArticulo(index, 'unidad', e.target.value)} />
+                                                </TableCell>
+                                                <TableCell>
+                                                    <TextField size="small" placeholder="Descripción detallada del artículo" fullWidth value={articulo.descripcion} onChange={(e) => handleChangeArticulo(index, 'descripcion', e.target.value)} />
+                                                </TableCell>
+                                                <TableCell align="center">
+                                                    <IconButton color="error" onClick={() => handleRemoveArticulo(index)} disabled={requisicion.listaArticulos.length === 1}>
+                                                        <DeleteIcon />
+                                                    </IconButton>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </TableContainer>
+                        </Grid>
+
+                        <Grid item xs={12} sx={{ display: 'flex', justifyContent: 'flex-end', mt: 3 }}>
+                            <Button variant="contained" onClick={() => solicitarPdf('requisicion', requisicion, `Requisicion.pdf`)} startIcon={<PictureAsPdfIcon />} sx={{ bgcolor: COLOR_GUINDA, px: 4, py: 1.5 }}>
+                                Generar PDF
+                            </Button>
+                        </Grid>
+                    </Grid>
                 </Paper>
             )}
         </Box>
