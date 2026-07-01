@@ -17,26 +17,11 @@ export const AuthProvider = ({ children }) => {
         const response = await api.post('/v1/auth/login', { identificador, password });
         const userData = response.data; 
         
-        // ---> NUEVA LÍNEA CRÍTICA: Traducción del nombre de la variable <---
-        // El backend envía "vistas", nosotros lo guardamos como "vistasPermitidas"
+        // Mapeo de la lista de vistas del backend al formato que espera el frontend
         userData.vistasPermitidas = userData.vistas || [];
-
-        // --- DECODIFICADOR DE TOKENS JWT ---
-        if (userData.tokenJwt) {
-            try {
-                const payloadBase64 = userData.tokenJwt.split('.')[1];
-                const base64 = payloadBase64.replace(/-/g, '+').replace(/_/g, '/');
-                const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
-                    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-                }).join(''));
-                
-                const decodedPayload = JSON.parse(jsonPayload);
-                userData.passwordTemporal = decodedPayload.passwordTemporal || false;
-            } catch (error) {
-                console.error("[AuthContext] Error al decodificar el token JWT:", error);
-                userData.passwordTemporal = false; 
-            }
-        }
+        
+        // Lectura directa de la propiedad enviada desde el backend sin decodificar el JWT
+        userData.passwordTemporal = userData.passwordTemporal || false;
 
         localStorage.setItem('user', JSON.stringify(userData));
         setUser(userData);

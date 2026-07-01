@@ -5,8 +5,8 @@ package com.sedif.sistema_tickets.core.documento;
  * y armar el documento independiente.
  */
 public record MemorandumRequest(
-        String destinatario,
-        String remitente,
+        String para,
+        String de,
         String asunto,
-        String cuerpoMensaje
+        String cuerpo
 ) {}

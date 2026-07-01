@@ -10,5 +10,6 @@ public record AuthResponseRecord(
         String token,
         String mensaje,
         List<VistaDTO> vistas, // <-- Nueva propiedad para enviar el menú
-        Long areaId
+        Long areaId,
+        Boolean passwordTemporal
 ) {}
