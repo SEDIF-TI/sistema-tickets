@@ -36,4 +36,17 @@ public class DocumentoResource {
         headers.add("Content-Disposition", "attachment; filename=Requisicion_Material.pdf");
         return ResponseEntity.ok().headers(headers).body(pdfGenerado);
     }
+
+    @PostMapping(value = "/dictamen", produces = MediaType.APPLICATION_PDF_VALUE)
+    public ResponseEntity<byte[]> generarDictamen(@RequestBody DictamenRequest request) {
+        
+        byte[] pdfGenerado = documentoService.generarDictamenTecnicoPdf(request);
+        
+        HttpHeaders headers = new HttpHeaders();
+        headers.add("Content-Disposition", "attachment; filename=Dictamen_Tecnico_" + request.folioTicket() + ".pdf");
+        
+        return ResponseEntity.ok()
+                .headers(headers)
+                .body(pdfGenerado);
+    }
 }

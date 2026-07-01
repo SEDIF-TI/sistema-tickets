@@ -2,13 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { 
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow, 
     Paper, Button, Typography, Chip, Dialog, DialogTitle, DialogContent, 
-    DialogActions, TextField, Box, Autocomplete, Tabs, Tab, Switch, Tooltip
+    DialogActions, TextField, Box, Autocomplete, Tabs, Tab, Switch, Tooltip, Grid
 } from '@mui/material';
 import { userService } from '../../services/userService';
 import { areaService } from '../../services/areaService';
-import api from '../../services/api'; // Importamos api directamente para la nueva petición PATCH
+import api from '../../services/api'; 
 
-// IMPORTAMOS EL NUEVO MODAL (Ajusta la ruta si lo guardaste en otra carpeta)
 import ModalCredenciales from '../../components/ModalCredenciales'; 
 
 const rolesDisponibles = [
@@ -17,9 +16,12 @@ const rolesDisponibles = [
     { id: 6, nombre: 'EMPLEADO' }
 ];
 
+// ---> CAMBIO 1: Se agregan los apellidos al estado inicial
 const estadoInicial = { 
     id: null, 
     nombre: '', 
+    apellidoPaterno: '',
+    apellidoMaterno: '',
     correo: '', 
     username: '', 
     rolId: null, 
@@ -34,14 +36,11 @@ const AdminUsuariosPage = () => {
     const [areas, setAreas] = useState([]);
     const [busqueda, setBusqueda] = useState('');
     
-    // Estado para las Pestañas (Tabs)
     const [tabIndex, setTabIndex] = useState(0);
     
-    // Estados para los modales
     const [openModal, setOpenModal] = useState(false);
     const [formData, setFormData] = useState(estadoInicial);
     
-    // Estados para el Modal de Credenciales
     const [openModalCredenciales, setOpenModalCredenciales] = useState(false);
     const [datosImpresion, setDatosImpresion] = useState(null);
 
@@ -68,11 +67,14 @@ const AdminUsuariosPage = () => {
     };
 
     const handleEditar = (usuario) => {
+        // ---> CAMBIO 2: Cargar los apellidos cuando se edita un usuario
         setFormData({
             id: usuario.id,
-            nombre: usuario.nombre,
-            correo: usuario.correo,
-            username: usuario.username,
+            nombre: usuario.nombre || '',
+            apellidoPaterno: usuario.apellidoPaterno || '',
+            apellidoMaterno: usuario.apellidoMaterno || '',
+            correo: usuario.correo || '',
+            username: usuario.username || '',
             rolId: usuario.rolId || null, 
             areaId: usuario.areaId || null,
             activo: usuario.activo
@@ -91,34 +93,32 @@ const AdminUsuariosPage = () => {
                 ...formData,
                 areaId: Number(formData.areaId),
                 rolId: Number(formData.rolId),
-                disponibleSoporte: false // Por defecto inician apagados
+                disponibleSoporte: false 
             };
 
             if (formData.id) {
-                // Actualizar usuario existente
                 await userService.update(formData.id, payload);
                 alert("Usuario actualizado con éxito.");
                 setOpenModal(false);
                 setFormData(estadoInicial);
                 cargarDatos();
             } else {
-                // Crear usuario nuevo
                 const response = await userService.create(payload);
                 
-                // Buscamos los nombres del Rol y Área para la credencial
                 const nombreRol = rolesDisponibles.find(r => r.id === formData.rolId)?.nombre || '';
                 const nombreArea = areas.find(a => a.id === formData.areaId)?.nombre || '';
 
-                // Preparamos los datos para imprimir
+                // ---> CAMBIO 3: Unimos el nombre para que la credencial se imprima bonita
+                const nombreCompleto = `${formData.nombre} ${formData.apellidoPaterno} ${formData.apellidoMaterno}`.trim();
+
                 setDatosImpresion({
-                    nombre: formData.nombre,
+                    nombre: nombreCompleto,
                     correo: formData.correo,
                     rol: nombreRol,
                     area: nombreArea,
                     password: response.data.passwordTemporalTexto
                 });
 
-                // Cerramos el formulario y abrimos el modal de éxito
                 setOpenModal(false);
                 setFormData(estadoInicial);
                 cargarDatos(); 
@@ -149,15 +149,12 @@ const AdminUsuariosPage = () => {
         }
     };
 
-    // ---> NUEVA FUNCIÓN: Cambiar disponibilidad del técnico
     const handleToggleDisponibilidad = async (usuario, isChecked) => {
         try {
-            // Nota: Asegúrate de que tu DisponibilidadRequest en Java espere el campo 'disponibleSoporte' o el nombre que le hayas dado.
             await api.patch(`/v1/admin/usuarios/${usuario.id}/disponibilidad`, {
                 disponibleSoporte: isChecked 
             });
             
-            // Actualizamos solo este usuario en el estado para evitar recargar toda la tabla
             setUsuarios(prev => prev.map(u => 
                 u.id === usuario.id ? { ...u, disponibleSoporte: isChecked } : u
             ));
@@ -167,7 +164,6 @@ const AdminUsuariosPage = () => {
         }
     };
 
-    // ---> LÓGICA DE FILTRADO DOBLE (Búsqueda + Pestañas)
     const usuariosFiltrados = usuarios.filter(u => {
         const pasaBusqueda = u.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
                              u.correo.toLowerCase().includes(busqueda.toLowerCase()) ||
@@ -175,11 +171,10 @@ const AdminUsuariosPage = () => {
         
         if (!pasaBusqueda) return false;
 
-        // Filtro por pestañas
         if (tabIndex === 1) return u.rolNombre === 'SOPORTE';
-        if (tabIndex === 2) return u.rolNombre !== 'SOPORTE'; // Empleados y Administradores
+        if (tabIndex === 2) return u.rolNombre !== 'SOPORTE'; 
         
-        return true; // tabIndex === 0 (Todos)
+        return true; 
     });
 
     return (
@@ -193,7 +188,6 @@ const AdminUsuariosPage = () => {
                 </Button>
             </Box>
 
-            {/* PESTAÑAS DE FILTRADO (Tabs) */}
             <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
                 <Tabs 
                     value={tabIndex} 
@@ -236,7 +230,6 @@ const AdminUsuariosPage = () => {
                                 <TableCell>{u.correo}</TableCell>
                                 <TableCell>{u.rolNombre}</TableCell>
                                 
-                                {/* NUEVA COLUMNA: ASIGNACIÓN */}
                                 <TableCell align="center">
                                     {u.rolNombre === 'SOPORTE' ? (
                                         <Tooltip title={u.disponibleSoporte ? "Recibiendo tickets automáticamente" : "Ignorado por el balanceador"}>
@@ -244,7 +237,7 @@ const AdminUsuariosPage = () => {
                                                 checked={u.disponibleSoporte || false}
                                                 onChange={(e) => handleToggleDisponibilidad(u, e.target.checked)}
                                                 color="success"
-                                                disabled={!u.activo} // Si está dado de baja, no se puede encender
+                                                disabled={!u.activo} 
                                             />
                                         </Tooltip>
                                     ) : (
@@ -279,11 +272,41 @@ const AdminUsuariosPage = () => {
                 </Table>
             </TableContainer>
 
-            {/* MODALES MANTENIDOS INTACTOS */}
             <Dialog open={openModal} onClose={() => setOpenModal(false)} maxWidth="sm" fullWidth>
                 <DialogTitle>{formData.id ? "Editar Usuario" : "Registrar Nuevo Usuario"}</DialogTitle>
                 <DialogContent>
-                    <TextField margin="dense" label="Nombre Completo" name="nombre" fullWidth value={formData.nombre || ''} onChange={handleChange} />
+                    
+                    {/* ---> CAMBIO 4: Reemplazamos el TextField único por un Grid de 3 campos */}
+                    <Grid container spacing={2} sx={{ mt: 0.5, mb: 1 }}>
+                        <Grid item xs={12}>
+                            <TextField 
+                                fullWidth required 
+                                label="Nombre(s)" 
+                                name="nombre" 
+                                value={formData.nombre} 
+                                onChange={handleChange} 
+                            />
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <TextField 
+                                fullWidth required 
+                                label="Apellido Paterno" 
+                                name="apellidoPaterno" 
+                                value={formData.apellidoPaterno} 
+                                onChange={handleChange} 
+                            />
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <TextField 
+                                fullWidth 
+                                label="Apellido Materno" 
+                                name="apellidoMaterno" 
+                                value={formData.apellidoMaterno} 
+                                onChange={handleChange} 
+                            />
+                        </Grid>
+                    </Grid>
+
                     <TextField margin="dense" label="Correo Electrónico" name="correo" type="email" fullWidth value={formData.correo || ''} onChange={handleChange} />
                     <TextField margin="dense" label="Nombre de Usuario (Login)" name="username" fullWidth value={formData.username || ''} onChange={handleChange} disabled={!!formData.id} />
                     

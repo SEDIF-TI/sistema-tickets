@@ -63,14 +63,21 @@ public class AuthService {
         // CORRECCIÓN CRÍTICA: Extraer el ID desde el objeto completo 'area' de forma segura
         Long idDelArea = (usuario.getArea() != null) ? usuario.getArea().getId() : null;
 
+        // Construimos el nombre completo para el frontend
+        String nombreCompleto = usuario.getNombre() + " " + 
+                                (usuario.getApellidoPaterno() != null ? usuario.getApellidoPaterno() : "") + " " + 
+                                (usuario.getApellidoMaterno() != null ? usuario.getApellidoMaterno() : "");
+
         return new AuthResponseRecord(
                 usuario.getId(),
-                usuario.getNombre(),
+                nombreCompleto.trim(), 
                 usuario.getRol().getNombre(),
                 tokenJwt,
                 "Autenticación exitosa.",
                 vistasPermitidas, 
-                idDelArea // <-- Enviamos el ID extraído de la relación muchos a uno
+                idDelArea,
+                // Le pasamos el valor exacto de la base de datos (o false si es nulo)
+                usuario.getPasswordTemporal() != null ? usuario.getPasswordTemporal() : false 
         );
     }
 
@@ -84,6 +91,8 @@ public class AuthService {
 
         Usuario nuevoUsuario = new Usuario();
         nuevoUsuario.setNombre(request.nombre());
+        nuevoUsuario.setApellidoPaterno(request.apellidoPaterno());
+        nuevoUsuario.setApellidoMaterno(request.apellidoMaterno());
         nuevoUsuario.setCorreo(request.correo());
         nuevoUsuario.setUsername(request.username());
         nuevoUsuario.setPassword(passwordEncoder.encode(request.password()));
@@ -91,6 +100,9 @@ public class AuthService {
         nuevoUsuario.setRol(rol); 
         nuevoUsuario.setActivo(true);
         nuevoUsuario.setDisponibleSoporte(false);
+        
+        // ---> LÍNEA CLAVE QUE ACTIVA LA REDIRECCIÓN EN EL FRONTEND <---
+        nuevoUsuario.setPasswordTemporal(true);
 
         usuarioRepository.save(nuevoUsuario);
         return "Usuario registrado exitosamente.";
