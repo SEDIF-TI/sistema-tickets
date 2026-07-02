@@ -9,6 +9,7 @@ import { areaService } from '../../services/areaService';
 import api from '../../services/api'; 
 
 import ModalCredenciales from '../../components/ModalCredenciales'; 
+import { toUpper } from '../../util/formater';
 
 const rolesDisponibles = [
     { id: 4, nombre: 'ADMINISTRADOR' },
@@ -63,7 +64,11 @@ const AdminUsuariosPage = () => {
 
     const handleChange = (e) => {
         const { name, value } = e.target;
-        setFormData({ ...formData, [name]: value });
+        // Solo aplicamos mayúsculas a los datos personales, respetando minúsculas en correo/username
+        const valorFormateado = (name === 'nombre' || name === 'apellidoPaterno' || name === 'apellidoMaterno') 
+            ? toUpper(value) 
+            : value;
+        setFormData({ ...formData, [name]: valorFormateado });
     };
 
     const handleEditar = (usuario) => {

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Switch, Box, Typography, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Button, TextField, Dialog, DialogActions, DialogContent, DialogTitle, Autocomplete } from '@mui/material';
 import { areaService } from '../../services/areaService';
 import { userService } from '../../services/userService'; // <-- Importamos para traer a los técnicos
+import { toUpper } from '../../util/formater'; // <-- Importamos la función para convertir a mayúsculas
 
 const AdminAreasPage = () => {
     const [areas, setAreas] = useState([]);
@@ -153,7 +154,7 @@ const AdminAreasPage = () => {
                         fullWidth 
                         margin="dense"
                         value={currentArea.nombre} 
-                        onChange={e => setCurrentArea({...currentArea, nombre: e.target.value})} 
+                        onChange={e => setCurrentArea({...currentArea, nombre: toUpper(e.target.value)})} 
                     />
                 </DialogContent>
                 <DialogActions>

@@ -16,6 +16,8 @@ import { useWebSocket } from '../../context/WebSocketContext.jsx';
 import { AuthContext } from '../../context/AuthContext.jsx'; 
 import api from '../../services/api';
 
+import { toUpper } from '../../util/formater'; // <-- Importamos la función para convertir a mayúsculas
+
 const COLOR_GUINDA = '#801A36';
 
 export default function PanelSoporte() {
@@ -373,7 +375,7 @@ useEffect(() => {
                         multiline
                         rows={4}
                         value={justificacion}
-                        onChange={(e) => setJustificacion(e.target.value)}
+                        onChange={(e) => setJustificacion(toUpper(e.target.value))}
                         variant="outlined"
                         placeholder="Ej. Se reemplazó el cartucho de tóner negro..."
                         required
