@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
-import { Typography, Paper, TextField, Button, Grid, Box, Divider } from '@mui/material';
+import React, { useState, useEffect } from 'react';
+import { Typography, Paper, TextField, Button, Grid, Box, Divider, Autocomplete } from '@mui/material';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
+import { toUpper } from '../../util/formater';
+import api from '../../services/api';
 
 const COLOR_GUINDA = '#801A36';
 
@@ -14,25 +16,49 @@ export default function DictamenFormato({ solicitarPdf }) {
         folioTicket: '', 
         fecha: new Date().toLocaleDateString('es-MX'), 
         
-        // Datos del Equipo
+        // Datos del Equipo (cve restaurado al estado inicial)
         cve: 'OT', descripcionEquipo: '', marca: '', modelo: '', serie: '', noResguardo: '',
         
-        // Datos del Usuario (Movido antes del análisis)
+        // Datos del Usuario
         direccionUsuario: '', departamentoUsuario: '', nombreUsuario: '', telefonoUsuario: '', tipoReporte: '',
         
         // Análisis Técnico
         fallaReportada: '', diagnostico: '', hallazgos: '', conclusion: '',
 
-        // Campos eliminados de la vista, pero se envían vacíos para no romper el backend en Java
+        // Campos eliminados de la vista, pero se envían vacíos para no romper el backend
         concepto: '', observacion: '', 
         
-        // Firmas automatizadas e invisibles en el formulario
+        // Firmas automatizadas
         realizadoPor: nombreTecnico,
         revisadoPor: 'C. MARCO POLO OLIVARES GONZALEZ',
         recibidoPor: 'DRA. CARMEN GONZÁLEZ SERDÁN'
     });
 
-    const handleChange = (e) => setDictamen({ ...dictamen, [e.target.name]: e.target.value });
+    // Estados para el Catálogo Inteligente
+    const [opcionesEquipo, setOpcionesEquipo] = useState([]);
+    const [busquedaEquipo, setBusquedaEquipo] = useState('');
+
+    // Efecto para buscar equipos en tiempo real
+    useEffect(() => {
+        if (busquedaEquipo.length < 2) {
+            setOpcionesEquipo([]);
+            return;
+        }
+        const fetchEquipos = async () => {
+            try {
+                const res = await api.get(`/v1/equipos/buscar?q=${busquedaEquipo}`);
+                setOpcionesEquipo(res.data);
+            } catch (error) {
+                console.error("Error buscando equipos:", error);
+            }
+        };
+        const timeoutId = setTimeout(() => fetchEquipos(), 300);
+        return () => clearTimeout(timeoutId);
+    }, [busquedaEquipo]);
+
+    const handleChange = (e) => {
+        setDictamen({ ...dictamen, [e.target.name]: toUpper(e.target.value) });
+    };
 
     return (
         <Paper sx={{ p: 4, borderRadius: 2, boxShadow: 2 }}>
@@ -41,7 +67,6 @@ export default function DictamenFormato({ solicitarPdf }) {
                 1. Datos Generales y del Equipo
             </Typography>
             <Grid container spacing={2}>
-                {/* Folio y Fecha Bloqueados y en gris */}
                 <Grid item xs={12} sm={3}>
                     <TextField fullWidth size="small" label="Folio Ticket" value="Autogenerado" disabled sx={{ bgcolor: '#f8fafc' }} />
                 </Grid>
@@ -50,8 +75,37 @@ export default function DictamenFormato({ solicitarPdf }) {
                 </Grid>
                 <Grid item xs={12} sm={6}></Grid>
 
-                <Grid item xs={12} sm={2}><TextField fullWidth size="small" label="CVE (Ej: OT)" name="cve" value={dictamen.cve} onChange={handleChange} /></Grid>
-                <Grid item xs={12} sm={4}><TextField fullWidth size="small" label="Descripción (Ej: LAPTOP)" name="descripcionEquipo" value={dictamen.descripcionEquipo} onChange={handleChange} /></Grid>
+                {/* Campo CVE Manual */}
+                <Grid item xs={12} sm={2}>
+                    <TextField fullWidth size="small" label="CVE (Ej: OT)" name="cve" value={dictamen.cve} onChange={handleChange} />
+                </Grid>
+
+                {/* Autocomplete del Catálogo (No modifica el CVE) */}
+                <Grid item xs={12} sm={4}>
+                    <Autocomplete
+                        freeSolo
+                        options={opcionesEquipo}
+                        getOptionLabel={(option) => typeof option === 'string' ? option : option.descripcion}
+                        inputValue={dictamen.descripcionEquipo}
+                        onInputChange={(event, newInputValue) => {
+                            setBusquedaEquipo(newInputValue);
+                            setDictamen({ ...dictamen, descripcionEquipo: toUpper(newInputValue) });
+                        }}
+                        onChange={(event, newValue) => {
+                            if (newValue && typeof newValue === 'object') {
+                                setDictamen({
+                                    ...dictamen,
+                                    descripcionEquipo: newValue.descripcion || '',
+                                    marca: newValue.marca || '',
+                                    modelo: newValue.modelo || ''
+                                });
+                            }
+                        }}
+                        renderInput={(params) => (
+                            <TextField {...params} fullWidth size="small" label="Descripción (Catálogo)" />
+                        )}
+                    />
+                </Grid>
                 <Grid item xs={12} sm={3}><TextField fullWidth size="small" label="Marca" name="marca" value={dictamen.marca} onChange={handleChange} /></Grid>
                 <Grid item xs={12} sm={3}><TextField fullWidth size="small" label="Modelo" name="modelo" value={dictamen.modelo} onChange={handleChange} /></Grid>
                 <Grid item xs={12} sm={6}><TextField fullWidth size="small" label="No. de Serie" name="serie" value={dictamen.serie} onChange={handleChange} /></Grid>
@@ -60,7 +114,7 @@ export default function DictamenFormato({ solicitarPdf }) {
 
             <Divider sx={{ my: 4 }} />
 
-            {/* --- SECCIÓN 2: DATOS DEL USUARIO (Movido arriba) --- */}
+            {/* --- SECCIÓN 2: DATOS DEL USUARIO --- */}
             <Typography variant="h6" sx={{ color: COLOR_GUINDA, fontWeight: 'bold', mb: 2 }}>
                 2. Datos del Usuario
             </Typography>
@@ -74,7 +128,7 @@ export default function DictamenFormato({ solicitarPdf }) {
 
             <Divider sx={{ my: 4 }} />
 
-            {/* --- SECCIÓN 3: ANÁLISIS TÉCNICO (Movido abajo) --- */}
+            {/* --- SECCIÓN 3: ANÁLISIS TÉCNICO --- */}
             <Typography variant="h6" sx={{ color: COLOR_GUINDA, fontWeight: 'bold', mb: 2 }}>
                 3. Análisis Técnico
             </Typography>
@@ -92,12 +146,24 @@ export default function DictamenFormato({ solicitarPdf }) {
                 </Grid>
             </Grid>
 
-            {/* LA SECCIÓN 4 FUE ELIMINADA DEL FORMULARIO VISUAL */}
-
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 4, pt: 2, borderTop: '1px solid #eee' }}>
                 <Button 
                     variant="contained" 
-                    onClick={() => solicitarPdf('dictamen', dictamen, `Dictamen_Automatico.pdf`)} 
+                    onClick={async () => {
+                        // 1. Guardar silenciosamente en el catálogo inteligente
+                        try {
+                            if (dictamen.descripcionEquipo) {
+                                await api.post('/v1/equipos/upsert', {
+                                    descripcion: dictamen.descripcionEquipo,
+                                    marca: dictamen.marca,
+                                    modelo: dictamen.modelo
+                                });
+                            }
+                        } catch (e) { console.error("No se pudo actualizar catálogo JIT", e); }
+                        
+                        // 2. Generar el PDF
+                        solicitarPdf('dictamen', dictamen, `Dictamen_Automatico.pdf`);
+                    }} 
                     startIcon={<PictureAsPdfIcon />} 
                     sx={{ bgcolor: COLOR_GUINDA, '&:hover': { bgcolor: '#5e1227' }, px: 4, py: 1.5, fontWeight: 'bold' }}
                 >

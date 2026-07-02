@@ -4,6 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import { AuthContext } from '../../context/AuthContext.jsx';
 
+import { toUpper } from '../../util/formater'; // <-- Importamos la función para convertir a mayúsculas
+
 const COLOR_GUINDA = '#5c0a28'; // Sincronizado con tu tema institucional
 
 export default function FormularioTicket() {
@@ -81,7 +83,7 @@ export default function FormularioTicket() {
                         variant="outlined"
                         margin="normal"
                         value={solicitante}
-                        onChange={(e) => setSolicitante(e.target.value)}
+                        onChange={(e) => setSolicitante(toUpper(e.target.value))}
                         placeholder="Escribe el nombre completo de la persona afectada"
                         required
                         inputProps={{ maxLength: 100 }} // Limitación de caracteres
@@ -95,7 +97,7 @@ export default function FormularioTicket() {
                         variant="outlined"
                         margin="normal"
                         value={titulo}
-                        onChange={(e) => setTitulo(e.target.value)}
+                        onChange={(e) => setTitulo(toUpper(e.target.value))}
                         placeholder="Ej. La impresora no se conecta a la red / Pantalla en negro"
                         required
                         inputProps={{ maxLength: 100 }} // Limitación de caracteres
@@ -110,7 +112,7 @@ export default function FormularioTicket() {
                             variant="outlined"
                             margin="normal"
                             value={sede}
-                            onChange={(e) => setSede(e.target.value)}
+                            onChange={(e) => setSede(toUpper(e.target.value))}
                             required={esSoporte}
                             inputProps={{ maxLength: 50 }}
                         />
@@ -125,7 +127,7 @@ export default function FormularioTicket() {
                         multiline
                         rows={4}
                         value={descripcion}
-                        onChange={(e) => setDescripcion(e.target.value)}
+                        onChange={(e) => setDescripcion(toUpper(e.target.value))}
                         placeholder="Describe detalladamente qué acciones causan el problema o qué mensajes de error aparecen en pantalla..."
                         required
                         inputProps={{ maxLength: 500 }} // Limitación de caracteres

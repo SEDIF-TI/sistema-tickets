@@ -23,6 +23,7 @@ import AdminUsuariosPage from './pages/admin/AdminUsuariosPage.jsx';
 import AdminAvisosPage from './pages/admin/AdminAvisosPage.jsx';
 import AdminAreasPage from './pages/admin/AdminAreasPage';
 import DashboardPage from './pages/admin/DashboardPage.jsx';
+import AdminEquiposPage from './pages/admin/AdminEquiposPage.jsx';
 
 // Componentes Adicionales
 import GeneradorDocumentos from './components/GeneradorDocumentos.jsx'; 
@@ -67,6 +68,7 @@ function AppContent() {
             <Route path="/admin/areas" element={<MainLayout><AdminAreasPage /></MainLayout>} />
             <Route path="/admin/avisos" element={<MainLayout><AdminAvisosPage /></MainLayout>} />
             <Route path="/admin/bitacora" element={<MainLayout><TicketsPage /></MainLayout>} />
+            <Route path="/admin/equipos" element={<MainLayout><AdminEquiposPage /></MainLayout>} />
 
             {/* Rutas de Soporte / Documentos */}
             <Route path="/soporte/bandeja" element={<MainLayout><PanelSoporte /></MainLayout>} />
