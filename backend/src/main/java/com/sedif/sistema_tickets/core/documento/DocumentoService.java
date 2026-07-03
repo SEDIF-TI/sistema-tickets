@@ -328,4 +328,107 @@ public class DocumentoService {
         
         return "C. " + nombreLimpio;
     }
+
+    // =========================================================
+    // MÉTODO PARA MANTENIMIENTO PREVENTIVO
+    // =========================================================
+    public byte[] generarMantenimientoPdf(MantenimientoPreventivoRequest request) {
+        try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+            // Usamos formato horizontal (rotate) para que quepan las 10 columnas
+            Document document = new Document(PageSize.LETTER.rotate(), 36, 36, 36, 36); 
+            PdfWriter.getInstance(document, baos);
+            document.open();
+
+            Font fontTitulo = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 10, Color.BLACK);
+            Font fontCabecera = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 7, Color.BLACK);
+            Font fontNormal = FontFactory.getFont(FontFactory.HELVETICA, 7, Color.BLACK);
+
+            // 1. TÍTULOS PRINCIPALES (Sustituyendo el encabezado general para igualar tu imagen)
+            Paragraph pDir = new Paragraph("DIRECCIÓN DE ADMINISTRACIÓN Y FINANZAS\nDEPARTAMENTO DE SOPORTE TÉCNICO\nLISTADO DE EQUIPOS DE CÓMPUTO AL QUE SE LE DIO MANTENIMIENTO PREVENTIVO\n(" + (request.departamento() != null ? request.departamento().toUpperCase() : "") + ")", fontTitulo);
+            pDir.setAlignment(Element.ALIGN_CENTER);
+            document.add(pDir);
+            
+            // Rango de Fechas alineado a la derecha
+            Paragraph pFechas = new Paragraph((request.fechaInicio() != null ? request.fechaInicio() : "") + " - " + (request.fechaFin() != null ? request.fechaFin() : ""), fontNormal);
+            pFechas.setAlignment(Element.ALIGN_RIGHT);
+            pFechas.setSpacingAfter(10f);
+            document.add(pFechas);
+
+            // 2. TABLA PRINCIPAL (10 Columnas)
+            PdfPTable table = new PdfPTable(10);
+            table.setWidthPercentage(100);
+            // Definimos anchos proporcionales para que unas columnas sean más anchas que otras
+            table.setWidths(new float[]{1f, 3.5f, 4.5f, 2.5f, 2.5f, 3f, 3f, 2f, 2.5f, 3f});
+
+            // Encabezados de la tabla (Fondo Gris)
+            String[] cabeceras = {"No.", "ÁREA", "NOMBRE DE USUARIO RESPONSABLE", "TIPO DE CPU", "MARCA", "MODELO", "NO. DE SERIE", "MEMORIA RAM", "CAPACIDAD DISCO DURO", "NO. DE INVENTARIO DE EQUIPO"};
+            for (String cab : cabeceras) {
+                PdfPCell cell = new PdfPCell(new Phrase(cab, fontCabecera));
+                cell.setBackgroundColor(Color.LIGHT_GRAY);
+                cell.setHorizontalAlignment(Element.ALIGN_CENTER);
+                cell.setVerticalAlignment(Element.ALIGN_MIDDLE);
+                cell.setPadding(4f);
+                table.addCell(cell);
+            }
+
+            // Filas (Llenado dinámico iterando la lista de React)
+            int index = 1;
+            if (request.equipos() != null) {
+                for (EquipoMantenimientoDTO equipo : request.equipos()) {
+                    // El número autoincrementable se inyecta con la variable 'index'
+                    table.addCell(crearCeldaTabla(String.valueOf(index++), fontNormal, Element.ALIGN_CENTER));
+                    table.addCell(crearCeldaTabla(equipo.area(), fontNormal, Element.ALIGN_LEFT));
+                    table.addCell(crearCeldaTabla(equipo.usuarioResponsable(), fontNormal, Element.ALIGN_LEFT));
+                    table.addCell(crearCeldaTabla(equipo.tipoCpu(), fontNormal, Element.ALIGN_LEFT));
+                    table.addCell(crearCeldaTabla(equipo.marca(), fontNormal, Element.ALIGN_LEFT));
+                    table.addCell(crearCeldaTabla(equipo.modelo(), fontNormal, Element.ALIGN_LEFT));
+                    table.addCell(crearCeldaTabla(equipo.numeroSerie(), fontNormal, Element.ALIGN_LEFT));
+                    table.addCell(crearCeldaTabla(equipo.memoriaRam(), fontNormal, Element.ALIGN_CENTER));
+                    table.addCell(crearCeldaTabla(equipo.capacidadDisco(), fontNormal, Element.ALIGN_CENTER));
+                    table.addCell(crearCeldaTabla(equipo.numeroInventario(), fontNormal, Element.ALIGN_CENTER));
+                }
+            }
+            document.add(table);
+            document.add(new Paragraph("\n\n\n\n")); // Espaciado para las firmas
+
+            // 3. FIRMAS (2 Columnas sin bordes)
+            PdfPTable tFirmas = new PdfPTable(2);
+            tFirmas.setWidthPercentage(100);
+
+            // Firma Izquierda (El que realizó)
+            String textoRealizo = "REALIZÓ EL SERVICIO\nSOPORTE TÉCNICO\n\n\n\n___________________________________\n" 
+                                + (request.nombreTecnico() != null ? request.nombreTecnico().toUpperCase() : "") 
+                                + "\nSOPORTE TÉCNICO";
+            PdfPCell cRealizo = new PdfPCell(new Phrase(textoRealizo, fontCabecera));
+            cRealizo.setBorder(Rectangle.NO_BORDER);
+            cRealizo.setHorizontalAlignment(Element.ALIGN_CENTER);
+
+            // Firma Derecha (Departamento del Usuario)
+            String textoConformidad = "FIRMA DE CONFORMIDAD\nPOR PARTE DEL USUARIO\n\n\n\n___________________________________\n" 
+                                    + (request.departamento() != null ? request.departamento().toUpperCase() : "");
+            PdfPCell cConformidad = new PdfPCell(new Phrase(textoConformidad, fontCabecera));
+            cConformidad.setBorder(Rectangle.NO_BORDER);
+            cConformidad.setHorizontalAlignment(Element.ALIGN_CENTER);
+
+            tFirmas.addCell(cRealizo);
+            tFirmas.addCell(cConformidad);
+            document.add(tFirmas);
+
+            document.close();
+            return baos.toByteArray();
+        } catch (Exception e) {
+            throw new RuntimeException("Error al generar el documento de Mantenimiento Preventivo", e);
+        }
+    }
+
+    // Método auxiliar para evitar repetir código al crear celdas de la tabla principal
+    private PdfPCell crearCeldaTabla(String texto, Font font, int alineacion) {
+        // Todo lo que llega nulo se limpia, y todo se convierte a mayúsculas para cumplir la regla
+        String textoLimpio = texto != null ? texto.toUpperCase().trim() : "";
+        PdfPCell cell = new PdfPCell(new Phrase(textoLimpio, font));
+        cell.setHorizontalAlignment(alineacion);
+        cell.setVerticalAlignment(Element.ALIGN_MIDDLE);
+        cell.setPadding(3f);
+        return cell;
+    }
 }
