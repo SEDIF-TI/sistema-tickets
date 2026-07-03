@@ -13,6 +13,8 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import api from '../../services/api';
 import { areaService } from '../../services/areaService'; 
 
+import { toUpper } from '../../util/formater'; // <-- Importamos la función para convertir a mayúsculas
+
 const COLOR_GUINDA = '#801A36'; 
 
 export default function AdminAvisosPage() {
@@ -122,8 +124,8 @@ export default function AdminAvisosPage() {
             <Paper elevation={2} sx={{ p: 3, borderRadius: 2, mb: 3 }}>
                 <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>Crear Nuevo Aviso</Typography>
                 <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-                    <TextField label="Título" sx={{ flex: 1, minWidth: '200px' }} value={titulo} onChange={(e) => setTitulo(e.target.value)} />
-                    <TextField label="Mensaje" sx={{ flex: 2, minWidth: '300px' }} value={mensaje} onChange={(e) => setMensaje(e.target.value)} />
+                    <TextField label="Título" sx={{ flex: 1, minWidth: '200px' }} value={titulo} onChange={(e) => setTitulo(toUpper(e.target.value))} />
+                    <TextField label="Mensaje" sx={{ flex: 2, minWidth: '300px' }} value={mensaje} onChange={(e) => setMensaje(toUpper(e.target.value))} />
                     
                     <Autocomplete
                         options={areas}

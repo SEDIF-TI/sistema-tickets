@@ -15,6 +15,7 @@ import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import CampaignIcon from '@mui/icons-material/Campaign'; 
 import AssignmentIcon from '@mui/icons-material/Assignment'; 
 import DescriptionIcon from '@mui/icons-material/Description'; 
+import ComputerIcon from '@mui/icons-material/Computer';
 
 const drawerWidth = 65; 
 const COLOR_GUINDA = '#801A36';
@@ -28,7 +29,8 @@ const iconMap = {
     'AddCircleIcon': AddCircleIcon,
     'CampaignIcon': CampaignIcon,
     'AssignmentIcon': AssignmentIcon,
-    'DescriptionIcon': DescriptionIcon
+    'DescriptionIcon': DescriptionIcon,
+    'ComputerIcon': ComputerIcon
 };
 
 export default function MainLayout({ children }) {
