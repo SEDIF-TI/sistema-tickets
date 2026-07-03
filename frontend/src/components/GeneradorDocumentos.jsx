@@ -1,32 +1,47 @@
 import React, { useState } from 'react';
-import { Box, Typography, Paper, Tabs, Tab } from '@mui/material';
+// Importamos los componentes del Dialog de Material UI
+import { Box, Typography, Paper, Tabs, Tab, Dialog, DialogTitle, DialogContent, DialogActions, Button } from '@mui/material';
 import api from "../services/api";
 
-// Importamos los submódulos con la extensión .jsx y la carpeta en singular
 import DictamenFormato from "./formato/DictamenFormato.jsx";
 import MemorandumFormato from "./formato/MemorandumFormato.jsx";
 import RequisicionFormato from "./formato/RequisicionFormato.jsx";
+import MantenimientoPreventivoFormato from "./formato/MantenimientoPreventivoFormato.jsx";
 
 const COLOR_GUINDA = '#801A36';
 
-export default function GeneradorDocumentos() {
+export default function GeneradorDocumentos({user}) {
     const [tabIndex, setTabIndex] = useState(0);
 
-    // Mantenemos la función de descarga aquí para no repetirla en cada archivo
+    // --- NUEVOS ESTADOS PARA CONTROLAR EL MODAL ---
+    const [openModal, setOpenModal] = useState(false);
+    const [pdfUrl, setPdfUrl] = useState("");
+    const [nombrePdfActual, setNombrePdfActual] = useState("");
+
     const solicitarPdf = async (endpoint, payload, nombreArchivo) => {
         try {
             const response = await api.post(`/v1/documentos/${endpoint}`, payload, { responseType: 'blob' });
+            
+            // Creamos la URL temporal
             const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
-            const link = document.createElement('a');
-            link.href = url;
-            link.setAttribute('download', nombreArchivo);
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
+            
+            // Guardamos los datos y ABRIMOS EL MODAL
+            setPdfUrl(url);
+            setNombrePdfActual(nombreArchivo);
+            setOpenModal(true);
+
         } catch (error) {
             console.error("Error al generar el PDF:", error);
             alert("Hubo un error al generar el documento. Verifica que el backend esté listo.");
         }
+    };
+
+    // Función para cerrar el modal y limpiar la memoria
+    const handleCloseModal = () => {
+        setOpenModal(false);
+        // Limpiamos la URL de la memoria para que no sature el navegador
+        setTimeout(() => window.URL.revokeObjectURL(pdfUrl), 100);
+        setPdfUrl("");
     };
 
     return (
@@ -46,6 +61,7 @@ export default function GeneradorDocumentos() {
                     <Tab label="Dictamen Técnico" />
                     <Tab label="Memorándum" />
                     <Tab label="Requisición de Material" />
+                    <Tab label="Mantenimiento Preventivo" />
                 </Tabs>
             </Paper>
 
@@ -53,6 +69,50 @@ export default function GeneradorDocumentos() {
             {tabIndex === 0 && <DictamenFormato solicitarPdf={solicitarPdf} />}
             {tabIndex === 1 && <MemorandumFormato solicitarPdf={solicitarPdf} />}
             {tabIndex === 2 && <RequisicionFormato solicitarPdf={solicitarPdf} />}
+            {tabIndex === 3 && <MantenimientoPreventivoFormato solicitarPdf={solicitarPdf} usuarioLogueado={user} />}
+
+            {/* ==========================================
+                COMPONENTE MODAL PARA VISUALIZAR EL PDF
+                ========================================== */}
+            <Dialog
+                open={openModal}
+                onClose={handleCloseModal}
+                maxWidth="lg" // Tamaño grande
+                fullWidth
+            >
+                <DialogTitle sx={{ color: COLOR_GUINDA, fontWeight: 'bold' }}>
+                    Vista Previa: {nombrePdfActual}
+                </DialogTitle>
+                
+                <DialogContent dividers sx={{ height: '80vh', p: 0 }}>
+                    {/* Usamos un iframe para mostrar el PDF ocupando todo el espacio */}
+                    {pdfUrl && (
+                        <iframe
+                            src={pdfUrl}
+                            width="100%"
+                            height="100%"
+                            style={{ border: 'none' }}
+                            title="Vista previa del documento"
+                        />
+                    )}
+                </DialogContent>
+                
+                <DialogActions>
+                    <Button onClick={handleCloseModal} color="inherit">
+                        Cerrar
+                    </Button>
+                    {/* Botón opcional por si, después de verlo, SÍ deciden descargarlo */}
+                    <Button 
+                        variant="contained" 
+                        sx={{ backgroundColor: COLOR_GUINDA, '&:hover': { backgroundColor: '#5c1226' } }}
+                        component="a"
+                        href={pdfUrl}
+                        download={nombrePdfActual}
+                    >
+                        Descargar Documento
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </Box>
     );
 }
