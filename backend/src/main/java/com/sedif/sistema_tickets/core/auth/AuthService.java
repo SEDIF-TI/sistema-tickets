@@ -90,9 +90,10 @@ public class AuthService {
                 .orElseThrow(() -> new IllegalArgumentException("Rol no encontrado con ID: " + request.rolId()));
 
         Usuario nuevoUsuario = new Usuario();
-        nuevoUsuario.setNombre(request.nombre());
-        nuevoUsuario.setApellidoPaterno(request.apellidoPaterno());
-        nuevoUsuario.setApellidoMaterno(request.apellidoMaterno());
+        // Forzamos mayúsculas a nivel de servidor como respaldo
+        nuevoUsuario.setNombre(request.nombre() != null ? request.nombre().toUpperCase().trim() : null);
+        nuevoUsuario.setApellidoPaterno(request.apellidoPaterno() != null ? request.apellidoPaterno().toUpperCase().trim() : null);
+        nuevoUsuario.setApellidoMaterno(request.apellidoMaterno() != null ? request.apellidoMaterno().toUpperCase().trim() : null);
         nuevoUsuario.setCorreo(request.correo());
         nuevoUsuario.setUsername(request.username());
         nuevoUsuario.setPassword(passwordEncoder.encode(request.password()));
