@@ -92,13 +92,17 @@ export default function DictamenFormato({ solicitarPdf }) {
                             setDictamen({ ...dictamen, descripcionEquipo: toUpper(newInputValue) });
                         }}
                         onChange={(event, newValue) => {
-                            if (newValue && typeof newValue === 'object') {
+                            if (typeof newValue === 'object' && newValue !== null) {
+                                // Caso: Selección desde el catálogo
                                 setDictamen({
                                     ...dictamen,
                                     descripcionEquipo: newValue.descripcion || '',
                                     marca: newValue.marca || '',
                                     modelo: newValue.modelo || ''
                                 });
+                            } else if (typeof newValue === 'string') {
+                                // Caso: Escribió un equipo nuevo manualmente
+                                setDictamen({ ...dictamen, descripcionEquipo: toUpper(newValue) });
                             }
                         }}
                         renderInput={(params) => (

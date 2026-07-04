@@ -6,6 +6,7 @@ import api from "../services/api";
 import DictamenFormato from "./formato/DictamenFormato.jsx";
 import MemorandumFormato from "./formato/MemorandumFormato.jsx";
 import RequisicionFormato from "./formato/RequisicionFormato.jsx";
+import ReporteActividadesFormato from "./formato/ReporteActividadesFormato.jsx";
 
 const COLOR_GUINDA = '#801A36';
 
@@ -46,6 +47,7 @@ export default function GeneradorDocumentos() {
                     <Tab label="Dictamen Técnico" />
                     <Tab label="Memorándum" />
                     <Tab label="Requisición de Material" />
+                    <Tab label="Reporte de Actividades" />
                 </Tabs>
             </Paper>
 
@@ -53,6 +55,7 @@ export default function GeneradorDocumentos() {
             {tabIndex === 0 && <DictamenFormato solicitarPdf={solicitarPdf} />}
             {tabIndex === 1 && <MemorandumFormato solicitarPdf={solicitarPdf} />}
             {tabIndex === 2 && <RequisicionFormato solicitarPdf={solicitarPdf} />}
+            {tabIndex === 3 && <ReporteActividadesFormato solicitarPdf={solicitarPdf} />}
         </Box>
     );
 }
