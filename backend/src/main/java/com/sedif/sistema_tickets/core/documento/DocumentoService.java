@@ -1,16 +1,38 @@
 package com.sedif.sistema_tickets.core.documento;
 
-import com.lowagie.text.*;
+// Importaciones de iText (PDF) explícitas para evitar choques
+import com.lowagie.text.Chunk;
+import com.lowagie.text.Document;
+import com.lowagie.text.DocumentException;
+import com.lowagie.text.Element;
+import com.lowagie.text.Font;
+import com.lowagie.text.FontFactory;
+import com.lowagie.text.PageSize;
+import com.lowagie.text.Paragraph;
+import com.lowagie.text.Phrase;
+import com.lowagie.text.Rectangle;
 import com.lowagie.text.pdf.PdfPCell;
 import com.lowagie.text.pdf.PdfPTable;
 import com.lowagie.text.pdf.PdfWriter;
-import com.lowagie.text.pdf.draw.LineSeparator;
-import org.springframework.stereotype.Service;
 
+// Importaciones de Spring y utilidades de Java
+import org.springframework.stereotype.Service;
 import java.awt.Color;
 import java.io.ByteArrayOutputStream;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
+
+// Importaciones de Apache POI (Excel) explícitas
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.IndexedColors;
+import org.apache.poi.ss.usermodel.FillPatternType;
+import org.apache.poi.ss.usermodel.HorizontalAlignment;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 @Service
 public class DocumentoService {
@@ -26,34 +48,31 @@ public class DocumentoService {
             PdfWriter.getInstance(document, baos);
             document.open();
 
-            // 1. Encabezado Reutilizable
             agregarEncabezadoInstitucional(document, "MEMORÁNDUM INTERNO");
 
-            // 2. Cuerpo del Memorándum
             Paragraph pPara = new Paragraph();
             pPara.add(new Chunk("PARA: ", fuenteNegrita));
-            pPara.add(new Chunk(request.para(), fuenteNormal)); // Actualizado
+            pPara.add(new Chunk(request.para(), fuenteNormal));
             document.add(pPara);
 
             Paragraph pDe = new Paragraph();
             pDe.add(new Chunk("DE: ", fuenteNegrita));
-            pDe.add(new Chunk(request.de(), fuenteNormal)); // Actualizado
+            pDe.add(new Chunk(request.de(), fuenteNormal)); 
             document.add(pDe);
 
             Paragraph pAsunto = new Paragraph();
             pAsunto.add(new Chunk("ASUNTO: ", fuenteNegrita));
-            pAsunto.add(new Chunk(request.asunto(), fuenteNormal)); // Actualizado
+            pAsunto.add(new Chunk(request.asunto(), fuenteNormal)); 
             pAsunto.setSpacingAfter(10);
             document.add(pAsunto);
 
-            // ... (Línea separadora)
-
-            Paragraph cuerpo = new Paragraph(request.cuerpo(), fuenteNormal); // Actualizado
+            Paragraph cuerpo = new Paragraph(request.cuerpo(), fuenteNormal);
             cuerpo.setAlignment(Element.ALIGN_JUSTIFIED);
-            // ... (Resto del código)
+            document.add(cuerpo);
+            
+            document.add(new Paragraph("\n\n"));
 
-            // 3. Firma
-            Paragraph firma = new Paragraph("___________________________________\n" + request.de(), fuenteNormal); // Actualizado
+            Paragraph firma = new Paragraph("___________________________________\n" + request.de(), fuenteNormal);
             firma.setAlignment(Element.ALIGN_CENTER);
             document.add(firma);
 
@@ -70,16 +89,13 @@ public class DocumentoService {
             PdfWriter.getInstance(document, baos);
             document.open();
 
-            // 1. Encabezado Reutilizable
             agregarEncabezadoInstitucional(document, "REQUISICIÓN DE MATERIAL");
 
-            // 2. Datos Generales
             Paragraph pArea = new Paragraph();
             pArea.add(new Chunk("ÁREA SOLICITANTE: ", fuenteNegrita));
-            pArea.add(new Chunk(request.areaSolicitante(), fuenteNormal)); // Usamos lo que manda React
+            pArea.add(new Chunk(request.areaSolicitante(), fuenteNormal)); 
             document.add(pArea);
 
-            // ---> NUEVO: Agregamos la fecha requerida que viene de React <---
             Paragraph pFechaReq = new Paragraph();
             pFechaReq.add(new Chunk("FECHA REQUERIDA: ", fuenteNegrita));
             pFechaReq.add(new Chunk(request.fechaRequerida(), fuenteNormal));
@@ -87,16 +103,14 @@ public class DocumentoService {
 
             Paragraph pJust = new Paragraph();
             pJust.add(new Chunk("JUSTIFICACIÓN: ", fuenteNegrita));
-            pJust.add(new Chunk(request.justificacion(), fuenteNormal)); // Ya estaba bien
+            pJust.add(new Chunk(request.justificacion(), fuenteNormal));
             pJust.setSpacingAfter(20);
             document.add(pJust);
 
-            // 3. TABLA DE ARTÍCULOS DINÁMICA
             PdfPTable table = new PdfPTable(3);
             table.setWidthPercentage(100);
-            table.setWidths(new float[]{1.5f, 2f, 6.5f}); // Proporción de las columnas
+            table.setWidths(new float[]{1.5f, 2f, 6.5f});
 
-            // Cabeceras de la tabla
             PdfPCell h1 = new PdfPCell(new Phrase("CANTIDAD", fuenteNegrita));
             h1.setBackgroundColor(Color.LIGHT_GRAY);
             h1.setHorizontalAlignment(Element.ALIGN_CENTER);
@@ -115,8 +129,7 @@ public class DocumentoService {
             h3.setPadding(5);
             table.addCell(h3);
 
-            // Rellenar filas dinámicamente con los datos de React
-            for (ArticuloDTO articulo : request.listaArticulos()) { // Actualizado el nombre de la lista
+            for (ArticuloDTO articulo : request.listaArticulos()) {
                 PdfPCell c1 = new PdfPCell(new Phrase(String.valueOf(articulo.cantidad()), fuenteNormal));
                 c1.setHorizontalAlignment(Element.ALIGN_CENTER);
                 c1.setPadding(5);
@@ -133,9 +146,8 @@ public class DocumentoService {
             }
             
             document.add(table);
-            document.add(new Paragraph("\n\n\n")); // Espaciado para firmas
+            document.add(new Paragraph("\n\n\n"));
 
-            // 4. Firmas (Tabla invisible para firmas alineadas)
             PdfPTable tableFirmas = new PdfPTable(2);
             tableFirmas.setWidthPercentage(100);
             
@@ -159,17 +171,8 @@ public class DocumentoService {
         }
     }
 
-    // =========================================================
-    // MÉTODO PRIVADO: ENCABEZADO REUTILIZABLE
-    // =========================================================
     private void agregarEncabezadoInstitucional(Document document, String titulo) throws DocumentException {
-        // --- AQUÍ IRÍAN LOS LOGOS MÁS ADELANTE ---
-        // // logo.scaleToFit(120, 120);
-        // ------------------------------------------
-
-        // Fuente para la institución
         Font fontInstitucion = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12, Color.BLACK);
-        // Fuente para el título del documento
         Font fontTitulo = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 14, Color.BLACK);
 
         Paragraph pInstitucion = new Paragraph("SISTEMA PARA EL DESARROLLO INTEGRAL DE LA FAMILIA\nDEL ESTADO DE PUEBLA", fontInstitucion);
@@ -177,15 +180,12 @@ public class DocumentoService {
         
         Paragraph pTitulo = new Paragraph("\n" + titulo.toUpperCase(), fontTitulo);
         pTitulo.setAlignment(Element.ALIGN_CENTER);
-        pTitulo.setSpacingAfter(20f); // Espacio antes de los datos del usuario
+        pTitulo.setSpacingAfter(20f); 
 
         document.add(pInstitucion);
         document.add(pTitulo);
     }
 
-    // =========================================================
-    // MÉTODO PARA EL DICTAMEN TÉCNICO (VISTA LIMPIA Y ORDENADA)
-    // =========================================================
     public byte[] generarDictamenTecnicoPdf(DictamenRequest request) {
         try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
             Document document = new Document(PageSize.LETTER, 36, 36, 36, 36); 
@@ -197,10 +197,8 @@ public class DocumentoService {
             Font fontBoldItalic = FontFactory.getFont(FontFactory.HELVETICA_BOLDOBLIQUE, 7, Color.BLACK);
             Font fontNormal = FontFactory.getFont(FontFactory.HELVETICA, 7, Color.BLACK);
 
-            // 1. ENCABEZADO Y LOGOS
             agregarEncabezadoInstitucional(document, "DICTAMEN TÉCNICO DE EQUIPO DE CÓMPUTO");
 
-            // 2. FECHA Y FOLIO
             PdfPTable tFechaFolio = new PdfPTable(2);
             tFechaFolio.setWidthPercentage(100);
             
@@ -217,7 +215,6 @@ public class DocumentoService {
             document.add(tFechaFolio);
             document.add(new Paragraph("\n"));
 
-            // 3. DATOS DEL USUARIO (Subidos antes de la tabla del equipo)
             document.add(new Phrase("DATOS DEL USUARIO\n", fontBold));
             PdfPTable tUsuario = new PdfPTable(new float[]{3f, 7f});
             tUsuario.setWidthPercentage(100);
@@ -230,7 +227,6 @@ public class DocumentoService {
             document.add(tUsuario);
             document.add(new Paragraph("\n"));
 
-            // 4. TABLA DEL EQUIPO
             PdfPTable tEquipo = new PdfPTable(new float[]{1f, 3f, 1.5f, 1.5f, 2f, 2f, 0.8f});
             tEquipo.setWidthPercentage(100);
             
@@ -252,7 +248,6 @@ public class DocumentoService {
             }
             document.add(tEquipo);
 
-            // 5. BLOQUE CENTRAL DE TEXTO (Falla, Diagnóstico, Conclusión)
             PdfPTable tTextos = new PdfPTable(1);
             tTextos.setWidthPercentage(100);
             
@@ -274,13 +269,11 @@ public class DocumentoService {
             cellTextos.setMinimumHeight(200f); 
             tTextos.addCell(cellTextos);
             document.add(tTextos);
-            document.add(new Paragraph("\n\n")); // Espacio para separar de las firmas
+            document.add(new Paragraph("\n\n")); 
 
-            // 6. FIRMAS (3 Columnas automáticas con formato C. NOMBRE)
             PdfPTable tFirmas = new PdfPTable(3);
             tFirmas.setWidthPercentage(100);
             
-            // Función interna para formatear el nombre
             String fRealizo = formatearNombreFirma(request.realizadoPor());
             String fReviso = formatearNombreFirma(request.revisadoPor());
             String fRecibio = formatearNombreFirma(request.nombreUsuario());
@@ -303,13 +296,12 @@ public class DocumentoService {
         }
     }
 
-    // Método auxiliar para dibujar la línea inferior en los datos de usuario
     private void agregarLineaDatoUsuario(PdfPTable table, String etiqueta, String valor, Font font) {
         PdfPCell cEtiq = new PdfPCell(new Phrase(etiqueta, font));
         cEtiq.setBorder(Rectangle.NO_BORDER);
         
         PdfPCell cVal = new PdfPCell(new Phrase(valor != null ? valor : "", font));
-        cVal.setBorder(Rectangle.BOTTOM); // Dibuja la línea inferior para simular el llenado
+        cVal.setBorder(Rectangle.BOTTOM);
         cVal.setBorderWidthBottom(0.5f);
         
         table.addCell(cEtiq);
@@ -318,14 +310,230 @@ public class DocumentoService {
 
     private String formatearNombreFirma(String nombre) {
         if (nombre == null || nombre.isBlank()) return "";
-        
         String nombreLimpio = nombre.toUpperCase().trim();
-        
-        // Verificamos si ya empieza con "C." o "C " para no duplicarlo
         if (nombreLimpio.startsWith("C.") || nombreLimpio.startsWith("C ")) {
             return nombreLimpio;
         }
-        
         return "C. " + nombreLimpio;
+    }
+
+    public byte[] generarReporteActividadesPdf(LocalDate fechaInicio, LocalDate fechaFin, 
+        List<com.sedif.sistema_tickets.core.ticket.Ticket> tickets, 
+        List<com.sedif.sistema_tickets.core.actividad.ActividadExtra> actividades) {
+        try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+            Document document = new Document(PageSize.LETTER.rotate(), 36, 36, 36, 36);
+            PdfWriter.getInstance(document, baos);
+            document.open();
+
+            Font fontTitulo = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12, Color.BLACK);
+            Font fontSubtitulo = FontFactory.getFont(FontFactory.HELVETICA_OBLIQUE, 10, Color.BLACK);
+            Font fontCabecera = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 9, Color.WHITE);
+            Font fontNormal = FontFactory.getFont(FontFactory.HELVETICA, 8, Color.BLACK);
+            Color colorGuinda = new Color(128, 26, 54); 
+
+            Paragraph pDir = new Paragraph("Dirección de Recursos Materiales, Servicios Generales, Archivo y Soporte Técnico", fontTitulo);
+            pDir.setAlignment(Element.ALIGN_CENTER);
+            document.add(pDir);
+
+            Paragraph pDep = new Paragraph("Departamento de Soporte Técnico", fontTitulo);
+            pDep.setAlignment(Element.ALIGN_CENTER);
+            document.add(pDep);
+
+            Paragraph pRep = new Paragraph("Reporte de Actividades", fontSubtitulo);
+            pRep.setAlignment(Element.ALIGN_CENTER);
+            pRep.setSpacingAfter(10);
+            document.add(pRep);
+
+            Paragraph pFechas = new Paragraph("Fecha del reporte: Del " + fechaInicio + " al " + fechaFin, FontFactory.getFont(FontFactory.HELVETICA_BOLD, 10, colorGuinda));
+            pFechas.setSpacingAfter(5);
+            document.add(pFechas);
+
+            PdfPTable table = new PdfPTable(new float[]{1f, 1.5f, 2f, 2f, 1.5f, 2f, 1.5f, 2.5f});
+            table.setWidthPercentage(100);
+
+            String[] cabeceras = {
+                "N° del Plan de Trabajo", "N° de Memorándum / Oficio / Orden de Servicio",
+                "Área Solicitante", "Actividad Solicitada", "Fecha de Asignación",
+                "Situación Actual", "Responsable", "Actividad de Solución"
+            };
+
+            for (String cab : cabeceras) {
+                PdfPCell cell = new PdfPCell(new Phrase(cab, fontCabecera));
+                cell.setBackgroundColor(colorGuinda);
+                cell.setHorizontalAlignment(Element.ALIGN_CENTER);
+                cell.setVerticalAlignment(Element.ALIGN_MIDDLE);
+                cell.setPadding(5);
+                table.addCell(cell);
+            }
+
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+
+            // =================================================================
+            // --- BUCLE 1 RESTAURADO: IMPRIMIR LOS TICKETS AUTOMÁTICOS ---
+            // =================================================================
+            for (com.sedif.sistema_tickets.core.ticket.Ticket t : tickets) {
+                // 1. Plan de trabajo
+                table.addCell(crearCelda(t.getPlanTrabajoClave() != null ? String.valueOf(t.getPlanTrabajoClave()) : "", fontNormal, Element.ALIGN_CENTER));
+                
+                // 2. N° Ticket
+                table.addCell(crearCelda(String.valueOf(t.getId()), fontNormal, Element.ALIGN_CENTER));
+                
+                // 3. Área solicitante
+                String areaTicket = "";
+                if (t.getUsuarioArea() != null && t.getUsuarioArea().getArea() != null) {
+                    areaTicket = t.getUsuarioArea().getArea().getNombre();
+                } else if (t.getSolicitanteNombre() != null) {
+                    areaTicket = t.getSolicitanteNombre();
+                }
+                table.addCell(crearCelda(areaTicket, fontNormal, Element.ALIGN_LEFT));
+                
+                // 4. Actividad Solicitada (Título)
+                table.addCell(crearCelda(t.getTitulo() != null ? t.getTitulo() : "", fontNormal, Element.ALIGN_LEFT));
+                
+                // 5. Fecha de Asignación/Fin
+                table.addCell(crearCelda(t.getFechaFin() != null ? t.getFechaFin().format(formatter) : "", fontNormal, Element.ALIGN_CENTER));
+                
+                // 6. Situación Actual (Estatus)
+                String estatus = (t.getEstatus() != null && t.getEstatus().getNombre() != null) ? t.getEstatus().getNombre() : "CERRADO";
+                table.addCell(crearCelda(estatus, fontNormal, Element.ALIGN_LEFT));
+                
+                // 7. Responsable (Ingeniero)
+                String responsableTicket = (t.getUsuarioSoporte() != null && t.getUsuarioSoporte().getNombre() != null) 
+                                     ? t.getUsuarioSoporte().getNombre() : "Sin Asignar";
+                table.addCell(crearCelda(responsableTicket, fontNormal, Element.ALIGN_CENTER));
+                
+                // 8. Actividad de Solución (Justificación)
+                table.addCell(crearCelda(t.getJustificacion() != null ? t.getJustificacion() : "", fontNormal, Element.ALIGN_LEFT));
+            }
+
+            // =================================================================
+            // --- BUCLE 2: IMPRIMIR ACTIVIDADES EXTRA MANUALES ---
+            // =================================================================
+            for (com.sedif.sistema_tickets.core.actividad.ActividadExtra a : actividades) {
+                table.addCell(crearCelda(a.getPlanTrabajoClave() != null ? String.valueOf(a.getPlanTrabajoClave()) : "", fontNormal, Element.ALIGN_CENTER));
+                table.addCell(crearCelda("N/A", fontNormal, Element.ALIGN_CENTER));
+                
+                String area = "";
+                if (a.getUsuario() != null && a.getUsuario().getArea() != null) {
+                    area = a.getUsuario().getArea().getNombre();
+                }
+                table.addCell(crearCelda(area, fontNormal, Element.ALIGN_LEFT));
+                table.addCell(crearCelda(a.getActividadSolicitada() != null ? a.getActividadSolicitada() : "", fontNormal, Element.ALIGN_LEFT));
+                table.addCell(crearCelda(a.getFechaActividad() != null ? a.getFechaActividad().format(formatter) : "", fontNormal, Element.ALIGN_CENTER));
+                table.addCell(crearCelda(a.getSituacionActual() != null ? a.getSituacionActual() : "", fontNormal, Element.ALIGN_LEFT));
+                
+                String responsable = (a.getUsuario() != null && a.getUsuario().getNombre() != null) 
+                                     ? a.getUsuario().getNombre() : "Sin Asignar";
+                table.addCell(crearCelda(responsable, fontNormal, Element.ALIGN_CENTER));
+                table.addCell(crearCelda(a.getJustificacion() != null ? a.getJustificacion() : "", fontNormal, Element.ALIGN_LEFT));
+            }
+
+            document.add(table);
+            document.close();
+            return baos.toByteArray();
+        } catch (Exception e) {
+            throw new RuntimeException("Error al generar el reporte de actividades", e);
+        }
+    }
+
+    private PdfPCell crearCelda(String texto, Font fuente, int alineacion) {
+        PdfPCell cell = new PdfPCell(new Phrase(texto, fuente));
+        cell.setHorizontalAlignment(alineacion);
+        cell.setVerticalAlignment(Element.ALIGN_MIDDLE);
+        cell.setPadding(4);
+        return cell;
+    }
+
+    public byte[] generarReporteActividadesExcel(List<com.sedif.sistema_tickets.core.ticket.Ticket> tickets, 
+        List<com.sedif.sistema_tickets.core.actividad.ActividadExtra> actividades) {
+        try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            Sheet sheet = workbook.createSheet("Reporte de Actividades");
+            
+            CellStyle styleCabecera = workbook.createCellStyle();
+            
+            org.apache.poi.ss.usermodel.Font fontCabecera = workbook.createFont();
+            fontCabecera.setBold(true);
+            fontCabecera.setColor(IndexedColors.WHITE.getIndex());
+            styleCabecera.setFont(fontCabecera);
+            styleCabecera.setFillForegroundColor(IndexedColors.DARK_RED.getIndex());
+            styleCabecera.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+            styleCabecera.setAlignment(HorizontalAlignment.CENTER);
+
+            Row headerRow = sheet.createRow(0);
+            String[] cabeceras = {
+                "N° del Plan de Trabajo", "N° de Memorándum", "Área Solicitante", 
+                "Actividad Solicitada", "Fecha de Asignación", "Situación Actual", 
+                "Responsable", "Actividad de Solución"
+            };
+
+            for (int i = 0; i < cabeceras.length; i++) {
+                Cell cell = headerRow.createCell(i);
+                cell.setCellValue(cabeceras[i]);
+                cell.setCellStyle(styleCabecera);
+                sheet.setColumnWidth(i, 6000); 
+            }
+
+            int rowIdx = 1;
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+
+            // =================================================================
+            // --- BUCLE 1 RESTAURADO PARA EXCEL: TICKETS AUTOMÁTICOS ---
+            // =================================================================
+            for (com.sedif.sistema_tickets.core.ticket.Ticket t : tickets) {
+                Row row = sheet.createRow(rowIdx++);
+                row.createCell(0).setCellValue(t.getPlanTrabajoClave() != null ? String.valueOf(t.getPlanTrabajoClave()) : "");
+                row.createCell(1).setCellValue(String.valueOf(t.getId()));
+                
+                String areaTicket = "";
+                if (t.getUsuarioArea() != null && t.getUsuarioArea().getArea() != null) {
+                    areaTicket = t.getUsuarioArea().getArea().getNombre();
+                } else if (t.getSolicitanteNombre() != null) {
+                    areaTicket = t.getSolicitanteNombre();
+                }
+                row.createCell(2).setCellValue(areaTicket);
+                
+                row.createCell(3).setCellValue(t.getTitulo() != null ? t.getTitulo() : "");
+                row.createCell(4).setCellValue(t.getFechaFin() != null ? t.getFechaFin().format(formatter) : "");
+                
+                String estatus = (t.getEstatus() != null && t.getEstatus().getNombre() != null) ? t.getEstatus().getNombre() : "CERRADO";
+                row.createCell(5).setCellValue(estatus);
+                
+                String responsableTicket = (t.getUsuarioSoporte() != null && t.getUsuarioSoporte().getNombre() != null) 
+                                     ? t.getUsuarioSoporte().getNombre() : "Sin Asignar";
+                row.createCell(6).setCellValue(responsableTicket);
+                
+                row.createCell(7).setCellValue(t.getJustificacion() != null ? t.getJustificacion() : "");
+            }
+
+            // =================================================================
+            // --- BUCLE 2 PARA EXCEL: ACTIVIDADES EXTRA MANUALES ---
+            // =================================================================
+            for (com.sedif.sistema_tickets.core.actividad.ActividadExtra a : actividades) {
+                Row row = sheet.createRow(rowIdx++);
+                row.createCell(0).setCellValue(a.getPlanTrabajoClave() != null ? String.valueOf(a.getPlanTrabajoClave()) : "");
+                row.createCell(1).setCellValue("N/A"); // No hay ticket
+                
+                String area = "";
+                if (a.getUsuario() != null && a.getUsuario().getArea() != null) {
+                    area = a.getUsuario().getArea().getNombre();
+                }
+                row.createCell(2).setCellValue(area);
+                
+                row.createCell(3).setCellValue(a.getActividadSolicitada() != null ? a.getActividadSolicitada() : "");
+                row.createCell(4).setCellValue(a.getFechaActividad() != null ? a.getFechaActividad().format(formatter) : "");
+                row.createCell(5).setCellValue(a.getSituacionActual() != null ? a.getSituacionActual() : "");
+                
+                String responsable = (a.getUsuario() != null && a.getUsuario().getNombre() != null) 
+                                     ? a.getUsuario().getNombre() : "Sin Asignar";
+                row.createCell(6).setCellValue(responsable);
+                
+                row.createCell(7).setCellValue(a.getJustificacion() != null ? a.getJustificacion() : "");
+            }
+
+            workbook.write(out);
+            return out.toByteArray();
+        } catch (Exception e) {
+            throw new RuntimeException("Error al generar el archivo Excel", e);
+        }
     }
 }

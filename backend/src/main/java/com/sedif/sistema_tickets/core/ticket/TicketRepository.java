@@ -1,9 +1,14 @@
 package com.sedif.sistema_tickets.core.ticket;
 
+import com.sedif.sistema_tickets.core.estatusticket.Estatus;
 import com.sedif.sistema_tickets.core.usuarios.Usuario;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param; // <-- Importación necesaria para el @Query
+
+import java.time.LocalDateTime;
 import java.util.List;
+
 public interface TicketRepository extends JpaRepository<Ticket, Long> {
 
     // Simplificamos: Spring entenderá la jerarquía usuarioArea -> area -> id
@@ -23,10 +28,9 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
 
     // Busca tickets navegando: Ticket -> Usuario (usuarioArea) -> Area -> Id
     List<Ticket> findByUsuarioArea_Area_IdOrderByFechaCreacionDesc(Long areaId);
+    
     @Query("SELECT t.usuarioArea.area.nombre, COUNT(t) FROM Ticket t GROUP BY t.usuarioArea.area.nombre")
     List<Object[]> contarTicketsPorArea();
-
-    // ... lo que ya tienes ...
 
     // NUEVO: Contar tickets según el nombre de su estatus (ej. "RESUELTO", "ABIERTO")
     long countByEstatusNombreIgnoreCase(String nombreEstatus);
@@ -45,4 +49,25 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
     
     @Query("SELECT t.prioridad, COUNT(t) FROM Ticket t GROUP BY t.prioridad")
     List<Object[]> contarPorPrioridad();
+
+    // =======================================================================
+    // CONSULTAS NATIVAS INFALIBLES (Van directo a la Base de Datos)
+    // =======================================================================
+
+    // 1. Consulta para el ADMIN (Trae todo)
+    @Query(value = "SELECT * FROM ticket WHERE d_fecha_fin BETWEEN :inicio AND :fin AND fn_estadoticket_id = :estatusId", nativeQuery = true)
+    List<Ticket> buscarTicketsGlobales(
+        @Param("inicio") LocalDateTime inicio, 
+        @Param("fin") LocalDateTime fin, 
+        @Param("estatusId") Long estatusId
+    );
+
+    // 2. Consulta para SOPORTE (Filtra por ingeniero exacto)
+    @Query(value = "SELECT * FROM ticket WHERE d_fecha_fin BETWEEN :inicio AND :fin AND fn_estadoticket_id = :estatusId AND fn_usuario_soporte_id = :soporteId", nativeQuery = true)
+    List<Ticket> buscarTicketsDelTecnico(
+        @Param("inicio") LocalDateTime inicio, 
+        @Param("fin") LocalDateTime fin, 
+        @Param("estatusId") Long estatusId, 
+        @Param("soporteId") Long soporteId
+    );
 }
