@@ -38,9 +38,7 @@ public class DocumentoResource {
     @PostMapping(value = "/requisicion", produces = MediaType.APPLICATION_PDF_VALUE)
     public ResponseEntity<byte[]> generarRequisicion(@RequestBody RequisicionRequest request) {
         byte[] pdfGenerado = documentoService.generarRequisicion(request);
-        HttpHeaders headers = new HttpHeaders();
-        headers.add("Content-Disposition", "attachment; filename=Requisicion_Material.pdf");
-        return ResponseEntity.ok().headers(headers).body(pdfGenerado);
+        return construirRespuestaPdf(pdfGenerado, "Requisicion_Material.pdf");
     }
 
     @PostMapping(value = "/dictamen", produces = MediaType.APPLICATION_PDF_VALUE)
