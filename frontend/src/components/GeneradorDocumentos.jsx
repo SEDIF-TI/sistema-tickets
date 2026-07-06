@@ -6,6 +6,7 @@ import api from "../services/api";
 import DictamenFormato from "./formato/DictamenFormato.jsx";
 import MemorandumFormato from "./formato/MemorandumFormato.jsx";
 import RequisicionFormato from "./formato/RequisicionFormato.jsx";
+import ReporteActividadesFormato from "./formato/ReporteActividadesFormato.jsx";
 import MantenimientoPreventivoFormato from "./formato/MantenimientoPreventivoFormato.jsx";
 
 const COLOR_GUINDA = '#801A36';
@@ -13,7 +14,7 @@ const COLOR_GUINDA = '#801A36';
 export default function GeneradorDocumentos({user}) {
     const [tabIndex, setTabIndex] = useState(0);
 
-    // --- NUEVOS ESTADOS PARA CONTROLAR EL MODAL ---
+    // --- ESTADOS PARA CONTROLAR EL MODAL ---
     const [openModal, setOpenModal] = useState(false);
     const [pdfUrl, setPdfUrl] = useState("");
     const [nombrePdfActual, setNombrePdfActual] = useState("");
@@ -45,31 +46,38 @@ export default function GeneradorDocumentos({user}) {
     };
 
     return (
-        <Box sx={{ p: 3, maxWidth: 1000, mx: 'auto' }}>
+        /* CORRECCIÓN: Quitamos maxWidth: 1000 y mx: 'auto' para que use todo el ancho disponible */
+        <Box sx={{ p: 3, width: '100%', boxSizing: 'border-box' }}>
             <Typography variant="h5" fontWeight="bold" sx={{ color: COLOR_GUINDA, mb: 3 }}>
                 Generador de Documentos Oficiales
             </Typography>
 
-            <Paper sx={{ mb: 3, borderRadius: 2, overflow: 'hidden' }}>
+            <Paper sx={{ mb: 3, borderRadius: 2, overflow: 'hidden', width: '100%' }}>
                 <Tabs 
                     value={tabIndex} 
                     onChange={(e, newValue) => setTabIndex(newValue)} 
                     centered 
+                    variant="scrollable"
+                    scrollButtons="auto"
                     TabIndicatorProps={{ style: { backgroundColor: COLOR_GUINDA } }}
                     sx={{ '& .Mui-selected': { color: `${COLOR_GUINDA} !important`, fontWeight: 'bold' } }}
                 >
                     <Tab label="Dictamen Técnico" />
                     <Tab label="Memorándum" />
                     <Tab label="Requisición de Material" />
+                    <Tab label="Reporte de Actividades" />
                     <Tab label="Mantenimiento Preventivo" />
                 </Tabs>
             </Paper>
 
-            {/* Renderizado condicional de los componentes hijos */}
-            {tabIndex === 0 && <DictamenFormato solicitarPdf={solicitarPdf} />}
-            {tabIndex === 1 && <MemorandumFormato solicitarPdf={solicitarPdf} />}
-            {tabIndex === 2 && <RequisicionFormato solicitarPdf={solicitarPdf} />}
-            {tabIndex === 3 && <MantenimientoPreventivoFormato solicitarPdf={solicitarPdf} usuarioLogueado={user} />}
+            {/* Renderizado condicional de los componentes hijos ocupando el 100% */}
+            <Box sx={{ width: '100%' }}>
+                {tabIndex === 0 && <DictamenFormato solicitarPdf={solicitarPdf} />}
+                {tabIndex === 1 && <MemorandumFormato solicitarPdf={solicitarPdf} />}
+                {tabIndex === 2 && <RequisicionFormato solicitarPdf={solicitarPdf} />}
+                {tabIndex === 3 && <ReporteActividadesFormato solicitarPdf={solicitarPdf} />}
+                {tabIndex === 4 && <MantenimientoPreventivoFormato solicitarPdf={solicitarPdf} usuarioLogueado={user} />}
+            </Box>
 
             {/* ==========================================
                 COMPONENTE MODAL PARA VISUALIZAR EL PDF
@@ -77,7 +85,7 @@ export default function GeneradorDocumentos({user}) {
             <Dialog
                 open={openModal}
                 onClose={handleCloseModal}
-                maxWidth="lg" // Tamaño grande
+                maxWidth="lg" 
                 fullWidth
             >
                 <DialogTitle sx={{ color: COLOR_GUINDA, fontWeight: 'bold' }}>
@@ -85,7 +93,6 @@ export default function GeneradorDocumentos({user}) {
                 </DialogTitle>
                 
                 <DialogContent dividers sx={{ height: '80vh', p: 0 }}>
-                    {/* Usamos un iframe para mostrar el PDF ocupando todo el espacio */}
                     {pdfUrl && (
                         <iframe
                             src={pdfUrl}
@@ -101,7 +108,6 @@ export default function GeneradorDocumentos({user}) {
                     <Button onClick={handleCloseModal} color="inherit">
                         Cerrar
                     </Button>
-                    {/* Botón opcional por si, después de verlo, SÍ deciden descargarlo */}
                     <Button 
                         variant="contained" 
                         sx={{ backgroundColor: COLOR_GUINDA, '&:hover': { backgroundColor: '#5c1226' } }}
