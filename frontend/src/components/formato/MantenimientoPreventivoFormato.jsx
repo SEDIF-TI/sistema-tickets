@@ -89,28 +89,32 @@ export default function MantenimientoPreventivoFormato({ solicitarPdf, usuarioLo
                     1. Datos del Periodo y Departamento
                 </Typography>
                 <Grid container spacing={2}>
-                    <Grid item xs={12} sm={4}>
-                        <TextField 
-                            fullWidth 
-                            type="date" 
-                            label="Fecha de Inicio" 
-                            InputLabelProps={{ shrink: true }} 
-                            value={fechaInicio} 
-                            onChange={(e) => setFechaInicio(e.target.value)} 
-                            required 
-                        />
-                    </Grid>
-                    <Grid item xs={12} sm={4}>
-                        <TextField 
-                            fullWidth 
-                            type="date" 
-                            label="Fecha de Fin" 
-                            InputLabelProps={{ shrink: true }} 
-                            value={fechaFin} 
-                            onChange={(e) => setFechaFin(e.target.value)} 
-                            required 
-                        />
-                    </Grid>
+                        <Grid item xs={12} sm={4}>
+                            <Typography variant="caption" sx={{ color: '#555', fontWeight: 'bold', display: 'block', mb: 0.5 }}>
+                                Fecha de Inicio *
+                            </Typography>
+                            <TextField 
+                                fullWidth 
+                                type="date" 
+                                value={fechaInicio} 
+                                onChange={(e) => setFechaInicio(e.target.value)} 
+                                required 
+                                size="small"
+                            />
+                        </Grid>
+                        <Grid item xs={12} sm={4}>
+                            <Typography variant="caption" sx={{ color: '#555', fontWeight: 'bold', display: 'block', mb: 0.5 }}>
+                                Fecha de Fin *
+                            </Typography>
+                            <TextField 
+                                fullWidth 
+                                type="date" 
+                                value={fechaFin} 
+                                onChange={(e) => setFechaFin(e.target.value)} 
+                                required 
+                                size="small"
+                            />
+                        </Grid>
                     <Grid item xs={12} sm={4}>
                         <TextField 
                             fullWidth 

@@ -4,9 +4,8 @@ import { Box, Typography, Paper, Tabs, Tab, Dialog, DialogTitle, DialogContent, 
 import api from "../services/api";
 
 import DictamenFormato from "./formato/DictamenFormato.jsx";
-import MemorandumFormato from "./formato/MemorandumFormato.jsx";
-import RequisicionFormato from "./formato/RequisicionFormato.jsx";
 import MantenimientoPreventivoFormato from "./formato/MantenimientoPreventivoFormato.jsx";
+import EntradaEquipoFormato from "./formato/EntradaEquipoFormato.jsx";
 
 const COLOR_GUINDA = '#801A36';
 
@@ -59,17 +58,15 @@ export default function GeneradorDocumentos({user}) {
                     sx={{ '& .Mui-selected': { color: `${COLOR_GUINDA} !important`, fontWeight: 'bold' } }}
                 >
                     <Tab label="Dictamen Técnico" />
-                    <Tab label="Memorándum" />
-                    <Tab label="Requisición de Material" />
                     <Tab label="Mantenimiento Preventivo" />
+                    <Tab label="Entrada de Equipo" />
                 </Tabs>
             </Paper>
 
             {/* Renderizado condicional de los componentes hijos */}
             {tabIndex === 0 && <DictamenFormato solicitarPdf={solicitarPdf} />}
-            {tabIndex === 1 && <MemorandumFormato solicitarPdf={solicitarPdf} />}
-            {tabIndex === 2 && <RequisicionFormato solicitarPdf={solicitarPdf} />}
-            {tabIndex === 3 && <MantenimientoPreventivoFormato solicitarPdf={solicitarPdf} usuarioLogueado={user} />}
+            {tabIndex === 1 && <MantenimientoPreventivoFormato solicitarPdf={solicitarPdf} usuarioLogueado={user} />}
+            {tabIndex === 2 && <EntradaEquipoFormato solicitarPdf={solicitarPdf} usuarioLogueado={user} />}
 
             {/* ==========================================
                 COMPONENTE MODAL PARA VISUALIZAR EL PDF
