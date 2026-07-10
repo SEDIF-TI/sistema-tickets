@@ -11,6 +11,9 @@ import {
     Paper 
 } from '@mui/material';
 
+// 1. Importar el logo
+import logoPuebla from '../assets/logo-puebla.png'; 
+
 export default function LoginPage() {
     const [identificador, setIdentificador] = useState('');
     const [password, setPassword] = useState('');
@@ -30,25 +33,37 @@ export default function LoginPage() {
 
        try {
             await login(identificador, password);
-            console.log("¡Login exitoso!");
-            
-            // ¡EL CAMBIO CRÍTICO ESTÁ AQUÍ!
-            // Ya no buscamos vistas manualmente. Mandamos a la raíz y dejamos que App.jsx tome el control.
             navigate('/', { replace: true }); 
-            
         } catch (err) {
             setError('Credenciales inválidas o error de conexión.');
         }
     };
 
     return (
-        <Container component="main" maxWidth="xs" sx={{ px: 2 }}> {/* px: 2 da un respiro en celulares */}
+        <Container component="main" maxWidth="sm" sx={{ px: 2 }}> 
             <Box sx={{ mt: 8, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                 <Paper elevation={3} sx={{ p: { xs: 3, md: 4 }, width: '100%', borderRadius: 3 }}>
-                    <Typography component="h1" variant="h5" align="center" gutterBottom>
+                    
+                    {/* 2. Modificamos el contenedor y la imagen para que use todo el ancho */}
+                    <Box sx={{ display: 'flex', justifyContent: 'center', mb: 4, mt: 1, px: 2 }}>
+                        <img 
+                            src={logoPuebla} 
+                            alt="Gobierno de Puebla" 
+                            style={{ 
+                                width: '100%',    // Ahora tomará todo el ancho de la tarjeta
+                                height: 'auto',   // Mantiene la proporción sin aplastarse
+                                display: 'block'
+                            }} 
+                        />
+                    </Box>
+
+                    {/* Aumentamos de variant="h5" a variant="h4" para hacerlo más grande */}
+                    <Typography component="h1" variant="h4" align="center" gutterBottom fontWeight="bold">
                         Sistema de Tickets
                     </Typography>
-                    <Typography variant="body2" align="center" color="textSecondary" sx={{ mb: 3 }}>
+                    
+                    {/* Aumentamos de variant="body2" a variant="subtitle1" (o "body1") */}
+                    <Typography variant="subtitle1" align="center" color="textSecondary" sx={{ mb: 4 }}>
                         Ingresa tus credenciales para continuar
                     </Typography>
 

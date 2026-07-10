@@ -73,17 +73,27 @@ public class TicketService {
         if (ticketGuardado.getUsuarioSoporte() != null && 
             ticketGuardado.getUsuarioSoporte().getTelegramChatId() != null) {
             
+            // Extraemos el nombre de quien reporta (Dependiendo de si tu front lo manda en "sede" o "solicitanteNombre")
+            String afectado = ticketGuardado.getSede(); 
+            if (afectado == null || afectado.isBlank()) {
+                afectado = ticketGuardado.getUsuarioArea().getNombre(); // Fallback al usuario de la sesión
+            }
+
+            // Armamos la plantilla completa con formato Markdown
             String mensaje = "🚨 *NUEVO TICKET ASIGNADO* 🚨\n\n" +
-                             "🆔 *ID:* #" + ticketGuardado.getId() + "\n" +
-                             "📌 *Título:* " + ticketGuardado.getTitulo();
+                             "🆔 *Folio:* #" + ticketGuardado.getId() + "\n" +
+                             "👤 *Usuario afectado:* " + afectado + "\n" +
+                             "📌 *Falla Principal:* " + ticketGuardado.getTitulo() + "\n\n" +
+                             "📝 *Descripción detallada:*\n_" + ticketGuardado.getDescripcion() + "_";
+
             try {
                 telegramBot.enviarMensaje(ticketGuardado.getUsuarioSoporte().getTelegramChatId(), mensaje);
-                System.out.println("✅ [SISTEMA] Notificación de Telegram enviada con éxito.");
+                System.out.println("[SISTEMA] Notificación de Telegram enviada con éxito.");
             } catch (Exception e) {
-                System.err.println("❌ [SISTEMA] Error al enviar notificación a Telegram: " + e.getMessage());
+                System.err.println("[SISTEMA] Error al enviar notificación a Telegram: " + e.getMessage());
             }
         } else {
-            System.out.println("⚠️ [SISTEMA] Telegram ignorado: El técnico asignado no tiene un ChatID vinculado.");
+            System.out.println("[SISTEMA] Telegram ignorado: El técnico asignado no tiene un ChatID vinculado.");
         }
 
         // ---> NUEVO: EMITIR EL EVENTO WEBSOCKET HACIA REACT
