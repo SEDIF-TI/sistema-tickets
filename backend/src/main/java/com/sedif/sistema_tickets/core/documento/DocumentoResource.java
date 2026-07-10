@@ -13,18 +13,6 @@ public class DocumentoResource {
 
     private final DocumentoService documentoService;
 
-    @PostMapping(value = "/memorandum", produces = MediaType.APPLICATION_PDF_VALUE)
-    public ResponseEntity<byte[]> generarMemorandum(@RequestBody MemorandumRequest request) {
-        byte[] pdfGenerado = documentoService.generarMemorandum(request);
-        return construirRespuestaPdf(pdfGenerado, "Memorandum_Oficial.pdf");
-    }
-
-    @PostMapping(value = "/requisicion", produces = MediaType.APPLICATION_PDF_VALUE)
-    public ResponseEntity<byte[]> generarRequisicion(@RequestBody RequisicionRequest request) {
-        byte[] pdfGenerado = documentoService.generarRequisicion(request);
-        return construirRespuestaPdf(pdfGenerado, "Requisicion_Material.pdf");
-    }
-
     @PostMapping(value = "/dictamen", produces = MediaType.APPLICATION_PDF_VALUE)
     public ResponseEntity<byte[]> generarDictamen(@RequestBody DictamenRequest request) {
         byte[] pdfGenerado = documentoService.generarDictamenTecnicoPdf(request);
@@ -36,6 +24,18 @@ public class DocumentoResource {
         // documentoService se encargará de iterar la lista y poner el número autoincrementable
         byte[] pdfGenerado = documentoService.generarMantenimientoPdf(request);
         return construirRespuestaPdf(pdfGenerado, "Mantenimiento_Preventivo.pdf");
+    }
+
+    @PostMapping(value = "/entrada-equipo", produces = MediaType.APPLICATION_PDF_VALUE)
+    public ResponseEntity<byte[]> generarEntradaEquipo(@RequestBody EntradaEquipoRequest request) {
+        // El servicio se encarga de dibujar el PDF de Entrada de Equipo
+        byte[] pdfGenerado = documentoService.generarEntradaEquipoPdf(request);
+        
+        // Nombramos el archivo dinámicamente usando el folio
+        String folio = request.getFolioTicket() != null ? String.valueOf(request.getFolioTicket()) : "0000";
+        String nombreArchivo = "Entrada_Equipo_" + folio + ".pdf";
+        
+        return construirRespuestaPdf(pdfGenerado, nombreArchivo);
     }
 
     /**
