@@ -32,6 +32,9 @@ public class Ticket extends Auditable {
     @Column(name = "s_solicitante_nombre", length = 100)
     private String solicitanteNombre;
 
+    @Column(name = "s_justificacion", columnDefinition = "TEXT")
+    private String justificacion;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "fn_estadoticket_id", nullable = false)
     private Estatus estatus; 
@@ -49,4 +52,7 @@ public class Ticket extends Auditable {
 
     @Column(name = "d_fecha_fin")
     private LocalDateTime fechaFin;
+
+    @Column(name = "plan_trabajo_clave")
+    private Integer planTrabajoClave;
 }

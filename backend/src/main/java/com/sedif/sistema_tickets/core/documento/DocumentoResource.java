@@ -6,12 +6,26 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import com.sedif.sistema_tickets.core.ticket.Ticket;
+import com.sedif.sistema_tickets.core.ticket.TicketRepository;
+import com.sedif.sistema_tickets.core.actividad.ActividadExtra;
+import com.sedif.sistema_tickets.core.actividad.ActividadExtraRepository;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.Map;
+import java.util.List;
+import java.util.stream.Collectors;
+
 @RestController
 @RequestMapping("/api/v1/documentos")
 @RequiredArgsConstructor
 public class DocumentoResource {
 
     private final DocumentoService documentoService;
+    private final TicketRepository ticketRepository; 
+    private final ActividadExtraRepository actividadExtraRepository;
 
     @PostMapping(value = "/dictamen", produces = MediaType.APPLICATION_PDF_VALUE)
     public ResponseEntity<byte[]> generarDictamen(@RequestBody DictamenRequest request) {
@@ -21,17 +35,13 @@ public class DocumentoResource {
 
     @PostMapping(value = "/mantenimiento", produces = MediaType.APPLICATION_PDF_VALUE)
     public ResponseEntity<byte[]> generarMantenimiento(@RequestBody MantenimientoPreventivoRequest request) {
-        // documentoService se encargará de iterar la lista y poner el número autoincrementable
         byte[] pdfGenerado = documentoService.generarMantenimientoPdf(request);
         return construirRespuestaPdf(pdfGenerado, "Mantenimiento_Preventivo.pdf");
     }
 
     @PostMapping(value = "/entrada-equipo", produces = MediaType.APPLICATION_PDF_VALUE)
     public ResponseEntity<byte[]> generarEntradaEquipo(@RequestBody EntradaEquipoRequest request) {
-        // El servicio se encarga de dibujar el PDF de Entrada de Equipo
         byte[] pdfGenerado = documentoService.generarEntradaEquipoPdf(request);
-        
-        // Nombramos el archivo dinámicamente usando el folio
         String folio = request.getFolioTicket() != null ? String.valueOf(request.getFolioTicket()) : "0000";
         String nombreArchivo = "Entrada_Equipo_" + folio + ".pdf";
         
@@ -44,10 +54,101 @@ public class DocumentoResource {
      */
     private ResponseEntity<byte[]> construirRespuestaPdf(byte[] documento, String nombreArchivo) {
         HttpHeaders headers = new HttpHeaders();
-        headers.add("Content-Disposition", "inline; filename=\"" + nombreArchivo + "\"");
+        // Corrección: usamos la variable nombreArchivo y la disposición inline que nosotros habíamos hecho
+        headers.add("Content-Disposition", "inline; filename=" + nombreArchivo);
+        return ResponseEntity.ok().headers(headers).body(documento);
+    }
 
-        return ResponseEntity.ok()
-                .headers(headers)
-                .body(documento);
+   // ==========================================================
+    // MÉTODO PARA GENERAR EL REPORTE EN PDF
+    // ==========================================================
+    @PostMapping("/reporte-actividades")
+    public ResponseEntity<byte[]> generarReporteActividades(@RequestBody Map<String, Object> payload) {
+        LocalDate fechaInicio = LocalDate.parse(payload.get("fechaInicio").toString());
+        LocalDate fechaFin = LocalDate.parse(payload.get("fechaFin").toString());
+        LocalDateTime inicioDia = fechaInicio.atStartOfDay();
+        LocalDateTime finDia = fechaFin.atTime(LocalTime.MAX);
+
+        String rol = payload.containsKey("rol") && payload.get("rol") != null ? payload.get("rol").toString() : "";
+        Long usuarioId = payload.containsKey("usuarioId") && payload.get("usuarioId") != null ? Long.parseLong(payload.get("usuarioId").toString()) : 0L;
+
+        List<Ticket> ticketsCerrados;
+        List<ActividadExtra> actividadesExtra;
+
+        // --- FILTRO INFALIBLE EN MEMORIA CON JAVA STREAMS ---
+        if ("ADMINISTRADOR".equalsIgnoreCase(rol)) {
+            ticketsCerrados = ticketRepository.findAll().stream()
+                .filter(t -> t.getEstatus() != null && t.getEstatus().getId() == 5L)
+                .filter(t -> t.getFechaFin() != null)
+                .filter(t -> !t.getFechaFin().isBefore(inicioDia) && !t.getFechaFin().isAfter(finDia))
+                .collect(Collectors.toList());
+
+            actividadesExtra = actividadExtraRepository.findByFechaActividadBetween(inicioDia, finDia);
+        } else {
+            ticketsCerrados = ticketRepository.findByUsuarioSoporteId(usuarioId).stream()
+                .filter(t -> t.getEstatus() != null && t.getEstatus().getId() == 5L)
+                .filter(t -> t.getFechaFin() != null)
+                .filter(t -> !t.getFechaFin().isBefore(inicioDia) && !t.getFechaFin().isAfter(finDia))
+                .collect(Collectors.toList());
+
+            actividadesExtra = actividadExtraRepository.findByUsuario_IdAndFechaActividadBetween(usuarioId, inicioDia, finDia);
+        }
+
+        byte[] pdfBytes = documentoService.generarReporteActividadesPdf(fechaInicio, fechaFin, ticketsCerrados, actividadesExtra);
+        
+        // ¡Usamos nuestro método auxiliar unificado para PDF!
+        return construirRespuestaPdf(pdfBytes, "Reporte_Actividades_" + fechaInicio + "_al_" + fechaFin + ".pdf");
+    }
+
+    // ==========================================================
+    // MÉTODO PARA GENERAR EL REPORTE EN EXCEL
+    // ==========================================================
+    @PostMapping("/reporte-actividades/excel")
+    public ResponseEntity<byte[]> generarReporteExcel(@RequestBody Map<String, Object> payload) {
+        LocalDate fechaInicio = LocalDate.parse(payload.get("fechaInicio").toString());
+        LocalDate fechaFin = LocalDate.parse(payload.get("fechaFin").toString());
+        LocalDateTime inicioDia = fechaInicio.atStartOfDay();
+        LocalDateTime finDia = fechaFin.atTime(LocalTime.MAX);
+
+        String rol = payload.containsKey("rol") && payload.get("rol") != null ? payload.get("rol").toString() : "";
+        Long usuarioId = payload.containsKey("usuarioId") && payload.get("usuarioId") != null ? Long.parseLong(payload.get("usuarioId").toString()) : 0L;
+
+        List<Ticket> ticketsCerrados;
+        List<ActividadExtra> actividadesExtra;
+
+        // --- FILTRO INFALIBLE EN MEMORIA CON JAVA STREAMS ---
+        if ("ADMINISTRADOR".equalsIgnoreCase(rol)) {
+            ticketsCerrados = ticketRepository.findAll().stream()
+                .filter(t -> t.getEstatus() != null && t.getEstatus().getId() == 5L)
+                .filter(t -> t.getFechaFin() != null)
+                .filter(t -> !t.getFechaFin().isBefore(inicioDia) && !t.getFechaFin().isAfter(finDia))
+                .collect(Collectors.toList());
+
+            actividadesExtra = actividadExtraRepository.findByFechaActividadBetween(inicioDia, finDia);
+        } else {
+            ticketsCerrados = ticketRepository.findByUsuarioSoporteId(usuarioId).stream()
+                .filter(t -> t.getEstatus() != null && t.getEstatus().getId() == 5L)
+                .filter(t -> t.getFechaFin() != null)
+                .filter(t -> !t.getFechaFin().isBefore(inicioDia) && !t.getFechaFin().isAfter(finDia))
+                .collect(Collectors.toList());
+
+            actividadesExtra = actividadExtraRepository.findByUsuario_IdAndFechaActividadBetween(usuarioId, inicioDia, finDia);
+        }
+
+        byte[] excelBytes = documentoService.generarReporteActividadesExcel(ticketsCerrados, actividadesExtra);
+        
+        // ¡Usamos nuestro nuevo método auxiliar unificado para Excel!
+        return construirRespuestaExcel(excelBytes, "Reporte_Actividades_" + fechaInicio + "_al_" + fechaFin + ".xlsx");
+    }
+
+    /**
+     * Método auxiliar para unificar la construcción de respuestas HTTP de documentos EXCEL.
+     * Configura la disposición como 'attachment' para forzar la descarga del archivo.
+     */
+    private ResponseEntity<byte[]> construirRespuestaExcel(byte[] documento, String nombreArchivo) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
+        headers.add("Content-Disposition", "attachment; filename=" + nombreArchivo);
+        return ResponseEntity.ok().headers(headers).body(documento);
     }
 }
