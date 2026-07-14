@@ -3,7 +3,7 @@ import {
     Typography, Box, Chip, Paper, Table, TableBody, 
     TableCell, TableContainer, TableHead, TableRow, Button,
     Dialog, DialogTitle, DialogContent, DialogActions, TextField, IconButton,
-    TablePagination, InputAdornment, CircularProgress, Tooltip
+    TablePagination, InputAdornment, CircularProgress, Tooltip, MenuItem // <-- AÑADIDO AQUÍ
 } from '@mui/material';
 
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -31,6 +31,7 @@ export default function PanelSoporte() {
     const [openResolucion, setOpenResolucion] = useState(false);
     
     const [justificacion, setJustificacion] = useState('');
+    const [planClave, setPlanClave] = useState('');
     const [ticketSeleccionado, setTicketSeleccionado] = useState(null);
 
     const [page, setPage] = useState(0);
@@ -52,7 +53,7 @@ export default function PanelSoporte() {
         cargarTicketsHistoricos();
     }, []);
 
-useEffect(() => {
+    useEffect(() => {
         if (isConnected && stompClient && stompClient.connected && user) {
             try {
                 const suscripcion = stompClient.subscribe('/topic/tickets-soporte', (mensaje) => {
@@ -96,15 +97,19 @@ useEffect(() => {
     };
 
     const handleResolverTicket = async () => {
-        if (!justificacion.trim()) {
-            alert("Debes escribir una justificación antes de confirmar.");
+        if (!justificacion.trim() || !planClave) {
+            alert("Debes escribir una justificación y seleccionar la clave del plan de trabajo.");
             return;
         }
         try {
-            await api.put(`/v1/tickets/${ticketSeleccionado.id}/resolver`, { justificacion });
+            // Mandamos ambos datos al backend
+            await api.put(`/v1/tickets/${ticketSeleccionado.id}/resolver`, { 
+                justificacion, 
+                planTrabajoClave: parseInt(planClave) 
+            });
             setTickets((prev) => prev.map(t => 
                 t.id === ticketSeleccionado.id 
-                ? { ...t, estatus: 'CERRADO', fechaFin: new Date().toISOString(), justificacion: justificacion } 
+                ? { ...t, estatus: 'CERRADO', fechaFin: new Date().toISOString(), justificacion: justificacion, planTrabajoClave: planClave } 
                 : t
             ));
             handleCloseResolucion();
@@ -124,6 +129,7 @@ useEffect(() => {
     const handleOpenResolucion = (ticket) => {
         setTicketSeleccionado(ticket);
         setJustificacion('');
+        setPlanClave('');
         setOpenResolucion(true);
     };
     const handleCloseResolucion = (event, reason) => {
@@ -131,6 +137,7 @@ useEffect(() => {
         setOpenResolucion(false);
         setTicketSeleccionado(null);
         setJustificacion('');
+        setPlanClave('');
     };
 
     const handleChangePage = (event, newPage) => setPage(newPage);
@@ -368,17 +375,41 @@ useEffect(() => {
                     <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
                         Estás a punto de marcar este ticket como resuelto. Ingresa el detalle del trabajo realizado.
                     </Typography>
+                    
+                    {/* NUEVO SELECT DE CLAVES */}
                     <TextField
-                        autoFocus
+                        select
+                        fullWidth
+                        label="Clave del Plan de Trabajo *"
+                        value={planClave}
+                        onChange={(e) => setPlanClave(e.target.value)}
+                        variant="outlined"
                         margin="dense"
+                        sx={{ mb: 2 }}
+                    >
+                        <MenuItem value="1">1 - Mantenimiento preventivo equipo oficinas centrales</MenuItem>
+                        <MenuItem value="2">2 - Mantenimiento preventivo equipo oficinas metropolitanas</MenuItem>
+                        <MenuItem value="3">3 - Mantenimiento preventivo equipo Casa Jóvenes en Progreso</MenuItem>
+                        <MenuItem value="4">4 - Mantenimiento preventivo equipo Delegaciones Regionales y Casas Carmen Serdán</MenuItem>
+                        <MenuItem value="5">5 - Mantenimiento de Sistemas Institucionales</MenuItem>
+                        <MenuItem value="6">6 - Mantenimiento Preventivo Servidores</MenuItem>
+                        <MenuItem value="7">7 - Soporte técnico a equipo de computo y software</MenuItem>
+                        <MenuItem value="8">8 - Mantenimiento Servicio de correo electrónico</MenuItem>
+                        <MenuItem value="9">9 - Supervisión Servicios de Internet, Telefonía IP, Correos</MenuItem>
+                        <MenuItem value="10">10 - Soporte Video Conferencias</MenuItem>
+                        <MenuItem value="11">11 - Realización de respaldos de base de datos (Bitácora)</MenuItem>
+                        <MenuItem value="12">12 - Mantenimiento e instalación de equipo de CCTV</MenuItem>
+                    </TextField>
+
+                    <TextField
                         fullWidth
                         multiline
                         rows={4}
                         value={justificacion}
-                        onChange={(e) => setJustificacion(toUpper(e.target.value))}
+                        onChange={(e) => setJustificacion(toUpper(e.target.value))} // Recuerda usar toUpper si lo importaste
                         variant="outlined"
-                        placeholder="Ej. Se reemplazó el cartucho de tóner negro..."
-                        required
+                        label="Actividad de Solución *"
+                        placeholder="Ej. SE REEMPLAZÓ EL CARTUCHO DE TÓNER NEGRO..."
                     />
                 </DialogContent>
                 <DialogActions sx={{ p: 2 }}>

@@ -4,8 +4,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication; // <-- IMPORTANTE: Faltaba esta
 import org.springframework.web.bind.annotation.*;
-
+import com.sedif.sistema_tickets.core.estatusticket.Estatus;
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/tickets")
@@ -13,6 +15,7 @@ import java.util.List;
 public class TicketResource {
 
     private final TicketService ticketService; // <-- Asegúrate de tener este campo final
+    private final TicketRepository ticketRepository; // <-- Asegúrate de tener este campo final
 
     @PostMapping
     public ResponseEntity<Ticket> crearTicket(@RequestBody TicketRequestRecord request, Authentication authentication) {
@@ -58,10 +61,28 @@ public class TicketResource {
     }
 
     @PutMapping("/{id}/resolver")
-    public ResponseEntity<Ticket> resolverTicket(@PathVariable Long id, @RequestBody ResolucionRequest request) {
-        // Se extrae la justificación del cuerpo de la petición JSON
-        Ticket ticketResuelto = ticketService.resolverTicket(id, request.justificacion());
-        return ResponseEntity.ok(ticketResuelto);
+    public ResponseEntity<Ticket> resolverTicket(@PathVariable Long id, @RequestBody Map<String, Object> payload) {
+        return ticketRepository.findById(id).map(ticket -> {
+            
+            // SOLUCIÓN: Creamos una referencia al objeto Estatus
+            // OJO: Verifica en tu base de datos qué ID numérico tiene el estatus "CERRADO"
+            // (Yo puse 3L como ejemplo, cámbialo por el ID correcto de tu BD).
+            Estatus estatusCerrado = new Estatus();
+            estatusCerrado.setId(5L); // <-- Cambia este ID según tu base de datos
+            
+            // Ahora sí, le pasamos el objeto completo a la entidad
+            ticket.setEstatus(estatusCerrado); 
+            ticket.setFechaFin(LocalDateTime.now());
+            
+            if (payload.containsKey("justificacion")) {
+                ticket.setJustificacion(payload.get("justificacion").toString());
+            }
+            if (payload.containsKey("planTrabajoClave") && payload.get("planTrabajoClave") != null) {
+                ticket.setPlanTrabajoClave(Integer.parseInt(payload.get("planTrabajoClave").toString()));
+            }
+            
+            return ResponseEntity.ok(ticketRepository.save(ticket));
+        }).orElse(ResponseEntity.notFound().build());
     }
 }
 record ResolucionRequest(String justificacion) {}

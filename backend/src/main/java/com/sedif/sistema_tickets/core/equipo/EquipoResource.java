@@ -26,19 +26,21 @@ public class EquipoResource { // <-- CAMBIADO A RESOURCE
     // 2. Endpoint "Just In Time" que guarda o actualiza el catálogo silenciosamente
     @PostMapping("/upsert")
     public ResponseEntity<Equipo> registrarOActualizar(@RequestBody Equipo equipoRequest) {
+        // Si la descripción está vacía, no hacemos nada (evita errores)
         if (equipoRequest.getDescripcion() == null || equipoRequest.getDescripcion().trim().isEmpty()) {
-            return ResponseEntity.badRequest().build();
+            return ResponseEntity.ok(null); 
         }
 
-        Equipo equipoExistente = equipoRepository.findByDescripcionIgnoreCase(equipoRequest.getDescripcion().trim())
+        // Buscamos si existe por descripción
+        Equipo equipo = equipoRepository.findByDescripcionIgnoreCase(equipoRequest.getDescripcion().trim())
                 .orElse(new Equipo());
 
-        equipoExistente.setDescripcion(equipoRequest.getDescripcion());
-        if (equipoRequest.getMarca() != null) equipoExistente.setMarca(equipoRequest.getMarca());
-        if (equipoRequest.getModelo() != null) equipoExistente.setModelo(equipoRequest.getModelo());
+        // Solo actualizamos si los nuevos valores no son nulos
+        equipo.setDescripcion(equipoRequest.getDescripcion().toUpperCase());
+        if (equipoRequest.getMarca() != null) equipo.setMarca(equipoRequest.getMarca().toUpperCase());
+        if (equipoRequest.getModelo() != null) equipo.setModelo(equipoRequest.getModelo().toUpperCase());
 
-        Equipo guardado = equipoRepository.save(equipoExistente);
-        return ResponseEntity.ok(guardado);
+        return ResponseEntity.ok(equipoRepository.save(equipo));
     }
 
     // 3. Listar TODOS los equipos para el panel de administración

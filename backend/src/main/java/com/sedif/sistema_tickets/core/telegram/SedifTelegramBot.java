@@ -83,6 +83,8 @@ public class SedifTelegramBot extends TelegramLongPollingBot {
         SendMessage message = new SendMessage();
         message.setChatId(String.valueOf(chatId));
         message.setText(texto);
+
+        message.setParseMode("Markdown"); // Permite usar Markdown en el mensaje
         // Sin try-catch para que TicketService pueda atrapar el error si Telegram falla
         execute(message);
     }
