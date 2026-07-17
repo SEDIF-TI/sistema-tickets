@@ -21,6 +21,8 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
     // Mantenemos este para el login dual (usuario o correo)
     Optional<Usuario> findByCorreoOrUsername(String correo, String username);
 
+
+    List<Usuario> findByRolNombre(String rolNombre);
     // ==========================================
     // 2. MÉTODOS DE VALIDACIÓN DE PERFIL
     // ==========================================

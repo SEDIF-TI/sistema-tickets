@@ -10,6 +10,7 @@ import com.sedif.sistema_tickets.core.ticket.Ticket;
 import com.sedif.sistema_tickets.core.ticket.TicketRepository;
 import com.sedif.sistema_tickets.core.actividad.ActividadExtra;
 import com.sedif.sistema_tickets.core.actividad.ActividadExtraRepository;
+import com.sedif.sistema_tickets.core.resguardo.ResguardoRequest;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -138,5 +139,13 @@ public class DocumentoResource {
         headers.setContentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
         headers.add("Content-Disposition", "attachment; filename=Reporte_Actividades.xlsx");
         return ResponseEntity.ok().headers(headers).body(excelBytes);
+    }
+
+    @PostMapping(value = "/resguardos", produces = MediaType.APPLICATION_PDF_VALUE)
+    public ResponseEntity<byte[]> generarResguardo(@RequestBody ResguardoRequest request) {
+        byte[] pdfGenerado = documentoService.generarResguardo(request);
+        HttpHeaders headers = new HttpHeaders();
+        headers.add("Content-Disposition", "attachment; filename=Resguardo_" + request.solicitanteNombre() + ".pdf");
+        return ResponseEntity.ok().headers(headers).body(pdfGenerado);
     }
 }

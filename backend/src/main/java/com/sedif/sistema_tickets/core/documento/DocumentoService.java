@@ -14,6 +14,7 @@ import com.lowagie.text.Rectangle;
 import com.lowagie.text.pdf.PdfPCell;
 import com.lowagie.text.pdf.PdfPTable;
 import com.lowagie.text.pdf.PdfWriter;
+import com.sedif.sistema_tickets.core.resguardo.ResguardoRequest;
 
 // Importaciones de Spring y utilidades de Java
 import org.springframework.stereotype.Service;
@@ -541,5 +542,176 @@ private String formatearNombreFirma(String nombre) {
         } catch (Exception e) {
             throw new RuntimeException("Error al generar el archivo Excel", e);
         }
+    }
+    
+    public byte[] generarResguardo(ResguardoRequest request) {
+        try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+            // Mismos márgenes exactos que el Dictamen (0.5 pulgada)
+            Document document = new Document(PageSize.LETTER, 36, 36, 36, 36);
+            PdfWriter.getInstance(document, baos);
+            document.open();
+
+            // Mismas tipografías y tamaños
+            Font fontBold = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 7, Color.BLACK);
+            Font fontBoldItalic = FontFactory.getFont(FontFactory.HELVETICA_BOLDOBLIQUE, 7, Color.BLACK);
+            Font fontNormal = FontFactory.getFont(FontFactory.HELVETICA, 7, Color.BLACK);
+
+            // --- 1. LOGO GRANDE Y CENTRADO ---
+            PdfPTable tableLogo = new PdfPTable(1);
+            tableLogo.setWidthPercentage(100);
+            PdfPCell cellLogo = new PdfPCell();
+            cellLogo.setBorder(Rectangle.NO_BORDER);
+            cellLogo.setHorizontalAlignment(Element.ALIGN_CENTER);
+            cellLogo.setPaddingBottom(15); 
+            try {
+                com.lowagie.text.Image logo = com.lowagie.text.Image.getInstance(getClass().getClassLoader().getResource("logo-puebla.png"));
+                logo.scaleToFit(220, 110); 
+                logo.setAlignment(Element.ALIGN_CENTER);
+                cellLogo.addElement(logo);
+            } catch (Exception e) {
+                System.err.println("Error cargando logo: " + e.getMessage());
+            }
+            tableLogo.addCell(cellLogo);
+            document.add(tableLogo);
+
+            // --- 2. TEXTOS A LA DERECHA (BLOQUE COMPACTO) ---
+            PdfPTable tableTextos = new PdfPTable(2);
+            tableTextos.setWidthPercentage(100);
+            tableTextos.setWidths(new float[]{1.5f, 1f}); 
+
+            PdfPCell cellVacia = new PdfPCell();
+            cellVacia.setBorder(Rectangle.NO_BORDER);
+            tableTextos.addCell(cellVacia);
+
+            PdfPCell cellTexto = new PdfPCell();
+            cellTexto.setBorder(Rectangle.NO_BORDER);
+            cellTexto.setHorizontalAlignment(Element.ALIGN_RIGHT);
+            
+            Paragraph textos = new Paragraph();
+            textos.setAlignment(Element.ALIGN_RIGHT);
+            textos.setLeading(9f); 
+            
+            // Obtenemos la fecha actual, ya que ResguardoRequest no trae fecha por defecto
+            String fechaActual = LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+
+            textos.add(new Chunk("UNIDAD DE PLANEACIÓN, ADMINISTRACIÓN Y FINANZAS\n", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 8)));
+            textos.add(new Chunk("DIRECCIÓN DE RECURSOS MATERIALES, SERVICIOS GENERALES, ARCHIVO Y SOPORTE TÉCNICO\n", FontFactory.getFont(FontFactory.HELVETICA, 7)));
+            textos.add(new Chunk("DEPARTAMENTO DE SOPORTE TÉCNICO\n", FontFactory.getFont(FontFactory.HELVETICA, 7)));
+            textos.add(new Chunk("Heroica Puebla de Zaragoza, a " + fechaActual, FontFactory.getFont(FontFactory.HELVETICA, 7)));
+            
+            cellTexto.addElement(textos);
+            tableTextos.addCell(cellTexto);
+            document.add(tableTextos);
+
+            document.add(new Paragraph("\n"));
+            
+            // --- 3. TÍTULO ---
+            Paragraph titulo = new Paragraph("RESGUARDO DE EQUIPO", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12, Color.BLACK));
+            titulo.setAlignment(Element.ALIGN_CENTER);
+            titulo.setSpacingAfter(15);
+            document.add(titulo);
+
+            // --- 4. CAJA DE FECHA (Sin folio, usando el número de empleado en su lugar para cuadrar el diseño) ---
+            PdfPTable tFechaFolio = new PdfPTable(2);
+            tFechaFolio.setWidthPercentage(100);
+            PdfPCell cFecha = new PdfPCell(new Phrase("FECHA: " + fechaActual, fontBold));
+            cFecha.setBorder(Rectangle.BOX);
+            
+            PdfPCell cEmpleado = new PdfPCell(new Phrase("No. EMPLEADO: " + (request.solicitanteNumero() != null ? request.solicitanteNumero() : "N/A"), fontBold));
+            cEmpleado.setBorder(Rectangle.BOX);
+            cEmpleado.setHorizontalAlignment(Element.ALIGN_RIGHT);
+            
+            tFechaFolio.addCell(cFecha);
+            tFechaFolio.addCell(cEmpleado);
+            document.add(tFechaFolio);
+            document.add(new Paragraph("\n"));
+
+            // --- 5. DATOS DEL USUARIO ---
+            document.add(new Phrase("DATOS DEL USUARIO\n", fontBold));
+            PdfPTable tUsuario = new PdfPTable(new float[]{3f, 7f});
+            tUsuario.setWidthPercentage(100);
+            
+            // Helper inline para replicar tu agregarLineaDatoUsuario
+            java.util.function.BiConsumer<String, String> agregarFilaUsu = (lbl, val) -> {
+                PdfPCell cLbl = new PdfPCell(new Phrase(lbl, fontBold)); cLbl.setBorder(Rectangle.NO_BORDER);
+                PdfPCell cVal = new PdfPCell(new Phrase(val != null ? val : "N/A", fontNormal)); cVal.setBorder(Rectangle.NO_BORDER);
+                tUsuario.addCell(cLbl); tUsuario.addCell(cVal);
+            };
+
+            agregarFilaUsu.accept("NOMBRE DE USUARIO:", formatearNombreFirma(request.solicitanteNombre()));
+            agregarFilaUsu.accept("DEPARTAMENTO:", request.departamento());
+            agregarFilaUsu.accept("TELÉFONO / EXT:", request.telefono());
+            document.add(tUsuario);
+            document.add(new Paragraph("\n"));
+
+            // --- 6. DATOS DEL EQUIPO (Adaptado a las variables del Resguardo) ---
+            PdfPTable tEquipo = new PdfPTable(new float[]{2f, 2f, 2f, 1.5f, 1.5f, 1.5f}); // 6 columnas
+            tEquipo.setWidthPercentage(100);
+            String[] cabecerasEquipo = {"EQUIPO", "No. SERIE", "No. INVENTARIO", "CONDICIONES", "TIPO VIG.", "CANTIDAD"};
+            for (String cab : cabecerasEquipo) {
+                PdfPCell cell = new PdfPCell(new Phrase(cab, fontBold));
+                cell.setHorizontalAlignment(Element.ALIGN_CENTER);
+                tEquipo.addCell(cell);
+            }
+            
+            String[] valoresEquipo = {
+                request.equipoNombre(), request.numeroSerie(), request.numeroInventario(), 
+                request.condiciones(), request.duracionTipo(), String.valueOf(request.duracionCantidad())
+            };
+            for (String val : valoresEquipo) {
+                PdfPCell cell = new PdfPCell(new Phrase(val != null && !val.equals("null") ? val : "N/A", fontNormal));
+                cell.setHorizontalAlignment(Element.ALIGN_CENTER);
+                tEquipo.addCell(cell);
+            }
+            document.add(tEquipo);
+
+            // --- 7. CAJA GRANDE DE TEXTO (Accesorios y Declaratoria) ---
+            PdfPTable tTextos = new PdfPTable(1);
+            tTextos.setWidthPercentage(100);
+            Paragraph cuerpoTextos = new Paragraph();
+            cuerpoTextos.add(new Chunk("ACCESORIOS Y OBSERVACIONES:\n", fontBold));
+            cuerpoTextos.add(new Chunk((request.accesorios() != null ? request.accesorios() : "SIN ACCESORIOS ADICIONALES") + "\n\n", fontNormal));
+            
+            cuerpoTextos.add(new Chunk("DECLARATORIA DE RESGUARDO:\n", fontBold));
+            cuerpoTextos.add(new Chunk("Por medio de la presente, me comprometo a resguardar y hacer buen uso del equipo descrito anteriormente, el cual me es asignado para el desempeño de mis funciones. En caso de robo, extravío o daño derivado del mal uso, me haré responsable de la reparación o reposición del mismo conforme a la normativa aplicable.\n", fontNormal));
+            
+            PdfPCell cellTextos = new PdfPCell(cuerpoTextos);
+            cellTextos.setPadding(10);
+            cellTextos.setMinimumHeight(200f); // Mismo recuadro grande que el dictamen
+            tTextos.addCell(cellTextos);
+            document.add(tTextos);
+            document.add(new Paragraph("\n\n")); 
+
+            // --- 8. FIRMAS (Mismo formato 3 columnas) ---
+            PdfPTable tFirmas = new PdfPTable(3);
+            tFirmas.setWidthPercentage(100);
+            
+            String fRealizo = "SOPORTE TÉCNICO"; // Quien entrega
+            String fVoBo = "Vo. Bo.";
+            String fRecibio = formatearNombreFirma(request.solicitanteNombre());
+            
+            String[] firmas = {fRealizo, fVoBo, fRecibio};
+            String[] titulosFirmas = {"ENTREGA:", "AUTORIZA:", "RECIBE (USUARIO):"};
+            
+            for (int i = 0; i < 3; i++) {
+                PdfPCell cFirma = new PdfPCell(new Phrase(titulosFirmas[i] + "\n(Nombre y Firma)\n\n\n___________________________\n" + firmas[i], fontBoldItalic));
+                cFirma.setBorder(Rectangle.NO_BORDER);
+                cFirma.setHorizontalAlignment(Element.ALIGN_CENTER);
+                tFirmas.addCell(cFirma);
+            }
+            document.add(tFirmas);
+
+            document.close();
+            return baos.toByteArray();
+        } catch (Exception e) {
+            throw new RuntimeException("Error al generar el formato oficial de Resguardo", e);
+        }
+    }
+
+    private String formatearNombre(String nombre) {
+        if (nombre == null || nombre.trim().isEmpty()) return "N/A";
+        String n = nombre.trim();
+        if (n.toUpperCase().startsWith("C. ")) return n;
+        return "C. " + n;
     }
 }
