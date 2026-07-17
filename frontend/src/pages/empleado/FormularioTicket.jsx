@@ -102,7 +102,7 @@ export default function FormularioTicket() {
                         onChange={(e) => setSolicitante(toUpper(e.target.value))}
                         placeholder="Escribe el nombre completo de la persona afectada"
                         required
-                        inputProps={{ maxLength: 100 }} // Limitación de caracteres
+                        InputProps={{ maxLength: 100 }} // Limitación de caracteres
                         helperText={`${solicitante.length}/100 caracteres`}
                         disabled={isOffline} // <-- Bloqueo opcional del campo
                     />
@@ -117,7 +117,7 @@ export default function FormularioTicket() {
                         onChange={(e) => setTitulo(toUpper(e.target.value))}
                         placeholder="Ej. La impresora no se conecta a la red / Pantalla en negro"
                         required
-                        inputProps={{ maxLength: 100 }} // Limitación de caracteres
+                        InputProps={{ maxLength: 100 }} // Limitación de caracteres
                         helperText={`${titulo.length}/100 caracteres`}
                         disabled={isOffline} // <-- Bloqueo opcional del campo
                     />
@@ -132,7 +132,7 @@ export default function FormularioTicket() {
                             value={sede}
                             onChange={(e) => setSede(toUpper(e.target.value))}
                             required={esSoporte}
-                            inputProps={{ maxLength: 50 }}
+                            InputProps={{ maxLength: 50 }}
                             disabled={isOffline}
                         />
                     )}
@@ -149,7 +149,7 @@ export default function FormularioTicket() {
                         onChange={(e) => setDescripcion(toUpper(e.target.value))}
                         placeholder="Describe detalladamente qué acciones causan el problema o qué mensajes de error aparecen en pantalla..."
                         required
-                        inputProps={{ maxLength: 500 }} // Limitación de caracteres
+                        InputProps={{ maxLength: 500 }} // Limitación de caracteres
                         helperText={`${descripcion.length}/500 caracteres`}
                         disabled={isOffline} // <-- Bloqueo opcional del campo
                     />

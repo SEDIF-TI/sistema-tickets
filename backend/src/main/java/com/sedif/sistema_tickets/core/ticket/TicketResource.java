@@ -18,12 +18,12 @@ public class TicketResource {
     private final TicketRepository ticketRepository; // <-- Asegúrate de tener este campo final
 
     @PostMapping
-    public ResponseEntity<Ticket> crearTicket(@RequestBody TicketRequestRecord request, Authentication authentication) {
+    public ResponseEntity<TicketResponse> crearTicket(@RequestBody TicketRequestRecord request, Authentication authentication) {
         // Si authentication es null, el filtro JWT no está funcionando
         System.out.println("DEBUG: Usuario autenticado: " + (authentication != null ? authentication.getName() : "NULO"));
         
         String correoUsuario = authentication.getName();
-        Ticket nuevoTicket = ticketService.crearTicket(request, correoUsuario);
+        TicketResponse nuevoTicket = ticketService.crearTicket(request, correoUsuario);
         return ResponseEntity.ok(nuevoTicket);
     }
 
@@ -37,12 +37,12 @@ public class TicketResource {
     }
 
     @PutMapping("/{id}/finalizar")
-    public ResponseEntity<Ticket> finalizarTicket(@PathVariable Long id, Authentication authentication) {
+    public ResponseEntity<TicketResponse> finalizarTicket(@PathVariable Long id, Authentication authentication) {
         // Tomamos el correo del usuario logueado gracias al token
         String correoUsuario = authentication.getName();
         
         // Llamamos al servicio
-        Ticket ticketFinalizado = ticketService.finalizarTicketPorEmpleado(id, correoUsuario);
+        TicketResponse ticketFinalizado = ticketService.finalizarTicketPorEmpleado(id, correoUsuario);
         
         return ResponseEntity.ok(ticketFinalizado);
     }
@@ -55,34 +55,30 @@ public class TicketResource {
     }
 
     @PutMapping("/{id}/atender")
-    public ResponseEntity<Ticket> atenderTicket(@PathVariable Long id) {
-        Ticket ticketAtendido = ticketService.atenderTicket(id);
+    public ResponseEntity<TicketResponse> atenderTicket(@PathVariable Long id) {
+        TicketResponse ticketAtendido = ticketService.atenderTicket(id);
         return ResponseEntity.ok(ticketAtendido);
     }
 
     @PutMapping("/{id}/resolver")
-    public ResponseEntity<Ticket> resolverTicket(@PathVariable Long id, @RequestBody Map<String, Object> payload) {
-        return ticketRepository.findById(id).map(ticket -> {
-            
-            // SOLUCIÓN: Creamos una referencia al objeto Estatus
-            // OJO: Verifica en tu base de datos qué ID numérico tiene el estatus "CERRADO"
-            // (Yo puse 3L como ejemplo, cámbialo por el ID correcto de tu BD).
-            Estatus estatusCerrado = new Estatus();
-            estatusCerrado.setId(5L); // <-- Cambia este ID según tu base de datos
-            
-            // Ahora sí, le pasamos el objeto completo a la entidad
-            ticket.setEstatus(estatusCerrado); 
-            ticket.setFechaFin(LocalDateTime.now());
-            
-            if (payload.containsKey("justificacion")) {
-                ticket.setJustificacion(payload.get("justificacion").toString());
-            }
-            if (payload.containsKey("planTrabajoClave") && payload.get("planTrabajoClave") != null) {
-                ticket.setPlanTrabajoClave(Integer.parseInt(payload.get("planTrabajoClave").toString()));
-            }
-            
-            return ResponseEntity.ok(ticketRepository.save(ticket));
-        }).orElse(ResponseEntity.notFound().build());
+    public ResponseEntity<TicketResponse> resolverTicket(@PathVariable Long id, @RequestBody Map<String, Object> payload) {
+        String justificacion = "Sin justificación";
+        Integer planTrabajo = null;
+        
+        // EXTRAEMOS LA JUSTIFICACIÓN
+        if (payload.containsKey("justificacion") && payload.get("justificacion") != null) {
+            justificacion = payload.get("justificacion").toString();
+        }
+        
+        // EXTRAEMOS EL PLAN DE TRABAJO
+        if (payload.containsKey("planTrabajoClave") && payload.get("planTrabajoClave") != null) {
+            planTrabajo = Integer.parseInt(payload.get("planTrabajoClave").toString());
+        }
+        
+        // DELEGAMOS AL SERVICIO
+        TicketResponse ticketResuelto = ticketService.resolverTicket(id, justificacion, planTrabajo);
+        
+        return ResponseEntity.ok(ticketResuelto);
     }
 }
 record ResolucionRequest(String justificacion) {}
