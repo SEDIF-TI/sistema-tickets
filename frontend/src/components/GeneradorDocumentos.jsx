@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
-import { Box, Typography, Paper, Tabs, Tab, FormControl, InputLabel, Select, MenuItem, Dialog, DialogTitle, DialogContent, DialogActions, Button } from '@mui/material';
+import { 
+    Box, Typography, Paper, Tabs, Tab, FormControl, InputLabel, Select, MenuItem, Dialog, 
+    DialogTitle, DialogContent, Button, IconButton 
+} from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
 import api from "../services/api";
 
-// Importaciones (Asegúrate de que las rutas sean correctas según tu estructura)
+// Importaciones
 import DictamenFormato from "./formato/DictamenFormato.jsx";
 import FormularioResguardo from "./formato/FormularioResguardo.jsx";
 import ReporteActividadesFormato from "./formato/ReporteActividadesFormato.jsx";
 import MantenimientoPreventivoFormato from "./formato/MantenimientoPreventivoFormato.jsx";
-import EntradaEquipoFormato from "./formato/EntradaEquipoFormato.jsx"; // Asegúrate de crear este archivo
-// Si necesitas Memorandum/Requisicion, descomenta o importa aquí:
-// import MemorandumFormato from "./formato/MemorandumFormato.jsx"; 
 
 const COLOR_GUINDA = '#801A36';
 
@@ -24,21 +25,26 @@ export default function GeneradorDocumentos({ user }) {
 
     const solicitarPdf = async (endpoint, payload, nombreArchivo) => {
         try {
+            // Nota: Aquí se construye la ruta final: /api/v1/documentos/{endpoint}
+            // Asegúrate de enviar SOLO el nombre del endpoint desde los hijos (ej: 'dictamen')
             const response = await api.post(`/v1/documentos/${endpoint}`, payload, { responseType: 'blob' });
+            
             const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
             setPdfUrl(url);
             setNombrePdfActual(nombreArchivo);
             setOpenModal(true);
         } catch (error) {
             console.error("Error al generar el PDF:", error);
-            alert("Hubo un error al generar el documento.");
+            alert("Hubo un error al generar el documento. Verifica los datos.");
         }
     };
 
     const handleCloseModal = () => {
-        setOpenModal(false);
-        setTimeout(() => window.URL.revokeObjectURL(pdfUrl), 100);
+        if (pdfUrl) {
+            window.URL.revokeObjectURL(pdfUrl); // Limpiamos la memoria
+        }
         setPdfUrl("");
+        setOpenModal(false);
     };
 
     return (
@@ -60,7 +66,6 @@ export default function GeneradorDocumentos({ user }) {
                     <Tab label="Dictámenes y Resguardos" />
                     <Tab label="Reporte de Actividades" />
                     <Tab label="Mantenimiento Preventivo" />
-                    <Tab label="Entrada de Equipo" />
                 </Tabs>
             </Paper>
 
@@ -93,14 +98,31 @@ export default function GeneradorDocumentos({ user }) {
                 
                 {/* PESTAÑA 2: Mantenimiento Preventivo */}
                 {tabIndex === 2 && <MantenimientoPreventivoFormato solicitarPdf={solicitarPdf} usuarioLogueado={user} />}
-                
-                {/* PESTAÑA 3: Entrada de Equipo */}
-                {tabIndex === 3 && <EntradaEquipoFormato solicitarPdf={solicitarPdf} />}
             </Box>
 
             {/* MODAL DEL PDF */}
             <Dialog open={openModal} onClose={handleCloseModal} maxWidth="lg" fullWidth>
-                {/* ... (Contenido del Dialog sin cambios) ... */}
+                <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Typography variant="h6">{nombrePdfActual}</Typography>
+                    <IconButton onClick={handleCloseModal}>
+                        <CloseIcon />
+                    </IconButton>
+                </DialogTitle>
+                <DialogContent dividers sx={{ height: '80vh', p: 0 }}>
+                    {pdfUrl ? (
+                        <iframe 
+                            src={pdfUrl} 
+                            width="100%" 
+                            height="100%" 
+                            title="Vista previa PDF"
+                            style={{ border: 'none' }}
+                        />
+                    ) : (
+                        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+                            <Typography>Cargando documento...</Typography>
+                        </Box>
+                    )}
+                </DialogContent>
             </Dialog>
         </Box>
     );
