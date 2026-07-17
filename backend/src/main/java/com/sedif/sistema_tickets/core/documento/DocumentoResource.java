@@ -17,7 +17,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.Map;
 import java.util.List;
-import java.util.stream.Collectors; // <-- IMPORTANTE PARA EL NUEVO FILTRO
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/v1/documentos")
@@ -28,35 +28,39 @@ public class DocumentoResource {
     private final TicketRepository ticketRepository; 
     private final ActividadExtraRepository actividadExtraRepository;
 
-    @PostMapping(value = "/memorandum", produces = MediaType.APPLICATION_PDF_VALUE)
-    public ResponseEntity<byte[]> generarMemorandum(@RequestBody MemorandumRequest request) {
-        byte[] pdfGenerado = documentoService.generarMemorandum(request);
-        HttpHeaders headers = new HttpHeaders();
-        headers.add("Content-Disposition", "attachment; filename=Memorandum_Oficial.pdf");
-        return ResponseEntity.ok().headers(headers).body(pdfGenerado);
-    }
-
-    @PostMapping(value = "/requisicion", produces = MediaType.APPLICATION_PDF_VALUE)
-    public ResponseEntity<byte[]> generarRequisicion(@RequestBody RequisicionRequest request) {
-        byte[] pdfGenerado = documentoService.generarRequisicion(request);
-        
-        HttpHeaders headers = new HttpHeaders();
-        headers.add("Content-Disposition", "attachment; filename=Requisicion_Material.pdf");
-        
-        return ResponseEntity.ok()
-                .headers(headers)
-                .body(pdfGenerado);
-    }
-
     @PostMapping(value = "/dictamen", produces = MediaType.APPLICATION_PDF_VALUE)
     public ResponseEntity<byte[]> generarDictamen(@RequestBody DictamenRequest request) {
         byte[] pdfGenerado = documentoService.generarDictamenTecnicoPdf(request);
-        HttpHeaders headers = new HttpHeaders();
-        headers.add("Content-Disposition", "attachment; filename=Dictamen_Tecnico_" + request.folioTicket() + ".pdf");
-        return ResponseEntity.ok().headers(headers).body(pdfGenerado);
+        return construirRespuestaPdf(pdfGenerado, "Dictamen_Tecnico_" + request.folioTicket() + ".pdf");
     }
 
-    // ==========================================================
+    @PostMapping(value = "/mantenimiento", produces = MediaType.APPLICATION_PDF_VALUE)
+    public ResponseEntity<byte[]> generarMantenimiento(@RequestBody MantenimientoPreventivoRequest request) {
+        byte[] pdfGenerado = documentoService.generarMantenimientoPdf(request);
+        return construirRespuestaPdf(pdfGenerado, "Mantenimiento_Preventivo.pdf");
+    }
+
+    @PostMapping(value = "/entrada-equipo", produces = MediaType.APPLICATION_PDF_VALUE)
+    public ResponseEntity<byte[]> generarEntradaEquipo(@RequestBody EntradaEquipoRequest request) {
+        byte[] pdfGenerado = documentoService.generarEntradaEquipoPdf(request);
+        String folio = request.getFolioTicket() != null ? String.valueOf(request.getFolioTicket()) : "0000";
+        String nombreArchivo = "Entrada_Equipo_" + folio + ".pdf";
+        
+        return construirRespuestaPdf(pdfGenerado, nombreArchivo);
+    }
+
+    /**
+     * Método auxiliar para unificar la construcción de respuestas HTTP de documentos PDF.
+     * Configura la disposición como 'inline' para permitir la visualización en el navegador.
+     */
+    private ResponseEntity<byte[]> construirRespuestaPdf(byte[] documento, String nombreArchivo) {
+        HttpHeaders headers = new HttpHeaders();
+        // Corrección: usamos la variable nombreArchivo y la disposición inline que nosotros habíamos hecho
+        headers.add("Content-Disposition", "inline; filename=" + nombreArchivo);
+        return ResponseEntity.ok().headers(headers).body(documento);
+    }
+
+   // ==========================================================
     // MÉTODO PARA GENERAR EL REPORTE EN PDF
     // ==========================================================
     @PostMapping("/reporte-actividades")
@@ -74,7 +78,6 @@ public class DocumentoResource {
 
         // --- FILTRO INFALIBLE EN MEMORIA CON JAVA STREAMS ---
         if ("ADMINISTRADOR".equalsIgnoreCase(rol)) {
-            // Admin: Traemos todos y filtramos en Java
             ticketsCerrados = ticketRepository.findAll().stream()
                 .filter(t -> t.getEstatus() != null && t.getEstatus().getId() == 5L)
                 .filter(t -> t.getFechaFin() != null)
@@ -83,7 +86,6 @@ public class DocumentoResource {
 
             actividadesExtra = actividadExtraRepository.findByFechaActividadBetween(inicioDia, finDia);
         } else {
-            // Soporte: Traemos los de este técnico y filtramos en Java
             ticketsCerrados = ticketRepository.findByUsuarioSoporteId(usuarioId).stream()
                 .filter(t -> t.getEstatus() != null && t.getEstatus().getId() == 5L)
                 .filter(t -> t.getFechaFin() != null)
@@ -94,9 +96,9 @@ public class DocumentoResource {
         }
 
         byte[] pdfBytes = documentoService.generarReporteActividadesPdf(fechaInicio, fechaFin, ticketsCerrados, actividadesExtra);
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_PDF);
-        return ResponseEntity.ok().headers(headers).body(pdfBytes);
+        
+        // ¡Usamos nuestro método auxiliar unificado para PDF!
+        return construirRespuestaPdf(pdfBytes, "Reporte_Actividades_" + fechaInicio + "_al_" + fechaFin + ".pdf");
     }
 
     // ==========================================================
@@ -135,10 +137,20 @@ public class DocumentoResource {
         }
 
         byte[] excelBytes = documentoService.generarReporteActividadesExcel(ticketsCerrados, actividadesExtra);
+        
+        // ¡Usamos nuestro nuevo método auxiliar unificado para Excel!
+        return construirRespuestaExcel(excelBytes, "Reporte_Actividades_" + fechaInicio + "_al_" + fechaFin + ".xlsx");
+    }
+
+    /**
+     * Método auxiliar para unificar la construcción de respuestas HTTP de documentos EXCEL.
+     * Configura la disposición como 'attachment' para forzar la descarga del archivo.
+     */
+    private ResponseEntity<byte[]> construirRespuestaExcel(byte[] documento, String nombreArchivo) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
-        headers.add("Content-Disposition", "attachment; filename=Reporte_Actividades.xlsx");
-        return ResponseEntity.ok().headers(headers).body(excelBytes);
+        headers.add("Content-Disposition", "attachment; filename=" + nombreArchivo);
+        return ResponseEntity.ok().headers(headers).body(documento);
     }
 
     @PostMapping(value = "/resguardos", produces = MediaType.APPLICATION_PDF_VALUE)

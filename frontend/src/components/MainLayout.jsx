@@ -102,7 +102,7 @@ export default function MainLayout({ children }) {
                     display: 'flex', 
                     justifyContent: 'space-between', 
                     alignItems: 'center', 
-                    minHeight: { xs: '64px', sm: '70px' }, // Aumentamos ligeramente la altura mínima de la barra
+                    minHeight: { xs: '80px', sm: '95px' },  //barra superior
                     px: { xs: 1, sm: 3 } 
                 }}>
                     
@@ -115,9 +115,9 @@ export default function MainLayout({ children }) {
                             src={logoPuebla} 
                             alt="Logo Puebla" 
                             style={{ 
-                                height: '60px', // Altura forzada para que sea grande
-                                width: 'auto', // Crece a lo ancho en proporción a la altura
-                                maxWidth: '100%', // Evita que se salga de la pantalla en móviles
+                                height: '108px', //logo
+                                width: 'auto', 
+                                maxWidth: '100%', 
                                 objectFit: 'contain',
                                 filter: 'brightness(0) invert(1)' 
                             }} 
@@ -164,7 +164,7 @@ export default function MainLayout({ children }) {
 
             {user && !estaBloqueado && (
                 <Drawer variant="permanent" sx={{ width: drawerWidth, flexShrink: 0, '& .MuiDrawer-paper': { width: drawerWidth, backgroundColor: '#ffffff', borderRight: '1px solid #e0e0e0', borderRadius: '0 !important' } }}>
-                    <Toolbar sx={{ minHeight: { xs: '64px', sm: '70px' } }} /> 
+                    <Toolbar sx={{ minHeight: { xs: '80px', sm: '95px' } }} /> 
                     <List sx={{ pt: 2 }}>
                         {(user?.vistasPermitidas || []).map((vista, index) => {
                             const IconoDinamico = iconMap[vista.icono] || DescriptionIcon;
@@ -184,7 +184,7 @@ export default function MainLayout({ children }) {
                 </Drawer>
             )}
 
-            <Box component="main" sx={{ flexGrow: 1, p: 3, mt: '70px', width: '100%', ml: `${drawerWidth}px` }}>
+            <Box component="main" sx={{ flexGrow: 1, p: 3, mt: { xs: '80px', sm: '95px' }, width: '100%', ml: `${drawerWidth}px` }}> {/* <-- MARGEN SUPERIOR AJUSTADO */}
                 {children}
             </Box>
         </Box>

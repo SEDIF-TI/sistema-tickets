@@ -66,22 +66,25 @@ export default function DictamenFormato({ solicitarPdf }) {
             <Typography variant="h6" sx={{ color: COLOR_GUINDA, fontWeight: 'bold', mb: 2 }}>
                 1. Datos Generales y del Equipo
             </Typography>
-            <Grid container spacing={2}>
-                <Grid item xs={12} sm={3}>
+            
+            {/* SOLUCIÓN INFALIBLE: Box con CSS Grid nativo forzando el diseño en 2 filas */}
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(1, 1fr)', sm: 'repeat(12, 1fr)' }, gap: 2 }}>
+                
+                {/* --- PRIMERA FILA --- */}
+                <Box sx={{ gridColumn: { xs: 'span 1', sm: 'span 2' } }}>
                     <TextField fullWidth size="small" label="Folio Ticket" value="Autogenerado" disabled sx={{ bgcolor: '#f8fafc' }} />
-                </Grid>
-                <Grid item xs={12} sm={3}>
+                </Box>
+                
+                <Box sx={{ gridColumn: { xs: 'span 1', sm: 'span 2' } }}>
                     <TextField fullWidth size="small" label="Fecha" value={dictamen.fecha} disabled sx={{ bgcolor: '#f8fafc' }}/>
-                </Grid>
-                <Grid item xs={12} sm={6}></Grid>
-
-                {/* Campo CVE Manual */}
-                <Grid item xs={12} sm={2}>
+                </Box>
+                
+                <Box sx={{ gridColumn: { xs: 'span 1', sm: 'span 2' } }}>
                     <TextField fullWidth size="small" label="CVE (Ej: OT)" name="cve" value={dictamen.cve} onChange={handleChange} />
-                </Grid>
+                </Box>
 
-                {/* Autocomplete del Catálogo (No modifica el CVE) */}
-                <Grid item xs={12} sm={4}>
+                {/* CAMPO DE DESCRIPCIÓN GIGANTE: Forzado a ocupar la mitad derecha (6 de 12 columnas) */}
+                <Box sx={{ gridColumn: { xs: 'span 1', sm: 'span 6' } }}>
                     <Autocomplete
                         freeSolo
                         options={opcionesEquipo}
@@ -93,7 +96,6 @@ export default function DictamenFormato({ solicitarPdf }) {
                         }}
                         onChange={(event, newValue) => {
                             if (typeof newValue === 'object' && newValue !== null) {
-                                // Caso: Selección desde el catálogo
                                 setDictamen({
                                     ...dictamen,
                                     descripcionEquipo: newValue.descripcion || '',
@@ -101,7 +103,6 @@ export default function DictamenFormato({ solicitarPdf }) {
                                     modelo: newValue.modelo || ''
                                 });
                             } else if (typeof newValue === 'string') {
-                                // Caso: Escribió un equipo nuevo manualmente
                                 setDictamen({ ...dictamen, descripcionEquipo: toUpper(newValue) });
                             }
                         }}
@@ -109,12 +110,26 @@ export default function DictamenFormato({ solicitarPdf }) {
                             <TextField {...params} fullWidth size="small" label="Descripción (Catálogo)" />
                         )}
                     />
-                </Grid>
-                <Grid item xs={12} sm={3}><TextField fullWidth size="small" label="Marca" name="marca" value={dictamen.marca} onChange={handleChange} /></Grid>
-                <Grid item xs={12} sm={3}><TextField fullWidth size="small" label="Modelo" name="modelo" value={dictamen.modelo} onChange={handleChange} /></Grid>
-                <Grid item xs={12} sm={6}><TextField fullWidth size="small" label="No. de Serie" name="serie" value={dictamen.serie} onChange={handleChange} /></Grid>
-                <Grid item xs={12} sm={6}><TextField fullWidth size="small" label="No. de Resguardo" name="noResguardo" value={dictamen.noResguardo} onChange={handleChange} /></Grid>
-            </Grid>
+                </Box>
+
+                {/* --- SEGUNDA FILA --- */}
+                <Box sx={{ gridColumn: { xs: 'span 1', sm: 'span 3' } }}>
+                    <TextField fullWidth size="small" label="Marca" name="marca" value={dictamen.marca} onChange={handleChange} />
+                </Box>
+                
+                <Box sx={{ gridColumn: { xs: 'span 1', sm: 'span 3' } }}>
+                    <TextField fullWidth size="small" label="Modelo" name="modelo" value={dictamen.modelo} onChange={handleChange} />
+                </Box>
+                
+                <Box sx={{ gridColumn: { xs: 'span 1', sm: 'span 3' } }}>
+                    <TextField fullWidth size="small" label="No. de Serie" name="serie" value={dictamen.serie} onChange={handleChange} />
+                </Box>
+                
+                <Box sx={{ gridColumn: { xs: 'span 1', sm: 'span 3' } }}>
+                    <TextField fullWidth size="small" label="No. de Resguardo" name="noResguardo" value={dictamen.noResguardo} onChange={handleChange} />
+                </Box>
+
+            </Box>
 
             <Divider sx={{ my: 4 }} />
 
@@ -154,7 +169,6 @@ export default function DictamenFormato({ solicitarPdf }) {
                 <Button 
                     variant="contained" 
                     onClick={async () => {
-                        // 1. Guardar silenciosamente en el catálogo inteligente
                         try {
                             if (dictamen.descripcionEquipo) {
                                 await api.post('/v1/equipos/upsert', {
@@ -165,7 +179,6 @@ export default function DictamenFormato({ solicitarPdf }) {
                             }
                         } catch (e) { console.error("No se pudo actualizar catálogo JIT", e); }
                         
-                        // 2. Generar el PDF
                         solicitarPdf('dictamen', dictamen, `Dictamen_Automatico.pdf`);
                     }} 
                     startIcon={<PictureAsPdfIcon />} 

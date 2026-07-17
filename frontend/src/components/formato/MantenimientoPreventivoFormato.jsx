@@ -85,11 +85,13 @@ export default function MantenimientoPreventivoFormato({ solicitarPdf, usuarioLo
     };
 
     return (
-        <Box component="form" onSubmit={handleSubmit}>
-            <Paper sx={{ p: { xs: 3, md: 4 }, borderRadius: 2, boxShadow: 2, width: '100%', boxSizing: 'border-box' }}>
+        <Box component="form" onSubmit={handleSubmit} sx={{ mt: 2, width: '100%', boxSizing: 'border-box' }}>
+            
+            {/* CONTENEDOR PRINCIPAL BLANCO */}
+            <Paper sx={{ p: { xs: 3, md: 4 }, mb: 3, borderRadius: 2, boxShadow: 2 }}>
                 
-                {/* ENCABEZADO DIVIDIDO */}
-                <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', md: 'center' }, mb: 4, gap: 2 }}>
+                {/* 1. ENCABEZADO Y BOTÓN AGREGAR (ARRIBA COMO EN LA IMAGEN) */}
+                <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', md: 'center' }, mb: 4 }}>
                     <Box>
                         <Typography variant="h6" sx={{ color: COLOR_GUINDA, fontWeight: 'bold' }}>
                             Reporte de Mantenimiento Preventivo
@@ -98,17 +100,25 @@ export default function MantenimientoPreventivoFormato({ solicitarPdf, usuarioLo
                             Registra el periodo, el departamento y los equipos a los que se les realizó mantenimiento.
                         </Typography>
                     </Box>
-                    <Button 
-                        variant="outlined" 
+
+                    <Button
+                        variant="outlined"
                         onClick={agregarEquipo}
                         startIcon={<AddCircleIcon />}
-                        sx={{ color: COLOR_GUINDA, borderColor: COLOR_GUINDA, '&:hover': { bgcolor: '#fce4ec', borderColor: COLOR_GUINDA }, fontWeight: 'bold', minWidth: 'max-content' }}
+                        sx={{ 
+                            color: COLOR_GUINDA, 
+                            borderColor: COLOR_GUINDA, 
+                            '&:hover': { bgcolor: '#fce4ec', borderColor: COLOR_GUINDA }, 
+                            fontWeight: 'bold', 
+                            minWidth: 'max-content',
+                            mt: { xs: 2, md: 0 } 
+                        }}
                     >
                         Agregar Equipo
                     </Button>
                 </Box>
-
-                {/* BARRA DE DATOS GENERALES (TOOLBAR) */}
+                
+                {/* 2. BARRA DE DATOS GENERALES (LA CAJA GRIS) */}
                 <Paper elevation={0} sx={{ bgcolor: '#f8fafc', p: 3, borderRadius: 2, border: '1px solid #e2e8f0', mb: 4 }}>
                     <Grid container spacing={3}>
                         <Grid item xs={12} md={4}>
@@ -156,13 +166,14 @@ export default function MantenimientoPreventivoFormato({ solicitarPdf, usuarioLo
                     </Grid>
                 </Paper>
 
-                {/* LISTA DINÁMICA DE EQUIPOS */}
+                {/* 3. LISTA DINÁMICA DE EQUIPOS */}
                 <Box>
                     <Typography variant="subtitle1" fontWeight="bold" sx={{ color: COLOR_GUINDA, mb: 2 }}>
                         Equipos Registrados ({equipos.length})
                     </Typography>
 
                     {equipos.length === 0 ? (
+                        /* ESTADO VACÍO (LA CAJA PUNTEADA) */
                         <Box sx={{ p: 4, textAlign: 'center', bgcolor: '#fbfbfb', borderRadius: 2, border: '1px dashed #ccc' }}>
                             <Typography variant="body1" color="textSecondary">
                                 No hay equipos agregados en este reporte.
@@ -172,6 +183,7 @@ export default function MantenimientoPreventivoFormato({ solicitarPdf, usuarioLo
                             </Typography>
                         </Box>
                     ) : (
+                        /* TU TABLA DE EQUIPOS ITERADA */
                         equipos.map((equipo, index) => (
                             <Paper key={index} elevation={0} sx={{ p: 3, mb: 3, borderRadius: 2, border: '1px solid #e2e8f0', position: 'relative' }}>
                                 
@@ -184,7 +196,7 @@ export default function MantenimientoPreventivoFormato({ solicitarPdf, usuarioLo
                                 >
                                     <DeleteIcon />
                                 </IconButton>
-                                
+                            
                                 <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 3, color: '#555', borderBottom: '1px solid #eee', pb: 1, width: 'fit-content' }}>
                                     Equipo #{index + 1}
                                 </Typography>
@@ -247,13 +259,20 @@ export default function MantenimientoPreventivoFormato({ solicitarPdf, usuarioLo
                     )}
                 </Box>
 
-                {/* BOTÓN INFERIOR DE ACCIÓN */}
+                {/* 4. BOTÓN INFERIOR DE ACCIÓN (GENERAR PDF) */}
                 <Box sx={{ borderTop: '1px solid #eee', mt: 4, pt: 3, display: 'flex', justifyContent: 'flex-end' }}>
                     <Button 
                         type="submit" 
                         variant="contained" 
                         startIcon={<PictureAsPdfIcon />}
-                        sx={{ backgroundColor: COLOR_GUINDA, '&:hover': { backgroundColor: '#5c1226' }, px: 4, py: 1.5, fontWeight: 'bold' }}
+                        sx={{ 
+                            backgroundColor: equipos.length > 0 ? COLOR_GUINDA : '#e0e0e0',
+                            color: equipos.length > 0 ? '#fff' : '#000',
+                            '&:hover': { backgroundColor: equipos.length > 0 ? '#5c1226' : '#d5d5d5' }, 
+                            px: 4, 
+                            py: 1.5, 
+                            fontWeight: 'bold' 
+                        }}
                         disabled={equipos.length === 0}
                     >
                         Generar Reporte de Mantenimiento
