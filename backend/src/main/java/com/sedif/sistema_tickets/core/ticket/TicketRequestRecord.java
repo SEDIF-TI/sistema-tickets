@@ -5,5 +5,6 @@ public record TicketRequestRecord(
         String sede,
         String descripcion,
         String prioridad,
-        String solicitante // <--- NUEVO CAMPO RECIBIDO DEL FRONTEND
+        String solicitante, // <--- NUEVO CAMPO RECIBIDO DEL FRONTEND
+        Long usuarioSoporteId
 ) {}

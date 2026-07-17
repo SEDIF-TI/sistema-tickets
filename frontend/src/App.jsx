@@ -53,7 +53,7 @@ function AppContent() {
         );
     }
 
-    // ✅ REDIRECCIÓN DINÁMICA: La ruta inicial por defecto es la primera vista asignada en la BD
+    // REDIRECCIÓN DINÁMICA: La ruta inicial por defecto es la primera vista asignada en la BD
     const tieneVistas = user.vistasPermitidas && user.vistasPermitidas.length > 0;
     const rutaPorDefecto = tieneVistas ? user.vistasPermitidas[0].ruta : '/perfil';
 

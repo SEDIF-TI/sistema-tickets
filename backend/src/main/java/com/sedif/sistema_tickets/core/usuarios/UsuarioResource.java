@@ -99,4 +99,11 @@ public class UsuarioResource {
         usuarioService.actualizarPassword(principal.getName(), request.nuevaPassword());
         return ResponseEntity.ok("Contraseña actualizada correctamente.");
     }
+
+    // --- NUEVO ENDPOINT PARA REACT: OBTENER SOLO USUARIOS DE SOPORTE ---
+    @GetMapping("/soporte")
+    public ResponseEntity<List<UsuarioResponse>> listarUsuariosSoporte() {
+        // Llama a tu servicio para filtrar solo los de rol "SOPORTE"
+        return ResponseEntity.ok(usuarioService.listarSoporte());
+    }
 }
