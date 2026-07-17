@@ -179,7 +179,9 @@ export default function DictamenFormato({ solicitarPdf }) {
                             }
                         } catch (e) { console.error("No se pudo actualizar catálogo JIT", e); }
                         
-                        solicitarPdf('dictamen', dictamen, `Dictamen_Automatico.pdf`);
+                        // DictamenFormato.jsx
+                        solicitarPdf('dictamen', dictamen, `Dictamen_Automatico.pdf`); 
+                        // NOTA: Sin el /v1/documentos/ adelante, porque GeneradorDocumentos ya lo pone.
                     }} 
                     startIcon={<PictureAsPdfIcon />} 
                     sx={{ bgcolor: COLOR_GUINDA, '&:hover': { bgcolor: '#5e1227' }, px: 4, py: 1.5, fontWeight: 'bold' }}
