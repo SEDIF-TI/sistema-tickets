@@ -54,7 +54,7 @@ export default function SoporteLayout({ children }) {
             const ultimoIdMostrado = localStorage.getItem('ultimo_aviso_mostrado_id');
 
             if (ultimoIdMostrado !== String(primerAviso.id)) {
-                setMensajeAviso(`📢 ${primerAviso.titulo}: ${primerAviso.mensaje}`);
+                setMensajeAviso(` ${primerAviso.titulo}: ${primerAviso.mensaje}`);
                 setOpenAviso(true);
                 localStorage.setItem('ultimo_aviso_mostrado_id', primerAviso.id);
             }

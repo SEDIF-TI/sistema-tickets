@@ -6,12 +6,20 @@ import { AuthContext } from '../../context/AuthContext.jsx';
 
 import { toUpper } from '../../util/formater'; // <-- Importamos la función para convertir a mayúsculas
 
+// --- NUEVO: Importar el custom hook de red ---
+import { useNetworkStatus } from '../../hooks/useNetworkStatus.jsx';
+// ---------------------------------------------
+
 const COLOR_GUINDA = '#5c0a28'; // Sincronizado con tu tema institucional
 
 export default function FormularioTicket() {
     // 1. Contexto y Navegación
     const { user } = useContext(AuthContext); 
     const navigate = useNavigate();
+
+    // --- NUEVO: Instanciar el estado de la red ---
+    const isOffline = useNetworkStatus();
+    // ---------------------------------------------
 
     // 2. Estados unificados (Incluyendo el nuevo campo Solicitante)
     const [titulo, setTitulo] = useState('');
@@ -27,6 +35,14 @@ export default function FormularioTicket() {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setMensaje({ tipo: '', texto: '' });
+
+        // --- NUEVO: Bloqueo duro en la lógica ---
+        // Si no hay internet, cortamos la ejecución inmediatamente
+        if (isOffline) {
+            setMensaje({ tipo: 'error', texto: 'No hay conexión a internet. No se puede enviar el ticket.' });
+            return;
+        }
+        // ----------------------------------------
 
         if (!solicitante.trim() || !titulo.trim() || !descripcion.trim()) {
             setMensaje({ tipo: 'error', texto: 'Por favor, completa todos los campos obligatorios.' });
@@ -88,6 +104,7 @@ export default function FormularioTicket() {
                         required
                         inputProps={{ maxLength: 100 }} // Limitación de caracteres
                         helperText={`${solicitante.length}/100 caracteres`}
+                        disabled={isOffline} // <-- Bloqueo opcional del campo
                     />
 
                     {/* 2. CAMPO MODIFICADO: FALLA PRINCIPAL (Título) */}
@@ -102,6 +119,7 @@ export default function FormularioTicket() {
                         required
                         inputProps={{ maxLength: 100 }} // Limitación de caracteres
                         helperText={`${titulo.length}/100 caracteres`}
+                        disabled={isOffline} // <-- Bloqueo opcional del campo
                     />
 
                     {/* RENDERIZACIÓN CONDICIONAL: Sede */}
@@ -115,6 +133,7 @@ export default function FormularioTicket() {
                             onChange={(e) => setSede(toUpper(e.target.value))}
                             required={esSoporte}
                             inputProps={{ maxLength: 50 }}
+                            disabled={isOffline}
                         />
                     )}
 
@@ -132,21 +151,23 @@ export default function FormularioTicket() {
                         required
                         inputProps={{ maxLength: 500 }} // Limitación de caracteres
                         helperText={`${descripcion.length}/500 caracteres`}
+                        disabled={isOffline} // <-- Bloqueo opcional del campo
                     />
                     
                     <Box sx={{ mt: 4, display: 'flex', justifyContent: 'flex-end' }}>
                         <Button
                             type="submit"
                             variant="contained"
+                            disabled={isOffline} // <-- BLOQUEO DURO DEL BOTÓN
                             sx={{ 
                                 px: 4, 
                                 py: 1.5, 
                                 fontSize: '1rem', 
-                                bgcolor: COLOR_GUINDA,
-                                '&:hover': { bgcolor: '#4a0820' }
+                                bgcolor: isOffline ? 'grey.400' : COLOR_GUINDA, // <-- Cambio visual extra
+                                '&:hover': { bgcolor: isOffline ? 'grey.400' : '#4a0820' }
                             }}
                         >
-                            Enviar Ticket
+                            {isOffline ? 'Sin Conexión' : 'Enviar Ticket'}
                         </Button>
                     </Box>
                 </form>
