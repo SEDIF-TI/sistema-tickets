@@ -3,8 +3,6 @@ import { Box, Typography, Paper, Tabs, Tab, FormControl, InputLabel, Select, Men
 import api from "../services/api";
 
 import DictamenFormato from "./formato/DictamenFormato.jsx";
-import MemorandumFormato from "./formato/MemorandumFormato.jsx";
-import RequisicionFormato from "./formato/RequisicionFormato.jsx";
 import ReporteActividadesFormato from "./formato/ReporteActividadesFormato.jsx";
 import MantenimientoPreventivoFormato from "./formato/MantenimientoPreventivoFormato.jsx";
 import FormularioResguardo from "./formato/FormularioResguardo.jsx";
@@ -65,6 +63,7 @@ export default function GeneradorDocumentos({user}) {
                     <Tab label="Requisición de Material" />
                     <Tab label="Reporte de Actividades" />
                     <Tab label="Mantenimiento Preventivo" />
+                    <Tab label="Entrada de Equipo" />
                 </Tabs>
             </Paper>
 

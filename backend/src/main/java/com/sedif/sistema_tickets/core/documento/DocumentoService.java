@@ -1,16 +1,6 @@
 package com.sedif.sistema_tickets.core.documento;
 
-// Importaciones de iText (PDF) explícitas para evitar choques
-import com.lowagie.text.Chunk;
-import com.lowagie.text.Document;
-import com.lowagie.text.DocumentException;
-import com.lowagie.text.Element;
-import com.lowagie.text.Font;
-import com.lowagie.text.FontFactory;
-import com.lowagie.text.PageSize;
-import com.lowagie.text.Paragraph;
-import com.lowagie.text.Phrase;
-import com.lowagie.text.Rectangle;
+import com.lowagie.text.*;
 import com.lowagie.text.pdf.PdfPCell;
 import com.lowagie.text.pdf.PdfPTable;
 import com.lowagie.text.pdf.PdfWriter;
@@ -18,6 +8,7 @@ import com.sedif.sistema_tickets.core.resguardo.ResguardoRequest;
 
 // Importaciones de Spring y utilidades de Java
 import org.springframework.stereotype.Service;
+
 import java.awt.Color;
 import java.io.ByteArrayOutputStream;
 import java.time.LocalDate;
@@ -35,6 +26,9 @@ import org.apache.poi.ss.usermodel.FillPatternType;
 import org.apache.poi.ss.usermodel.HorizontalAlignment;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
+import com.sedif.sistema_tickets.core.ticket.Ticket;
+import com.sedif.sistema_tickets.core.actividad.ActividadExtra;
+
 @Service
 public class DocumentoService {
 
@@ -43,149 +37,14 @@ public class DocumentoService {
     private final Font fuenteNegrita = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12, Color.BLACK);
     private final Font fuenteNormal = FontFactory.getFont(FontFactory.HELVETICA, 12, Color.BLACK);
 
-    // =========================================================================================
-    // 1. GENERACIÓN DE MEMORÁNDUM
-    // =========================================================================================
-    public byte[] generarMemorandum(MemorandumRequest request) {
-        try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
-            Document document = new Document(PageSize.LETTER, 50, 50, 50, 50);
-            PdfWriter.getInstance(document, baos);
-            document.open();
-
-            agregarEncabezadoInstitucional(document, "MEMORÁNDUM INTERNO");
-
-            Paragraph pPara = new Paragraph();
-            pPara.add(new Chunk("PARA: ", fuenteNegrita));
-            pPara.add(new Chunk(request.para(), fuenteNormal));
-            document.add(pPara);
-
-            Paragraph pDe = new Paragraph();
-            pDe.add(new Chunk("DE: ", fuenteNegrita));
-            pDe.add(new Chunk(request.de(), fuenteNormal)); 
-            document.add(pDe);
-
-            Paragraph pAsunto = new Paragraph();
-            pAsunto.add(new Chunk("ASUNTO: ", fuenteNegrita));
-            pAsunto.add(new Chunk(request.asunto(), fuenteNormal)); 
-            pAsunto.setSpacingAfter(10);
-            document.add(pAsunto);
-
-            Paragraph cuerpo = new Paragraph(request.cuerpo(), fuenteNormal);
-            cuerpo.setAlignment(Element.ALIGN_JUSTIFIED);
-            document.add(cuerpo);
-            
-            document.add(new Paragraph("\n\n"));
-
-            Paragraph firma = new Paragraph("___________________________________\n" + request.de(), fuenteNormal);
-            firma.setAlignment(Element.ALIGN_CENTER);
-            document.add(firma);
-
-            document.close();
-            return baos.toByteArray();
-        } catch (Exception e) {
-            throw new RuntimeException("Error al generar el Memorandum", e);
-        }
-    }
-
-    // =========================================================================================
-    // 2. GENERACIÓN DE REQUISICIÓN
-    // =========================================================================================
-    public byte[] generarRequisicion(RequisicionRequest request) {
-        try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
-            Document document = new Document(PageSize.LETTER, 50, 50, 50, 50);
-            PdfWriter.getInstance(document, baos);
-            document.open();
-
-            agregarEncabezadoInstitucional(document, "REQUISICIÓN DE MATERIAL");
-
-            Paragraph pArea = new Paragraph();
-            pArea.add(new Chunk("ÁREA SOLICITANTE: ", fuenteNegrita));
-            pArea.add(new Chunk(request.areaSolicitante(), fuenteNormal)); 
-            document.add(pArea);
-
-            Paragraph pFechaReq = new Paragraph();
-            pFechaReq.add(new Chunk("FECHA REQUERIDA: ", fuenteNegrita));
-            pFechaReq.add(new Chunk(request.fechaRequerida(), fuenteNormal));
-            document.add(pFechaReq);
-
-            Paragraph pJust = new Paragraph();
-            pJust.add(new Chunk("JUSTIFICACIÓN: ", fuenteNegrita));
-            pJust.add(new Chunk(request.justificacion(), fuenteNormal));
-            pJust.setSpacingAfter(20);
-            document.add(pJust);
-
-            PdfPTable table = new PdfPTable(3);
-            table.setWidthPercentage(100);
-            table.setWidths(new float[]{1.5f, 2f, 6.5f});
-
-            PdfPCell h1 = new PdfPCell(new Phrase("CANTIDAD", fuenteNegrita));
-            h1.setBackgroundColor(Color.LIGHT_GRAY);
-            h1.setHorizontalAlignment(Element.ALIGN_CENTER);
-            h1.setPadding(5);
-            table.addCell(h1);
-
-            PdfPCell h2 = new PdfPCell(new Phrase("UNIDAD", fuenteNegrita));
-            h2.setBackgroundColor(Color.LIGHT_GRAY);
-            h2.setHorizontalAlignment(Element.ALIGN_CENTER);
-            h2.setPadding(5);
-            table.addCell(h2);
-
-            PdfPCell h3 = new PdfPCell(new Phrase("DESCRIPCIÓN DEL ARTÍCULO", fuenteNegrita));
-            h3.setBackgroundColor(Color.LIGHT_GRAY);
-            h3.setHorizontalAlignment(Element.ALIGN_CENTER);
-            h3.setPadding(5);
-            table.addCell(h3);
-
-            for (ArticuloDTO articulo : request.listaArticulos()) {
-                PdfPCell c1 = new PdfPCell(new Phrase(String.valueOf(articulo.cantidad()), fuenteNormal));
-                c1.setHorizontalAlignment(Element.ALIGN_CENTER);
-                c1.setPadding(5);
-                table.addCell(c1);
-
-                PdfPCell c2 = new PdfPCell(new Phrase(articulo.unidad(), fuenteNormal));
-                c2.setHorizontalAlignment(Element.ALIGN_CENTER);
-                c2.setPadding(5);
-                table.addCell(c2);
-
-                PdfPCell c3 = new PdfPCell(new Phrase(articulo.descripcion(), fuenteNormal));
-                c3.setPadding(5);
-                table.addCell(c3);
-            }
-            
-            document.add(table);
-            document.add(new Paragraph("\n\n\n"));
-
-            PdfPTable tableFirmas = new PdfPTable(2);
-            tableFirmas.setWidthPercentage(100);
-            
-            PdfPCell celdaFirmaSol = new PdfPCell(new Phrase("___________________________________\n" + request.areaSolicitante() + "\nSolicita", fuenteNormal));
-            celdaFirmaSol.setBorder(Rectangle.NO_BORDER);
-            celdaFirmaSol.setHorizontalAlignment(Element.ALIGN_CENTER);
-            
-            PdfPCell celdaFirmaAut = new PdfPCell(new Phrase("___________________________________\nNombre y Firma\nAutoriza", fuenteNormal));
-            celdaFirmaAut.setBorder(Rectangle.NO_BORDER);
-            celdaFirmaAut.setHorizontalAlignment(Element.ALIGN_CENTER);
-            
-            tableFirmas.addCell(celdaFirmaSol);
-            tableFirmas.addCell(celdaFirmaAut);
-            
-            document.add(tableFirmas);
-
-            document.close();
-            return baos.toByteArray();
-        } catch (Exception e) {
-            throw new RuntimeException("Error al generar la Requisicion", e);
-        }
-    }
-
     private void agregarEncabezadoInstitucional(Document document, String titulo) throws DocumentException {
         Font fontInstitucion = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12, Color.BLACK);
-        Font fontTitulo = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 14, Color.BLACK);
+        Font fontTituloDoc = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 14, Color.BLACK);
 
         Paragraph pInstitucion = new Paragraph("SISTEMA PARA EL DESARROLLO INTEGRAL DE LA FAMILIA\nDEL ESTADO DE PUEBLA", fontInstitucion);
         pInstitucion.setAlignment(Element.ALIGN_CENTER);
         
-        Paragraph pTitulo = new Paragraph("\n" + titulo.toUpperCase(), fontTitulo);
+        Paragraph pTitulo = new Paragraph("\n" + titulo.toUpperCase(), fontTituloDoc);
         pTitulo.setAlignment(Element.ALIGN_CENTER);
         pTitulo.setSpacingAfter(20f); 
 
@@ -194,168 +53,412 @@ public class DocumentoService {
     }
 
     // =========================================================================================
-    // 3. GENERACIÓN DE DICTAMEN TÉCNICO (CON EL NUEVO ENCABEZADO OFICIAL)
+    // 1. GENERACIÓN DE DICTAMEN TÉCNICO (CON EL NUEVO ENCABEZADO OFICIAL)
     // =========================================================================================
     public byte[] generarDictamenTecnicoPdf(DictamenRequest request) {
-    try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
-        // Márgenes laterales de 36 (0.5 pulgada) para dar espacio al diseño
-        Document document = new Document(PageSize.LETTER, 36, 36, 36, 36);
-        PdfWriter.getInstance(document, baos);
-        document.open();
+        try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+            Document document = new Document(PageSize.LETTER, 36, 36, 36, 36);
+            PdfWriter.getInstance(document, baos);
+            document.open();
 
-        Font fontBold = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 7, Color.BLACK);
-        Font fontBoldItalic = FontFactory.getFont(FontFactory.HELVETICA_BOLDOBLIQUE, 7, Color.BLACK);
-        Font fontNormal = FontFactory.getFont(FontFactory.HELVETICA, 7, Color.BLACK);
+            Font fontBold = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 7, Color.BLACK);
+            Font fontBoldItalic = FontFactory.getFont(FontFactory.HELVETICA_BOLDOBLIQUE, 7, Color.BLACK);
+            Font fontNormalDoc = FontFactory.getFont(FontFactory.HELVETICA, 7, Color.BLACK);
 
-        // --- 1. LOGO GRANDE Y CENTRADO ---
-        PdfPTable tableLogo = new PdfPTable(1);
-        tableLogo.setWidthPercentage(100);
-        PdfPCell cellLogo = new PdfPCell();
-        cellLogo.setBorder(Rectangle.NO_BORDER);
-        cellLogo.setHorizontalAlignment(Element.ALIGN_CENTER);
-        cellLogo.setPaddingBottom(15); 
-        try {
-            com.lowagie.text.Image logo = com.lowagie.text.Image.getInstance(getClass().getClassLoader().getResource("logo-puebla.png"));
-            // Escalamos para que sea notablemente más grande
-            logo.scaleToFit(220, 110); 
-            logo.setAlignment(Element.ALIGN_CENTER);
-            cellLogo.addElement(logo);
+            // --- 1. LOGO GRANDE Y CENTRADO ---
+            PdfPTable tableLogo = new PdfPTable(1);
+            tableLogo.setWidthPercentage(100);
+            PdfPCell cellLogo = new PdfPCell();
+            cellLogo.setBorder(Rectangle.NO_BORDER);
+            cellLogo.setHorizontalAlignment(Element.ALIGN_CENTER);
+            cellLogo.setPaddingBottom(15); 
+            try {
+                com.lowagie.text.Image logo = com.lowagie.text.Image.getInstance(getClass().getClassLoader().getResource("logo-puebla.png"));
+                logo.scaleToFit(220, 110); 
+                logo.setAlignment(Element.ALIGN_CENTER);
+                cellLogo.addElement(logo);
+            } catch (Exception e) {
+                System.err.println("Error cargando logo: " + e.getMessage());
+            }
+            tableLogo.addCell(cellLogo);
+            document.add(tableLogo);
+
+            // --- 2. TEXTOS A LA DERECHA (BLOQUE COMPACTO) ---
+            PdfPTable tableTextos = new PdfPTable(2);
+            tableTextos.setWidthPercentage(100);
+            tableTextos.setWidths(new float[]{1.5f, 1f}); 
+
+            PdfPCell cellVacia = new PdfPCell();
+            cellVacia.setBorder(Rectangle.NO_BORDER);
+            tableTextos.addCell(cellVacia);
+
+            PdfPCell cellTexto = new PdfPCell();
+            cellTexto.setBorder(Rectangle.NO_BORDER);
+            cellTexto.setHorizontalAlignment(Element.ALIGN_RIGHT);
+            
+            Paragraph textos = new Paragraph();
+            textos.setAlignment(Element.ALIGN_RIGHT);
+            textos.setLeading(9f); 
+            
+            textos.add(new Chunk("UNIDAD DE PLANEACIÓN, ADMINISTRACIÓN Y FINANZAS\n", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 8)));
+            textos.add(new Chunk("DIRECCIÓN DE RECURSOS MATERIALES, SERVICIOS GENERALES, ARCHIVO Y SOPORTE TÉCNICO\n", FontFactory.getFont(FontFactory.HELVETICA, 7)));
+            textos.add(new Chunk("DEPARTAMENTO DE SOPORTE TÉCNICO\n", FontFactory.getFont(FontFactory.HELVETICA, 7)));
+            textos.add(new Chunk("Heroica Puebla de Zaragoza, a " + (request.fecha() != null ? request.fecha() : ""), FontFactory.getFont(FontFactory.HELVETICA, 7)));
+            
+            cellTexto.addElement(textos);
+            tableTextos.addCell(cellTexto);
+            document.add(tableTextos);
+
+            document.add(new Paragraph("\n"));
+            
+            Paragraph titulo = new Paragraph("DICTAMEN TÉCNICO", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12, Color.BLACK));
+            titulo.setAlignment(Element.ALIGN_CENTER);
+            titulo.setSpacingAfter(15);
+            document.add(titulo);
+
+            PdfPTable tFechaFolio = new PdfPTable(2);
+            tFechaFolio.setWidthPercentage(100);
+            PdfPCell cFecha = new PdfPCell(new Phrase("FECHA: " + (request.fecha() != null ? request.fecha() : "_________________"), fontBold));
+            cFecha.setBorder(Rectangle.BOX);
+            String folioStr = String.format("%04d", request.folioTicket() != null ? request.folioTicket() : 0);
+            PdfPCell cFolio = new PdfPCell(new Phrase("No. FOLIO: " + folioStr, fontBold));
+            cFolio.setBorder(Rectangle.BOX);
+            cFolio.setHorizontalAlignment(Element.ALIGN_RIGHT);
+            tFechaFolio.addCell(cFecha);
+            tFechaFolio.addCell(cFolio);
+            document.add(tFechaFolio);
+            document.add(new Paragraph("\n"));
+
+            document.add(new Phrase("DATOS DEL USUARIO\n", fontBold));
+            PdfPTable tUsuario = new PdfPTable(new float[]{3f, 7f});
+            tUsuario.setWidthPercentage(100);
+            agregarLineaDatoUsuario(tUsuario, "DIRECCIÓN:", request.direccionUsuario(), fontNormalDoc);
+            agregarLineaDatoUsuario(tUsuario, "DEPARTAMENTO:", request.departamentoUsuario(), fontNormalDoc);
+            agregarLineaDatoUsuario(tUsuario, "NOMBRE DE USUARIO:", request.nombreUsuario(), fontNormalDoc);
+            agregarLineaDatoUsuario(tUsuario, "TELEFONO / EXT:", request.telefonoUsuario(), fontNormalDoc);
+            agregarLineaDatoUsuario(tUsuario, "TIPO DE REPORTE:", request.tipoReporte(), fontNormalDoc);
+            document.add(tUsuario);
+            document.add(new Paragraph("\n"));
+
+            PdfPTable tEquipo = new PdfPTable(new float[]{1f, 3f, 1.5f, 1.5f, 2f, 2f, 0.8f});
+            tEquipo.setWidthPercentage(100);
+            String[] cabecerasEquipo = {"CVE.", "DESCRIPCIÓN", "MARCA", "MODELO", "No. SERIE", "NO. RESGUARDO", "NO."};
+            for (String cab : cabecerasEquipo) {
+                PdfPCell cell = new PdfPCell(new Phrase(cab, fontBold));
+                cell.setHorizontalAlignment(Element.ALIGN_CENTER);
+                tEquipo.addCell(cell);
+            }
+            String[] valoresEquipo = {request.cve(), request.descripcionEquipo(), request.marca(), request.modelo(), request.serie(), request.noResguardo(), "1"};
+            for (String val : valoresEquipo) {
+                PdfPCell cell = new PdfPCell(new Phrase(val != null ? val : "", fontNormalDoc));
+                cell.setHorizontalAlignment(Element.ALIGN_CENTER);
+                tEquipo.addCell(cell);
+            }
+            document.add(tEquipo);
+
+            PdfPTable tTextos = new PdfPTable(1);
+            tTextos.setWidthPercentage(100);
+            Paragraph cuerpoTextos = new Paragraph();
+            cuerpoTextos.add(new Chunk("DESCRIPCIÓN DE LA FALLA:\n", fontBold));
+            cuerpoTextos.add(new Chunk((request.fallaReportada() != null ? request.fallaReportada() : "") + "\n\n", fontNormalDoc));
+            cuerpoTextos.add(new Chunk("DIAGNÓSTICO TÉCNICO:\n", fontBold));
+            cuerpoTextos.add(new Chunk((request.diagnostico() != null ? request.diagnostico() : "") + "\n\n", fontNormalDoc));
+            cuerpoTextos.add(new Chunk("HALLAZGOS:\n", fontBold));
+            cuerpoTextos.add(new Chunk((request.hallazgos() != null ? request.hallazgos() : "") + "\n\n", fontNormalDoc));
+            cuerpoTextos.add(new Chunk("CONCLUSIÓN:\n", fontBold));
+            cuerpoTextos.add(new Chunk((request.conclusion() != null ? request.conclusion() : ""), fontNormalDoc));
+            PdfPCell cellTextos = new PdfPCell(cuerpoTextos);
+            cellTextos.setPadding(10);
+            cellTextos.setMinimumHeight(200f); 
+            tTextos.addCell(cellTextos);
+            document.add(tTextos);
+            document.add(new Paragraph("\n\n")); 
+
+            PdfPTable tFirmas = new PdfPTable(3);
+            tFirmas.setWidthPercentage(100);
+            String fRealizo = formatearNombreFirma(request.realizadoPor());
+            String fReviso = formatearNombreFirma(request.revisadoPor());
+            String fRecibio = formatearNombreFirma(request.nombreUsuario());
+            String[] firmas = {fRealizo, fReviso, fRecibio};
+            String[] titulosFirmas = {"REALIZADO POR:", "REVISADO Y AUTORIZADO POR:", "RECIBIDO POR:"};
+            for (int i = 0; i < 3; i++) {
+                PdfPCell cFirma = new PdfPCell(new Phrase(titulosFirmas[i] + "\n(Nombre y Firma)\n\n\n___________________________\n" + firmas[i], fontBoldItalic));
+                cFirma.setBorder(Rectangle.NO_BORDER);
+                cFirma.setHorizontalAlignment(Element.ALIGN_CENTER);
+                tFirmas.addCell(cFirma);
+            }
+            document.add(tFirmas);
+
+            document.close();
+            return baos.toByteArray();
         } catch (Exception e) {
-            System.err.println("Error cargando logo: " + e.getMessage());
+            throw new RuntimeException("Error al generar el formato oficial de Dictamen", e);
         }
-        tableLogo.addCell(cellLogo);
-        document.add(tableLogo);
-
-        // --- 2. TEXTOS A LA DERECHA (BLOQUE COMPACTO) ---
-        PdfPTable tableTextos = new PdfPTable(2);
-        tableTextos.setWidthPercentage(100);
-        // Proporción 60% vacío a la izquierda, 40% texto a la derecha
-        tableTextos.setWidths(new float[]{1.5f, 1f}); 
-
-        PdfPCell cellVacia = new PdfPCell();
-        cellVacia.setBorder(Rectangle.NO_BORDER);
-        tableTextos.addCell(cellVacia);
-
-        PdfPCell cellTexto = new PdfPCell();
-        cellTexto.setBorder(Rectangle.NO_BORDER);
-        cellTexto.setHorizontalAlignment(Element.ALIGN_RIGHT);
-        
-        Paragraph textos = new Paragraph();
-        textos.setAlignment(Element.ALIGN_RIGHT);
-        textos.setLeading(9f); // Ajuste de interlineado para que se vea compacto
-        
-        textos.add(new Chunk("UNIDAD DE PLANEACIÓN, ADMINISTRACIÓN Y FINANZAS\n", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 8)));
-        textos.add(new Chunk("DIRECCIÓN DE RECURSOS MATERIALES, SERVICIOS GENERALES, ARCHIVO Y SOPORTE TÉCNICO\n", FontFactory.getFont(FontFactory.HELVETICA, 7)));
-        textos.add(new Chunk("DEPARTAMENTO DE SOPORTE TÉCNICO\n", FontFactory.getFont(FontFactory.HELVETICA, 7)));
-        textos.add(new Chunk("Heroica Puebla de Zaragoza, a " + (request.fecha() != null ? request.fecha() : ""), FontFactory.getFont(FontFactory.HELVETICA, 7)));
-        
-        cellTexto.addElement(textos);
-        tableTextos.addCell(cellTexto);
-        document.add(tableTextos);
-
-        document.add(new Paragraph("\n"));
-        
-        // --- TÍTULO ---
-        Paragraph titulo = new Paragraph("DICTAMEN TÉCNICO", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12, Color.BLACK));
-        titulo.setAlignment(Element.ALIGN_CENTER);
-        titulo.setSpacingAfter(15);
-        document.add(titulo);
-
-        // --- RESTO DEL DOCUMENTO ---
-        PdfPTable tFechaFolio = new PdfPTable(2);
-        tFechaFolio.setWidthPercentage(100);
-        PdfPCell cFecha = new PdfPCell(new Phrase("FECHA: " + (request.fecha() != null ? request.fecha() : "_________________"), fontBold));
-        cFecha.setBorder(Rectangle.BOX);
-        String folioStr = String.format("%04d", request.folioTicket() != null ? request.folioTicket() : 0);
-        PdfPCell cFolio = new PdfPCell(new Phrase("No. FOLIO: " + folioStr, fontBold));
-        cFolio.setBorder(Rectangle.BOX);
-        cFolio.setHorizontalAlignment(Element.ALIGN_RIGHT);
-        tFechaFolio.addCell(cFecha);
-        tFechaFolio.addCell(cFolio);
-        document.add(tFechaFolio);
-        document.add(new Paragraph("\n"));
-
-        document.add(new Phrase("DATOS DEL USUARIO\n", fontBold));
-        PdfPTable tUsuario = new PdfPTable(new float[]{3f, 7f});
-        tUsuario.setWidthPercentage(100);
-        agregarLineaDatoUsuario(tUsuario, "DIRECCIÓN:", request.direccionUsuario(), fontNormal);
-        agregarLineaDatoUsuario(tUsuario, "DEPARTAMENTO:", request.departamentoUsuario(), fontNormal);
-        agregarLineaDatoUsuario(tUsuario, "NOMBRE DE USUARIO:", request.nombreUsuario(), fontNormal);
-        agregarLineaDatoUsuario(tUsuario, "TELEFONO / EXT:", request.telefonoUsuario(), fontNormal);
-        agregarLineaDatoUsuario(tUsuario, "TIPO DE REPORTE:", request.tipoReporte(), fontNormal);
-        document.add(tUsuario);
-        document.add(new Paragraph("\n"));
-
-        PdfPTable tEquipo = new PdfPTable(new float[]{1f, 3f, 1.5f, 1.5f, 2f, 2f, 0.8f});
-        tEquipo.setWidthPercentage(100);
-        String[] cabecerasEquipo = {"CVE.", "DESCRIPCIÓN", "MARCA", "MODELO", "No. SERIE", "NO. RESGUARDO", "NO."};
-        for (String cab : cabecerasEquipo) {
-            PdfPCell cell = new PdfPCell(new Phrase(cab, fontBold));
-            cell.setHorizontalAlignment(Element.ALIGN_CENTER);
-            tEquipo.addCell(cell);
-        }
-        String[] valoresEquipo = {request.cve(), request.descripcionEquipo(), request.marca(), request.modelo(), request.serie(), request.noResguardo(), "1"};
-        for (String val : valoresEquipo) {
-            PdfPCell cell = new PdfPCell(new Phrase(val != null ? val : "", fontNormal));
-            cell.setHorizontalAlignment(Element.ALIGN_CENTER);
-            tEquipo.addCell(cell);
-        }
-        document.add(tEquipo);
-
-        PdfPTable tTextos = new PdfPTable(1);
-        tTextos.setWidthPercentage(100);
-        Paragraph cuerpoTextos = new Paragraph();
-        cuerpoTextos.add(new Chunk("DESCRIPCIÓN DE LA FALLA:\n", fontBold));
-        cuerpoTextos.add(new Chunk((request.fallaReportada() != null ? request.fallaReportada() : "") + "\n\n", fontNormal));
-        cuerpoTextos.add(new Chunk("DIAGNÓSTICO TÉCNICO:\n", fontBold));
-        cuerpoTextos.add(new Chunk((request.diagnostico() != null ? request.diagnostico() : "") + "\n\n", fontNormal));
-        cuerpoTextos.add(new Chunk("HALLAZGOS:\n", fontBold));
-        cuerpoTextos.add(new Chunk((request.hallazgos() != null ? request.hallazgos() : "") + "\n\n", fontNormal));
-        cuerpoTextos.add(new Chunk("CONCLUSIÓN:\n", fontBold));
-        cuerpoTextos.add(new Chunk((request.conclusion() != null ? request.conclusion() : ""), fontNormal));
-        PdfPCell cellTextos = new PdfPCell(cuerpoTextos);
-        cellTextos.setPadding(10);
-        cellTextos.setMinimumHeight(200f); 
-        tTextos.addCell(cellTextos);
-        document.add(tTextos);
-        document.add(new Paragraph("\n\n")); 
-
-        PdfPTable tFirmas = new PdfPTable(3);
-        tFirmas.setWidthPercentage(100);
-        String fRealizo = formatearNombreFirma(request.realizadoPor());
-        String fReviso = formatearNombreFirma(request.revisadoPor());
-        String fRecibio = formatearNombreFirma(request.nombreUsuario());
-        String[] firmas = {fRealizo, fReviso, fRecibio};
-        String[] titulosFirmas = {"REALIZADO POR:", "REVISADO Y AUTORIZADO POR:", "RECIBIDO POR:"};
-        for (int i = 0; i < 3; i++) {
-            PdfPCell cFirma = new PdfPCell(new Phrase(titulosFirmas[i] + "\n(Nombre y Firma)\n\n\n___________________________\n" + firmas[i], fontBoldItalic));
-            cFirma.setBorder(Rectangle.NO_BORDER);
-            cFirma.setHorizontalAlignment(Element.ALIGN_CENTER);
-            tFirmas.addCell(cFirma);
-        }
-        document.add(tFirmas);
-
-        document.close();
-        return baos.toByteArray();
-    } catch (Exception e) {
-        throw new RuntimeException("Error al generar el formato oficial de Dictamen", e);
     }
-}
 
-// Métodos auxiliares necesarios en tu clase
-private void agregarLineaDatoUsuario(PdfPTable table, String label, String value, Font font) {
-    PdfPCell cellLabel = new PdfPCell(new Phrase(label, FontFactory.getFont(FontFactory.HELVETICA_BOLD, 7)));
-    cellLabel.setBorder(Rectangle.NO_BORDER);
-    table.addCell(cellLabel);
-    
-    PdfPCell cellValue = new PdfPCell(new Phrase(value != null ? value : "", font));
-    cellValue.setBorder(Rectangle.NO_BORDER);
-    table.addCell(cellValue);
-}
+    // =========================================================================================
+    // 2. GENERACIÓN DE MANTENIMIENTO PREVENTIVO
+    // =========================================================================================
+    public byte[] generarMantenimientoPdf(MantenimientoPreventivoRequest request) {
+        try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+            Document document = new Document(PageSize.LETTER.rotate(), 36, 36, 36, 36); 
+            PdfWriter.getInstance(document, baos);
+            document.open();
+            
+            Color colorGuinda = new Color(128, 26, 54);
 
-private String formatearNombreFirma(String nombre) {
-    return (nombre != null && !nombre.isEmpty()) ? nombre.toUpperCase() : "___________________________";
-}
+            Font fontTituloDoc = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 10, Color.BLACK);
+            Font fontCabecera = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 7, Color.WHITE);
+            Font fontNormalDoc = FontFactory.getFont(FontFactory.HELVETICA, 7, Color.BLACK);
+
+            Paragraph pDir = new Paragraph("DIRECCIÓN DE ADMINISTRACIÓN Y FINANZAS\nDEPARTAMENTO DE SOPORTE TÉCNICO\nLISTADO DE EQUIPOS DE CÓMPUTO AL QUE SE LE DIO MANTENIMIENTO PREVENTIVO\n(" + (request.departamento() != null ? request.departamento().toUpperCase() : "") + ")", fontTituloDoc);
+            pDir.setAlignment(Element.ALIGN_CENTER);
+            document.add(pDir);
+            
+            Paragraph pFechas = new Paragraph((request.fechaInicio() != null ? request.fechaInicio() : "") + " - " + (request.fechaFin() != null ? request.fechaFin() : ""), fontNormalDoc);
+            pFechas.setAlignment(Element.ALIGN_RIGHT);
+            pFechas.setSpacingAfter(10f);
+            document.add(pFechas);
+
+            PdfPTable table = new PdfPTable(10);
+            table.setWidthPercentage(100);
+            table.setWidths(new float[]{1f, 3.5f, 4.5f, 2.5f, 2.5f, 3f, 3f, 2f, 2.5f, 3f});
+
+            String[] cabeceras = {"No.", "ÁREA", "NOMBRE DE USUARIO RESPONSABLE", "TIPO DE CPU", "MARCA", "MODELO", "NO. DE SERIE", "MEMORIA RAM", "CAPACIDAD DISCO DURO", "NO. DE INVENTARIO DE EQUIPO"};
+            for (String cab : cabeceras) {
+                PdfPCell cell = new PdfPCell(new Phrase(cab, fontCabecera));
+                cell.setBackgroundColor(colorGuinda);
+                cell.setHorizontalAlignment(Element.ALIGN_CENTER);
+                cell.setVerticalAlignment(Element.ALIGN_MIDDLE);
+                cell.setPadding(4f);
+                table.addCell(cell);
+            }
+
+            int index = 1;
+            if (request.equipos() != null) {
+                for (EquipoMantenimientoDTO equipo : request.equipos()) {
+                    table.addCell(crearCeldaTabla(String.valueOf(index++), fontNormalDoc, Element.ALIGN_CENTER));
+                    table.addCell(crearCeldaTabla(equipo.area(), fontNormalDoc, Element.ALIGN_LEFT));
+                    table.addCell(crearCeldaTabla(equipo.usuarioResponsable(), fontNormalDoc, Element.ALIGN_LEFT));
+                    table.addCell(crearCeldaTabla(equipo.tipoCpu(), fontNormalDoc, Element.ALIGN_LEFT));
+                    table.addCell(crearCeldaTabla(equipo.marca(), fontNormalDoc, Element.ALIGN_LEFT));
+                    table.addCell(crearCeldaTabla(equipo.modelo(), fontNormalDoc, Element.ALIGN_LEFT));
+                    table.addCell(crearCeldaTabla(equipo.numeroSerie(), fontNormalDoc, Element.ALIGN_LEFT));
+                    table.addCell(crearCeldaTabla(equipo.memoriaRam(), fontNormalDoc, Element.ALIGN_CENTER));
+                    table.addCell(crearCeldaTabla(equipo.capacidadDisco(), fontNormalDoc, Element.ALIGN_CENTER));
+                    table.addCell(crearCeldaTabla(equipo.numeroInventario(), fontNormalDoc, Element.ALIGN_CENTER));
+                }
+            }
+            document.add(table);
+            document.add(new Paragraph("\n\n\n\n")); 
+
+            PdfPTable tFirmas = new PdfPTable(2);
+            tFirmas.setWidthPercentage(100);
+            Font fontFirma = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 7, Color.BLACK);
+            
+            String textoRealizo = "REALIZÓ EL SERVICIO\nSOPORTE TÉCNICO\n\n\n\n___________________________________\n" 
+                                + (request.nombreTecnico() != null ? request.nombreTecnico().toUpperCase() : "") 
+                                + "\nSOPORTE TÉCNICO";
+            PdfPCell cRealizo = new PdfPCell(new Phrase(textoRealizo, fontFirma));
+            cRealizo.setBorder(Rectangle.NO_BORDER);
+            cRealizo.setHorizontalAlignment(Element.ALIGN_CENTER);
+
+            String textoConformidad = "FIRMA DE CONFORMIDAD\nPOR PARTE DEL USUARIO\n\n\n\n___________________________________\n" 
+                                    + (request.departamento() != null ? request.departamento().toUpperCase() : "");
+            PdfPCell cConformidad = new PdfPCell(new Phrase(textoConformidad, fontFirma));
+            cConformidad.setBorder(Rectangle.NO_BORDER);
+            cConformidad.setHorizontalAlignment(Element.ALIGN_CENTER);
+
+            tFirmas.addCell(cRealizo);
+            tFirmas.addCell(cConformidad);
+            document.add(tFirmas);
+
+            document.close();
+            return baos.toByteArray();
+        } catch (Exception e) {
+            throw new RuntimeException("Error al generar el documento de Mantenimiento Preventivo", e);
+        }
+    }
+
+    // =========================================================
+    // 3. MÉTODO PARA ENTRADA DE EQUIPO DE CÓMPUTO
+    // =========================================================
+    public byte[] generarEntradaEquipoPdf(EntradaEquipoRequest request) {
+        try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+            Document document = new Document(PageSize.LETTER, 36, 36, 36, 36); 
+            PdfWriter.getInstance(document, baos);
+            document.open();
+
+            Font fontBold = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 8, Color.BLACK);
+            Font fontBoldItalic = FontFactory.getFont(FontFactory.HELVETICA_BOLDOBLIQUE, 8, Color.BLACK);
+            Font fontNormalDoc = FontFactory.getFont(FontFactory.HELVETICA, 8, Color.BLACK);
+
+            // --- 1. ENCABEZADO INSTITUCIONAL ---
+            PdfPTable tableLogo = new PdfPTable(1);
+            tableLogo.setWidthPercentage(100);
+            PdfPCell cellLogo = new PdfPCell();
+            cellLogo.setBorder(Rectangle.NO_BORDER);
+            cellLogo.setHorizontalAlignment(Element.ALIGN_CENTER);
+            cellLogo.setPaddingBottom(15); 
+            try {
+                com.lowagie.text.Image logo = com.lowagie.text.Image.getInstance(getClass().getClassLoader().getResource("logo-puebla.png"));
+                logo.scaleToFit(220, 110); 
+                logo.setAlignment(Element.ALIGN_CENTER);
+                cellLogo.addElement(logo);
+            } catch (Exception e) {
+                System.err.println("Error cargando logo: " + e.getMessage());
+            }
+            tableLogo.addCell(cellLogo);
+            document.add(tableLogo);
+
+            PdfPTable tableTextos = new PdfPTable(2);
+            tableTextos.setWidthPercentage(100);
+            tableTextos.setWidths(new float[]{1.5f, 1f}); 
+
+            PdfPCell cellVacia = new PdfPCell();
+            cellVacia.setBorder(Rectangle.NO_BORDER);
+            tableTextos.addCell(cellVacia);
+
+            PdfPCell cellTexto = new PdfPCell();
+            cellTexto.setBorder(Rectangle.NO_BORDER);
+            cellTexto.setHorizontalAlignment(Element.ALIGN_RIGHT);
+            
+            Paragraph textos = new Paragraph();
+            textos.setAlignment(Element.ALIGN_RIGHT);
+            textos.setLeading(10f); 
+            
+            Font fontHeaderBold = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 8);
+            textos.add(new Chunk("Unidad de Planeación, Administración y Finanzas\n", fontHeaderBold));
+            textos.add(new Chunk("Dirección de Recursos Materiales, Servicios Generales, Archivo y Soporte Técnico\n", fontHeaderBold));
+            textos.add(new Chunk("Departamento de Soporte Técnico\n", fontHeaderBold));
+            textos.add(new Chunk("Heroica Puebla de Zaragoza, a " + (request.getFecha() != null ? request.getFecha() : ""), fontHeaderBold));
+            
+            cellTexto.addElement(textos);
+            tableTextos.addCell(cellTexto);
+            document.add(tableTextos);
+
+            document.add(new Paragraph("\n"));
+            
+            Paragraph titulo = new Paragraph("ENTRADA DE EQUIPO DE CÓMPUTO", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12, Color.BLACK));
+            titulo.setAlignment(Element.ALIGN_CENTER);
+            titulo.setSpacingAfter(10);
+            document.add(titulo);
+
+            // --- 2. FECHA Y FOLIO ---
+            PdfPTable tFechaFolio = new PdfPTable(2);
+            tFechaFolio.setWidthPercentage(100);
+            
+            PdfPCell cFecha = new PdfPCell(new Phrase("FECHA: " + (request.getFecha() != null ? request.getFecha() : "_________________"), fontBold));
+            cFecha.setBorder(Rectangle.BOTTOM | Rectangle.TOP | Rectangle.LEFT | Rectangle.RIGHT);
+            
+            String folioStr = String.format("%04d", request.getFolioTicket() != null ? request.getFolioTicket() : 0);
+            PdfPCell cFolio = new PdfPCell(new Phrase("No. FOLIO: " + folioStr, fontBold));
+            cFolio.setBorder(Rectangle.BOTTOM | Rectangle.TOP | Rectangle.LEFT | Rectangle.RIGHT);
+            cFolio.setHorizontalAlignment(Element.ALIGN_RIGHT);
+            
+            tFechaFolio.addCell(cFecha);
+            tFechaFolio.addCell(cFolio);
+            document.add(tFechaFolio);
+            document.add(new Paragraph("\n"));
+
+            // --- 3. NUEVO DISEÑO: UBICACIONES EN DOS COLUMNAS ---
+            // Creamos una tabla de 4 columnas (Etiqueta1, Valor1, Etiqueta2, Valor2)
+            PdfPTable tUbicacion = new PdfPTable(4);
+            tUbicacion.setWidthPercentage(100);
+            tUbicacion.setWidths(new float[]{1.5f, 3.5f, 1.5f, 3.5f});
+            
+            // Títulos de las dos secciones
+            PdfPCell titActual = new PdfPCell(new Phrase("UBICACION ACTUAL", fontBoldItalic));
+            titActual.setColspan(2);
+            titActual.setBorder(Rectangle.NO_BORDER);
+            tUbicacion.addCell(titActual);
+            
+            PdfPCell titDestino = new PdfPCell(new Phrase("UBICACION DESTINO", fontBoldItalic));
+            titDestino.setColspan(2);
+            titDestino.setBorder(Rectangle.NO_BORDER);
+            tUbicacion.addCell(titDestino);
+            
+            // Llenado de filas (Izquierda: Actual, Derecha: Destino)
+            agregarLineaDatoUsuario(tUbicacion, "DEPARTAMENTO:", request.getDepartamentoActual(), fontNormalDoc);
+            agregarLineaDatoUsuario(tUbicacion, "A RESGUARDO DE:", request.getResguardoDestino(), fontNormalDoc);
+            
+            agregarLineaDatoUsuario(tUbicacion, "DIRECCIÓN:", request.getDireccionActual(), fontNormalDoc);
+            agregarLineaDatoUsuario(tUbicacion, "DIRECCIÓN:", request.getDireccionDestino(), fontNormalDoc);
+            
+            agregarLineaDatoUsuario(tUbicacion, "TELEFONO:", request.getTelefonoActual(), fontNormalDoc);
+            agregarLineaDatoUsuario(tUbicacion, "TELEFONO:", request.getTelefonoDestino(), fontNormalDoc);
+            
+            agregarLineaDatoUsuario(tUbicacion, "RESPONSABLE:", request.getResponsableActual(), fontNormalDoc);
+            agregarLineaDatoUsuario(tUbicacion, "RESPONSABLE:", request.getResponsableDestino(), fontNormalDoc);
+            
+            document.add(tUbicacion);
+            
+            // Espacio antes de la tabla de equipos
+            Paragraph espacio = new Paragraph(" ");
+            espacio.setSpacingAfter(5f);
+            document.add(espacio);
+
+            // --- 4. TABLA CENTRAL DE EQUIPOS ---
+            PdfPTable tEquipo = new PdfPTable(new float[]{1f, 3.5f, 2f, 2f, 2.5f, 2.5f, 1f});
+            tEquipo.setWidthPercentage(100);
+            
+            String[] cabecerasEquipo = {"CVE.", "DESCRIPCION", "MARCA", "MODELO", "No. SERIE", "NO. DE RESGUARDO", "CANT."};
+            for (String cab : cabecerasEquipo) {
+                PdfPCell cell = new PdfPCell(new Phrase(cab, fontBold));
+                cell.setHorizontalAlignment(Element.ALIGN_CENTER);
+                tEquipo.addCell(cell);
+            }
+            
+            int filasLlenadas = 0;
+            if (request.getEquipos() != null) {
+                for (EntradaEquipoDetalleDTO equipo : request.getEquipos()) {
+                    tEquipo.addCell(new Phrase(equipo.getCve() != null ? equipo.getCve() : "", fontNormalDoc));
+                    tEquipo.addCell(new Phrase(equipo.getDescripcion() != null ? equipo.getDescripcion() : "", fontNormalDoc));
+                    tEquipo.addCell(new Phrase(equipo.getMarca() != null ? equipo.getMarca() : "", fontNormalDoc));
+                    tEquipo.addCell(new Phrase(equipo.getModelo() != null ? equipo.getModelo() : "", fontNormalDoc));
+                    tEquipo.addCell(new Phrase(equipo.getSerie() != null ? equipo.getSerie() : "", fontNormalDoc));
+                    tEquipo.addCell(new Phrase(equipo.getNoResguardo() != null ? equipo.getNoResguardo() : "", fontNormalDoc));
+                    tEquipo.addCell(new Phrase(equipo.getCantidad() != null ? equipo.getCantidad() : "", fontNormalDoc));
+                    filasLlenadas++;
+                }
+            }
+            
+            // Rellenar filas vacías hasta llegar a 10
+            for (int i = filasLlenadas; i < 10; i++) {
+                for(int j = 0; j < 7; j++) {
+                    PdfPCell emptyCell = new PdfPCell(new Phrase(" "));
+                    emptyCell.setMinimumHeight(15f);
+                    tEquipo.addCell(emptyCell);
+                }
+            }
+            document.add(tEquipo);
+            document.add(new Paragraph("\n\n\n\n")); // Espacio amplio para las firmas
+
+            // --- 5. FIRMAS ---
+            PdfPTable tFirmas = new PdfPTable(2);
+            tFirmas.setWidthPercentage(100);
+            
+            String fEntregado = formatearNombreFirma(request.getEntregadoPor());
+            String fRecibido = formatearNombreFirma(request.getRecibidoPor());
+            
+            PdfPCell cFirmaE = new PdfPCell(new Phrase("ENTREGADO POR:\n(Nombre y Firma)\n\n\n___________________________\n" + fEntregado, fontBoldItalic));
+            cFirmaE.setBorder(Rectangle.NO_BORDER);
+            cFirmaE.setHorizontalAlignment(Element.ALIGN_CENTER);
+            
+            PdfPCell cFirmaR = new PdfPCell(new Phrase("RECIBIDO POR:\n(Nombre y Firma)\n\n\n___________________________\n" + fRecibido, fontBoldItalic));
+            cFirmaR.setBorder(Rectangle.NO_BORDER);
+            cFirmaR.setHorizontalAlignment(Element.ALIGN_CENTER);
+            
+            tFirmas.addCell(cFirmaE);
+            tFirmas.addCell(cFirmaR);
+            document.add(tFirmas);
+
+            document.close();
+            return baos.toByteArray();
+        } catch (Exception e) {
+            throw new RuntimeException("Error al generar el formato oficial de Entrada de Equipo", e);
+        }
+    }
 
     // =========================================================================================
     // 4. GENERACIÓN DE REPORTE DE ACTIVIDADES PDF
@@ -367,12 +470,13 @@ private String formatearNombreFirma(String nombre) {
             Document document = new Document(PageSize.LETTER.rotate(), 36, 36, 36, 36);
             PdfWriter.getInstance(document, baos);
             document.open();
+            
+            Color colorGuinda = new Color(128, 26, 54);
 
             Font fontTitulo = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12, Color.BLACK);
             Font fontSubtitulo = FontFactory.getFont(FontFactory.HELVETICA_OBLIQUE, 10, Color.BLACK);
             Font fontCabecera = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 9, Color.WHITE);
-            Font fontNormal = FontFactory.getFont(FontFactory.HELVETICA, 8, Color.BLACK);
-            Color colorGuinda = new Color(128, 26, 54); 
+            Font fontNormal = FontFactory.getFont(FontFactory.HELVETICA, 8, Color.BLACK); 
 
             Paragraph pDir = new Paragraph("Dirección de Recursos Materiales, Servicios Generales, Archivo y Soporte Técnico", fontTitulo);
             pDir.setAlignment(Element.ALIGN_CENTER);
@@ -405,7 +509,7 @@ private String formatearNombreFirma(String nombre) {
                 cell.setBackgroundColor(colorGuinda);
                 cell.setHorizontalAlignment(Element.ALIGN_CENTER);
                 cell.setVerticalAlignment(Element.ALIGN_MIDDLE);
-                cell.setPadding(5);
+                cell.setPadding(4);
                 table.addCell(cell);
             }
 
@@ -454,14 +558,6 @@ private String formatearNombreFirma(String nombre) {
         } catch (Exception e) {
             throw new RuntimeException("Error al generar el reporte de actividades", e);
         }
-    }
-
-    private PdfPCell crearCelda(String texto, Font fuente, int alineacion) {
-        PdfPCell cell = new PdfPCell(new Phrase(texto, fuente));
-        cell.setHorizontalAlignment(alineacion);
-        cell.setVerticalAlignment(Element.ALIGN_MIDDLE);
-        cell.setPadding(4);
-        return cell;
     }
 
     // =========================================================================================
