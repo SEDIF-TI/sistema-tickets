@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
-    Box, Typography, Paper, Tabs, Tab, FormControl, InputLabel, Select, MenuItem, Dialog, 
-    DialogTitle, DialogContent, Button, IconButton 
+    Box, Typography, Paper, Tabs, Tab, FormControl, InputLabel, Select, MenuItem, 
+    Dialog, DialogTitle, DialogContent, IconButton 
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import api from "../services/api";
@@ -25,23 +25,37 @@ export default function GeneradorDocumentos({ user }) {
 
     const solicitarPdf = async (endpoint, payload, nombreArchivo) => {
         try {
-            // Nota: Aquí se construye la ruta final: /api/v1/documentos/{endpoint}
-            // Asegúrate de enviar SOLO el nombre del endpoint desde los hijos (ej: 'dictamen')
-            const response = await api.post(`/v1/documentos/${endpoint}`, payload, { responseType: 'blob' });
+            // --- SOLUCIÓN DEFINITIVA A LAS RUTAS DUPLICADAS ---
+            // 1. Limpiamos cualquier rastro de "/v1/documentos/" que los hijos puedan enviar por error
+            let cleanEndpoint = endpoint;
+            if (cleanEndpoint.includes('/v1/documentos/')) {
+                cleanEndpoint = cleanEndpoint.replace('/v1/documentos/', '');
+            }
+            if (cleanEndpoint.startsWith('/')) {
+                cleanEndpoint = cleanEndpoint.substring(1);
+            }
+
+            // 2. Construimos la ruta limpia de forma segura
+            const rutaFinal = `/v1/documentos/${cleanEndpoint}`;
+            console.log("🚀 URL limpia que se enviará al backend:", rutaFinal);
+
+            // 3. Hacemos la petición
+            const response = await api.post(rutaFinal, payload, { responseType: 'blob' });
             
+            // 4. Generamos el visor
             const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
             setPdfUrl(url);
             setNombrePdfActual(nombreArchivo);
             setOpenModal(true);
         } catch (error) {
             console.error("Error al generar el PDF:", error);
-            alert("Hubo un error al generar el documento. Verifica los datos.");
+            alert("Hubo un error al generar el documento. Revisa la consola.");
         }
     };
 
     const handleCloseModal = () => {
         if (pdfUrl) {
-            window.URL.revokeObjectURL(pdfUrl); // Limpiamos la memoria
+            window.URL.revokeObjectURL(pdfUrl);
         }
         setPdfUrl("");
         setOpenModal(false);
@@ -100,22 +114,22 @@ export default function GeneradorDocumentos({ user }) {
                 {tabIndex === 2 && <MantenimientoPreventivoFormato solicitarPdf={solicitarPdf} usuarioLogueado={user} />}
             </Box>
 
-            {/* MODAL DEL PDF */}
+            {/* MODAL DEL PDF VISUALIZADOR COMPLETADO */}
             <Dialog open={openModal} onClose={handleCloseModal} maxWidth="lg" fullWidth>
-                <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Typography variant="h6">{nombrePdfActual}</Typography>
+                <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', bgcolor: '#f5f5f5' }}>
+                    <Typography variant="h6" sx={{ fontWeight: 'bold' }}>{nombrePdfActual}</Typography>
                     <IconButton onClick={handleCloseModal}>
                         <CloseIcon />
                     </IconButton>
                 </DialogTitle>
-                <DialogContent dividers sx={{ height: '80vh', p: 0 }}>
+                <DialogContent dividers sx={{ height: '82vh', p: 0, overflow: 'hidden' }}>
                     {pdfUrl ? (
                         <iframe 
                             src={pdfUrl} 
                             width="100%" 
                             height="100%" 
                             title="Vista previa PDF"
-                            style={{ border: 'none' }}
+                            style={{ border: 'none', display: 'block' }}
                         />
                     ) : (
                         <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
