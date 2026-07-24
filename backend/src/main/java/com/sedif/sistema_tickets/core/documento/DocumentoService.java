@@ -17,6 +17,7 @@ import com.lowagie.text.pdf.PdfWriter;
 import com.sedif.sistema_tickets.core.resguardo.ResguardoRequest;
 
 // Importaciones de Spring y utilidades de Java
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import java.awt.Color;
 import java.io.ByteArrayOutputStream;
@@ -35,6 +36,8 @@ import org.apache.poi.ss.usermodel.FillPatternType;
 import org.apache.poi.ss.usermodel.HorizontalAlignment;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
+import com.sedif.sistema_tickets.core.usuarios.UsuarioRepository;
+
 @Service
 public class DocumentoService {
 
@@ -42,6 +45,10 @@ public class DocumentoService {
     private final Font fuenteTitulo = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 16, Color.BLACK);
     private final Font fuenteNegrita = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12, Color.BLACK);
     private final Font fuenteNormal = FontFactory.getFont(FontFactory.HELVETICA, 12, Color.BLACK);
+    
+    // CORRECCIÓN: Se quitó 'final' y se agregó @Autowired para inyectar correctamente la BD
+    @Autowired
+    private UsuarioRepository usuarioRepository;
 
     private void agregarEncabezadoInstitucional(Document document, String titulo) throws DocumentException {
         Font fontInstitucion = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12, Color.BLACK);
@@ -401,7 +408,7 @@ public class DocumentoService {
     }
     
     // =========================================================================================
-    // 4. GENERACIÓN DE RESGUARDO 
+    // 4. GENERACIÓN DE RESGUARDO (MÉTODO COMPLETO DEFINITIVO CON NOMBRE DE PERFIL REAL)
     // =========================================================================================
     public byte[] generarResguardo(ResguardoRequest request) {
         try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
@@ -413,6 +420,7 @@ public class DocumentoService {
             Font fontBoldItalic = FontFactory.getFont(FontFactory.HELVETICA_BOLDOBLIQUE, 7, Color.BLACK);
             Font fontNorm = FontFactory.getFont(FontFactory.HELVETICA, 7, Color.BLACK);
 
+            // 1. SECCIÓN: LOGO OFICIAL
             PdfPTable tableLogo = new PdfPTable(1);
             tableLogo.setWidthPercentage(100);
             PdfPCell cellLogo = new PdfPCell();
@@ -430,6 +438,7 @@ public class DocumentoService {
             tableLogo.addCell(cellLogo);
             document.add(tableLogo);
 
+            // 2. SECCIÓN: ENCABEZADO DERECHO (ÁREA E INSTITUCIÓN)
             PdfPTable tableTextos = new PdfPTable(2);
             tableTextos.setWidthPercentage(100);
             tableTextos.setWidths(new float[]{1.5f, 1f}); 
@@ -458,11 +467,13 @@ public class DocumentoService {
             document.add(tableTextos);
             document.add(new Paragraph("\n"));
             
+            // TÍTULO CENTRAL
             Paragraph titulo = new Paragraph("RESGUARDO DE EQUIPO", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12, Color.BLACK));
             titulo.setAlignment(Element.ALIGN_CENTER);
             titulo.setSpacingAfter(15);
             document.add(titulo);
 
+            // 3. SECCIÓN: FECHA Y NO. DE EMPLEADO
             PdfPTable tFechaFolio = new PdfPTable(2);
             tFechaFolio.setWidthPercentage(100);
             PdfPCell cFecha = new PdfPCell(new Phrase("FECHA: " + fechaActual, fontBold));
@@ -477,6 +488,7 @@ public class DocumentoService {
             document.add(tFechaFolio);
             document.add(new Paragraph("\n"));
 
+            // 4. SECCIÓN: DATOS DEL USUARIO (CON PREFIJO "C. ")
             document.add(new Phrase("DATOS DEL USUARIO\n", fontBold));
             PdfPTable tUsuario = new PdfPTable(new float[]{3f, 7f});
             tUsuario.setWidthPercentage(100);
@@ -493,6 +505,7 @@ public class DocumentoService {
             document.add(tUsuario);
             document.add(new Paragraph("\n"));
 
+            // 5. SECCIÓN: TABLA DE CARACTERÍSTICAS DEL EQUIPO
             PdfPTable tEquipo = new PdfPTable(new float[]{2f, 2f, 2f, 1.5f, 1.5f, 1.5f});
             tEquipo.setWidthPercentage(100);
             String[] cabecerasEquipo = {"EQUIPO", "No. SERIE", "No. INVENTARIO", "CONDICIONES", "TIPO VIG.", "CANTIDAD"};
@@ -513,6 +526,7 @@ public class DocumentoService {
             }
             document.add(tEquipo);
 
+            // 6. SECCIÓN: OBSERVACIONES Y DECLARATORIA
             PdfPTable tTextos = new PdfPTable(1);
             tTextos.setWidthPercentage(100);
             Paragraph cuerpoTextos = new Paragraph();
@@ -524,23 +538,76 @@ public class DocumentoService {
             
             PdfPCell cellTextos = new PdfPCell(cuerpoTextos);
             cellTextos.setPadding(10);
-            cellTextos.setMinimumHeight(200f);
+            cellTextos.setMinimumHeight(180f); 
             tTextos.addCell(cellTextos);
             document.add(tTextos);
-            document.add(new Paragraph("\n\n")); 
+            document.add(new Paragraph("\n")); 
 
-            PdfPTable tFirmas = new PdfPTable(3);
+            // =====================================================================
+            // 7. SECCIÓN DEL APARTADO DE FIRMAS DINÁMICO
+            // =====================================================================
+            PdfPTable tFirmas = new PdfPTable(2);
             tFirmas.setWidthPercentage(100);
+            tFirmas.setSpacingBefore(15f);
             
-            String[] firmas = {"SOPORTE TÉCNICO", "Vo. Bo.", formatearNombre(request.solicitanteNombre())};
-            String[] titulosFirmas = {"ENTREGA:", "AUTORIZA:", "RECIBE (USUARIO):"};
+            // --- COLUMNA IZQUIERDA: ENTREGA (Nombre real completo recuperado desde la BD) ---
+            PdfPCell cEntrega = new PdfPCell();
+            cEntrega.setBorder(Rectangle.NO_BORDER);
+            cEntrega.setHorizontalAlignment(Element.ALIGN_CENTER);
             
-            for (int i = 0; i < 3; i++) {
-                PdfPCell cFirma = new PdfPCell(new Phrase(titulosFirmas[i] + "\n(Nombre y Firma)\n\n\n___________________________\n" + firmas[i], fontBoldItalic));
-                cFirma.setBorder(Rectangle.NO_BORDER);
-                cFirma.setHorizontalAlignment(Element.ALIGN_CENTER);
-                tFirmas.addCell(cFirma);
+            Paragraph pEntrega = new Paragraph();
+            pEntrega.setAlignment(Element.ALIGN_CENTER);
+            pEntrega.setLeading(13f);
+            pEntrega.add(new Chunk("ENTREGA:\n(Nombre y Firma)\n\n\n\n\n", fontBoldItalic)); 
+            pEntrega.add(new Chunk("___________________________\n", fontBoldItalic));
+            
+            String operador = "SOPORTE TÉCNICO";
+            try {
+                org.springframework.security.core.Authentication auth = 
+                    org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+                
+                if (auth != null && auth.getName() != null && !auth.getName().equals("anonymousUser")) {
+                    String correoLogueado = auth.getName();
+                    
+                    // Buscamos al usuario en la BD usando el correo de la sesión
+                    var usuarioOpt = usuarioRepository.findByCorreo(correoLogueado);
+                    if (usuarioOpt.isPresent()) {
+                        com.sedif.sistema_tickets.core.usuarios.Usuario u = usuarioOpt.get();
+                        
+                        // Concatenamos el Nombre Completo tal cual aparece al lado de tu perfil
+                        StringBuilder nombreCompleto = new StringBuilder(u.getNombre());
+                        if (u.getApellidoPaterno() != null && !u.getApellidoPaterno().trim().isEmpty()) {
+                            nombreCompleto.append(" ").append(u.getApellidoPaterno());
+                        }
+                        if (u.getApellidoMaterno() != null && !u.getApellidoMaterno().trim().isEmpty()) {
+                            nombreCompleto.append(" ").append(u.getApellidoMaterno());
+                        }
+                        operador = nombreCompleto.toString();
+                    }
+                }
+            } catch (Exception e) {
+                System.err.println("Error al mapear el nombre del perfil: " + e.getMessage());
             }
+
+            pEntrega.add(new Chunk(formatearNombre(operador), fontBoldItalic));
+            cEntrega.addElement(pEntrega);
+            tFirmas.addCell(cEntrega);
+            
+            // --- COLUMNA DERECHA: RECIBE (El Servidor Público / Usuario) ---
+            PdfPCell cRecibe = new PdfPCell();
+            cRecibe.setBorder(Rectangle.NO_BORDER);
+            cRecibe.setHorizontalAlignment(Element.ALIGN_CENTER);
+            
+            Paragraph pRecibe = new Paragraph();
+            pRecibe.setAlignment(Element.ALIGN_CENTER);
+            pRecibe.setLeading(13f);
+            pRecibe.add(new Chunk("RECIBE (USUARIO):\n(Nombre y Firma)\n\n\n\n\n", fontBoldItalic)); 
+            pRecibe.add(new Chunk("___________________________\n", fontBoldItalic));
+            pRecibe.add(new Chunk(formatearNombre(request.solicitanteNombre()), fontBoldItalic));
+            
+            cRecibe.addElement(pRecibe);
+            tFirmas.addCell(cRecibe);
+
             document.add(tFirmas);
 
             document.close();

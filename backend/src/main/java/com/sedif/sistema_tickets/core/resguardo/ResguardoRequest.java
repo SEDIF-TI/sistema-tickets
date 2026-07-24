@@ -11,5 +11,6 @@ public record ResguardoRequest(
         String telefono,
         String departamento,
         String numeroInventario,
-        String condiciones
+        String condiciones,
+        String entregaNombre
 ) {}

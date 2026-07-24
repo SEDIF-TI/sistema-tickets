@@ -25,6 +25,9 @@ import AdminAreasPage from './pages/admin/AdminAreasPage';
 import DashboardPage from './pages/admin/DashboardPage.jsx';
 import AdminEquiposPage from './pages/admin/AdminEquiposPage.jsx';
 
+// Módulo de Correos Institucionales (Ajusta la ruta si lo guardaste en otra carpeta)
+import { GestionCorreos } from './pages/soporte/GestionCorreos.jsx';
+
 // Componentes Adicionales
 import GeneradorDocumentos from './components/GeneradorDocumentos.jsx'; 
 
@@ -69,6 +72,9 @@ function AppContent() {
             <Route path="/admin/avisos" element={<MainLayout><AdminAvisosPage /></MainLayout>} />
             <Route path="/admin/bitacora" element={<MainLayout><TicketsPage /></MainLayout>} />
             <Route path="/admin/equipos" element={<MainLayout><AdminEquiposPage /></MainLayout>} />
+            
+            {/* RUTA NUEVA: Correos Institucionales */}
+            <Route path="/admin/correos" element={<MainLayout><GestionCorreos /></MainLayout>} />
 
             {/* Rutas de Soporte / Documentos */}
             <Route path="/soporte/bandeja" element={<MainLayout><PanelSoporte /></MainLayout>} />
