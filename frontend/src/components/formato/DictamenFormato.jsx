@@ -179,9 +179,20 @@ export default function DictamenFormato({ solicitarPdf }) {
                             }
                         } catch (e) { console.error("No se pudo actualizar catálogo JIT", e); }
                         
-                        // DictamenFormato.jsx
-                        solicitarPdf('dictamen', dictamen, `Dictamen_Automatico.pdf`); 
-                        // NOTA: Sin el /v1/documentos/ adelante, porque GeneradorDocumentos ya lo pone.
+                        // --- CÓDIGO NUEVO PARA AGREGAR "C. " ---
+                        // Creamos una copia de los datos pero formateando los nombres
+                        const datosParaPdf = {
+                            ...dictamen,
+                            // Agregamos "C. " al técnico (REALIZADO POR) si no lo tiene ya
+                            realizadoPor: dictamen.realizadoPor.startsWith('C. ') ? dictamen.realizadoPor : `C. ${dictamen.realizadoPor}`,
+                            // Agregamos "C. " al usuario (RECIBIDO POR) si no lo tiene ya
+                            nombreUsuario: dictamen.nombreUsuario && !dictamen.nombreUsuario.startsWith('C. ') 
+                                            ? `C. ${dictamen.nombreUsuario}` 
+                                            : dictamen.nombreUsuario
+                        };
+
+                        // Enviamos la copia formateada en lugar del estado original
+                        solicitarPdf('dictamen', datosParaPdf, `Dictamen_Automatico.pdf`);
                     }} 
                     startIcon={<PictureAsPdfIcon />} 
                     sx={{ bgcolor: COLOR_GUINDA, '&:hover': { bgcolor: '#5e1227' }, px: 4, py: 1.5, fontWeight: 'bold' }}
