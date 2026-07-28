@@ -1,0 +1,115 @@
+[33m03f9e5e[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mformulario[m[33m, [m[1;31morigin/formulario[m[33m)[m feat: Modulo de gestion de correo Institucional con CRUD, la baja se maneja logicamente
+[33md6018a4[m feat: Funcionalidad de resguardo y ajustes en los formularios de generacion de documentos
+[33m56f1399[m feat: Funcionalidad de resguardo y ajustes en los formularios de generacion de documentos
+[33m20c5290[m feat: Funcionalidad de resguardo y ajustes en los formularios de generacion de documentos
+[33mb86ff15[m feat: Funcionalidad de resguardo y ajustes en los formularios de generacion de documentos
+[33mdf6e874[m feat: Funcionalidad de resguardo y ajustes en los formularios de generacion de documentos
+[33m0259ab1[m feat: Funcionalidad de resguardo y ajustes en los formularios de generacion de documentos
+[33m8bf2501[m fix/feat: Ajustes de interfaz en formatos y estructura de PDFs
+[33m64e4dc0[m agregar formato PDF para Entrada de Equipo, modelos DTO con Lombok y nueva pestaña en frontend
+[33m0ee6a5b[m fix: Cambio en el diseeño login, dictamen tecnico
+[33m2518321[m Fix: Fusiion de ramas, correccion de errores, mejora en las vistas de los formularios
+[33m94b5a8d[m Merge branch 'formulario' of https://github.com/SEDIF-TI/sistema-tickets into formulario
+[33m28a6026[m fix: Cambios en el reporte de activiaddes, ticket, ver el generador de documentos desde addministrador, cambio de frontend en cuestion de las fechas
+[33mf3e5495[m Merge branch 'formulario' of https://github.com/SEDIF-TI/sistema-tickets into formulario
+[33m900e6e1[m feat: agregar formato PDF para mantenimiento preventivo, refactorizar endpoints y visor modal de documentos
+[33m798b026[m fix: Estandarizacion de las entradas, catalogo de equipos
+[33m02078c1[m fix: Modificacion del menejo de las vistas, formulario de dictamen tecnico, ajuste en la vista PrimerCambioPassword
+[33m02d6e3e[m fix: Correccion en las relaciones de las vistas segun el rol
+[33m41b6558[m[33m ([m[1;31mpersonal-origin/fusion[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/develop[m[33m, [m[1;31morigin/dev[m[33m, [m[1;31morigin/HEAD[m[33m, [m[1;32mdev[m[33m)[m fix: Correccion en alerta, visibilidad de todas para el administrador y visibilidad por areas, feat: Nueva grafica de las alertas disponibles, correccion tanto en backend como frontend
+[33m318f816[m fix: Correccion en alertas, ahora el administrador puede elegir areas para mostrar la alerta o que sea global
+[33m750460f[m[33m ([m[1;31mpersonal-origin/modulo_pdf[m[33m, [m[1;32mmodulo_pdf[m[33m)[m feat: cambios en colores, vistas
+[33m9d25eaf[m fix: arreglo de vista empleado, soporte y administrador
+[33m77c1d31[m fix: Correcciones de boton al crear nuevo ticket, reajuste de visulaizacion de informacion en las tablas
+[33m7ce0601[m Merge branch 'vistas_usuarios' of https://github.com/JoseGuadalupeML/sistema_tickets into modulo_pdf
+[33mb855d2e[m feat: rediseño institucional, seguridad en primer login y panel de soporte dinámico
+[33m82b06d7[m feat: Integrar notificaciones globales en layouts y generador de PDFs para Requisiciones y Memorándums
+[33mf27d62f[m Merge: Resolución de conflictos en rutas, seguridad y layout; integración lista
+[33ma73e97a[m feat: Vista generar documentos memurandoum
+[33mb4121fb[m wip: Avance en módulo de Avisos Globales (Layout, Rutas y Página Admin en construcción)
+[33mb348362[m fix: Integracion de modulo area y vista usuarios
+[33m3899654[m Merge remote-tracking branch 'origin/vistas_usuarios' into modulo_pdf
+[33m0b35c4f[m fix: Ingreso con nuevos usuarios corregido
+[33m9c0dcb2[m Merge: Resolución de conflictos con los últimos cambios remotos
+[33ma7146d4[m fix: Ajustes post-merge, corrección de rutas de documentos, filtro de tickets por técnico asignado y numeración secuencial en tabla
+[33m76d73dd[m fix: Ingreso con nuevos usuarios corregido
+[33m3eb25e8[m[33m ([m[1;31mpersonal-origin/modulo_area[m[33m, [m[1;32mmodulo_area[m[33m)[m fix: Ingreso con nuevos usuarios corregido
+[33m2f712e0[m Merge branch 'modulo_usuarios' into 'vistas_usuarios' y resolución de conflictos
+[33m181c536[m fix/feat: estabilización de sesión, rutas y seguridad unificada
+[33md549690[m[33m ([m[1;32mvistas_usuarios[m[33m)[m feat: vistas areas
+[33me15ad7d[m feat: vistas areas
+[33mce4fbf6[m Feat: Vista agregar usuarios, areas, para el administrador
+[33mf9019b6[m Merge origin/modulo_area: conflictos resueltos en rutas y repositorios
+[33mf6899cd[m Feat: Vista agregar usuarios, areas, para el administrador
+[33m7bb1526[m[33m ([m[1;31mpersonal-origin/modulo_usuarios[m[33m)[m feat: Integrar generación de PDF con OpenPDF, ajustes de seguridad y nueva vista de documentos en React
+[33m963d44b[m feat: Integracion de telegram con el sistema para trealizar las notificaciones
+[33ma81364b[m feat: Integracion de telegram con el sistema para trealizar las notificaciones
+[33mbb8f324[m Merge remote-tracking branch 'origin/modulo_usuarios' into modulo_area
+[33m6c77c0c[m feat: Integracion de telegram con el sistema para trealizar las notificaciones
+[33m4761613[m feat: Integracion de telegram con el sistema para trealizar las notificaciones
+[33mbce4400[m feat: implementacion de bitacora y flujo completo de resolucion de tickets
+[33m25b628b[m feat: integracion de campo sede, correcion de TicketResponse y DTOs
+[33m46b8894[m style(soporte): vista soporte, creacion de alertas, levantamiento de tickets
+[33m38cfebf[m style: Cambio en el diseño de la vista de empleado
+[33m3456447[m feat(soporte): reestructurar vista principal del panel de soporte
+[33m3c27240[m feat: barra lateral en el frontend
+[33m046f4c9[m Merge: resolucion de conflicto en vite.config.js
+[33maf23fa5[m feat(websocket): configuracion de vite.config.js
+[33m25fa8b1[m fear: Vista segun rol empleado
+[33m9a926c0[m Merge remote-tracking branch 'origin/modulo_usuarios' into modulo_area
+[33m4464221[m feat(websocket): configurar servidor STOMP y habilitar endpoint publico en SecurityConfig
+[33m8df7a9e[m Merge remote-tracking branch 'origin/modulo_usuarios' into modulo_area
+[33m51802b9[m fear: Vista segun rol empleado
+[33mc87ea17[m feat(websocket): implementar WebSocketContext integrado con autenticacion STOMP y SockJS
+[33m5fb04e6[m fear: cambio de la regla con area prioritaria, frontend y asiganacion de vistas
+[33m98e8d96[m fleat: Funcionalidad de la rama modulo area y seguridad
+[33m00b4b52[m Merge pull request #6 from JoseGuadalupeML/modulo_area
+[33mc00fa4f[m Chore: Combinancion de las ramas modulo_area y seguridad
+[33m0390736[m Merge branch 'seguridad' of https://github.com/JoseGuadalupeML/sistema_tickets into modulo_area
+[33m6849aaa[m feat: vistas del ticket segun el rol
+[33m391aa60[m[33m ([m[1;31mpersonal-origin/seguridad[m[33m)[m Merge branch 'seguridad' of https://github.com/JoseGuadalupeML/sistema_tickets into seguridad
+[33mc263a06[m feat: integración de auditoría automática con JWT en AvisoService
+[33m78ca504[m Merge pull request #5 from JoseGuadalupeML/seguridad
+[33mb5f95d9[m Merge branch 'main' into seguridad
+[33mbeba01b[m feat: implementación del endpoint de registro de usuarios
+[33m862ecb5[m Merge branch 'modulo_area'
+[33mba866e0[m[33m ([m[1;31mpersonal-origin/feature/modulo-avisos[m[33m)[m feat: implementación de autenticación JWT y Database Seeder para administrador
+[33m6a3aae5[m feat: filtrado de ticket segun el rol v:1.0.0
+[33me33fb03[m feat: Obtener lista de todos los tickets
+[33mf309b8b[m feat: Estatus del ticket y solo manejo de id en el ticket
+[33m1f4db79[m fix: Correccion en ticket, arranque del siste, feat: Tabla estatus para manejar las respuestas solo por id en ticket
+[33m5731d10[m feat: implementar modulo global de avisos con validaciones manuales
+[33m1cb8f0f[m feat: implementar asignacion de soporte fijo en modulo de areas
+[33m577dbdd[m Merge pull request #4 from JoseGuadalupeML/modulo_usuarios
+[33m7863663[m fix: estandarizacion del nombre de las tablas  a singular(area, usuario)
+[33med09d3b[m Optimizacion de asignacion de tickets
+[33mf5a5bee[m Merge branch 'modulo_area' of https://github.com/JoseGuadalupeML/sistema_tickets into modulo_usuarios
+[33m5a3575c[m modulo tickets
+[33mbc06e4d[m Actualizacion de Usuarios
+[33m63f2632[m Baja Logica
+[33mf5e7ad0[m Merge branch 'modulo_usuarios' of https://github.com/JoseGuadalupeML/sistema_tickets into modulo_usuarios
+[33m52ea987[m Baja Logica
+[33mf18d733[m Merge pull request #3 from JoseGuadalupeML/modulo_usuarios
+[33me5e9b78[m Merge branch 'main' into modulo_usuarios
+[33m571dc06[m Cambios en usuario
+[33mde70c40[m conflictos resueltos en módulo de usuarios
+[33m7ba5d73[m corregir usuarios
+[33md520c8c[m 'Cambios Disponibilidad Usuarios'
+[33m6642bcc[m areresourece, service
+[33m874ecad[m Merge branch 'modulo_usuarios' of https://github.com/JoseGuadalupeML/sistema_tickets into modulo_usuarios
+[33me94f3d9[m Usuario_Resource
+[33m7467866[m 'cambios en el modulo de area'
+[33m848834b[m 'Cambios en los archivos de usuarios'
+[33m60ccc79[m 'Cambios en Usuario.java'
+[33m7950cb9[m Merge branch 'main' of https://github.com/JoseGuadalupeML/sistema_tickets
+[33m72a328d[m 'Modificaciones en l archivo Usuario.java'
+[33m33ac309[m Usuario_Resource
+[33m7b18fac[m Usuarios_Resource
+[33m7175963[m Merge pull request #2 from JoseGuadalupeML/modulo_usuarios
+[33m003e924[m Merge branch 'main' of https://github.com/JoseGuadalupeML/sistema_tickets into modulo_usuarios
+[33m23e6ae7[m Modulo Usuarios
+[33mb8fc18e[m Merge branch 'modulo_areas'
+[33mf84753b[m areas
+[33m1a4433a[m Merge pull request #1 from JoseGuadalupeML/prueba2
+[33m8e74a35[m prueba
+[33m3ea5ac8[m first commit

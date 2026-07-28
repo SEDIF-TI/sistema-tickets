@@ -24,6 +24,7 @@ import AdminAvisosPage from './pages/admin/AdminAvisosPage.jsx';
 import AdminAreasPage from './pages/admin/AdminAreasPage';
 import DashboardPage from './pages/admin/DashboardPage.jsx';
 import AdminEquiposPage from './pages/admin/AdminEquiposPage.jsx';
+import {GestionTaller} from './pages/soporte/GestionTaller.jsx';
 
 // Módulo de Correos Institucionales (Ajusta la ruta si lo guardaste en otra carpeta)
 import { GestionCorreos } from './pages/soporte/GestionCorreos.jsx';
@@ -78,6 +79,7 @@ function AppContent() {
 
             {/* Rutas de Soporte / Documentos */}
             <Route path="/soporte/bandeja" element={<MainLayout><PanelSoporte /></MainLayout>} />
+            <Route path="/soporte/taller" element={<MainLayout><GestionTaller /></MainLayout>} />
             <Route path="/documentos/crear" element={<MainLayout><GeneradorDocumentos /></MainLayout>} />
 
             {/* Ruta Compartida de Tickets */}
