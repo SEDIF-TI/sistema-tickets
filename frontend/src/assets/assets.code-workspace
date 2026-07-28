@@ -1,0 +1,40 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../components"
+		},
+		{
+			"path": "../components/formato"
+		},
+		{
+			"path": "../context"
+		},
+		{
+			"path": "../pages"
+		},
+		{
+			"path": "../pages/admin"
+		},
+		{
+			"path": "../pages/empleado"
+		},
+		{
+			"path": "../pages/soporte"
+		},
+		{
+			"path": "../pages/tickets"
+		},
+		{
+			"path": "../services"
+		},
+		{
+			"path": "../theme"
+		},
+		{
+			"path": "../util"
+		}
+	]
+}
