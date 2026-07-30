@@ -4,24 +4,30 @@ import AddIcon from '@mui/icons-material/Add';
 import CheckIcon from '@mui/icons-material/Check';
 import { useNavigate, useLocation } from 'react-router-dom';
 import api from '../../services/api';
-import { AuthContext } from '../../context/AuthContext.jsx'; // <-- IMPORTAMOS EL CONTEXTO
+import { AuthContext } from '../../context/AuthContext.jsx'; 
+
+// --- NUEVO: Importamos tu hook de red ---
+import { useNetworkStatus } from '../../hooks/useNetworkStatus.jsx';
+// ----------------------------------------
 
 const COLOR_GUINDA = '#801A36';
 
 export default function TicketsPage() {
-    const { user } = useContext(AuthContext); // <-- OBTENEMOS EL USUARIO
-    const [historialTickets, setHistorialTickets] = useState([]);
+    const { user } = useContext(AuthContext); 
     const navigate = useNavigate();
     const location = useLocation();
 
+    // --- NUEVO: Instanciamos el estado de la red ---
+    const isOffline = useNetworkStatus();
+    // -----------------------------------------------
+
+    const [historialTickets, setHistorialTickets] = useState([]);
     const [openSnackbar, setOpenSnackbar] = useState(false);
     const [snackbarMessage, setSnackbarMessage] = useState('');
 
-    // Determinamos el rol limpio para usarlo en validaciones
     const userRole = user?.rol || user?.role || user?.rolNombre || '';
     const cleanRole = userRole.replace('ROLE_', '').toUpperCase();
 
-    // Función de formato compacto
     const formatearFecha = (fecha) => {
         if (!fecha) return '--/--/----';
         const d = new Date(fecha);
@@ -29,6 +35,8 @@ export default function TicketsPage() {
     };
 
     const cargarHistorial = async () => {
+        // Si no hay red, mejor ni intentamos hacer la petición para evitar errores en consola
+        if (isOffline) return; 
         try {
             const response = await api.get('/v1/tickets/mis-tickets');
             setHistorialTickets(response.data);
@@ -38,6 +46,12 @@ export default function TicketsPage() {
     };
 
     const handleFinalizarTicket = async (ticketId) => {
+        // --- NUEVO: Bloqueo lógico por si logran burlar el botón ---
+        if (isOffline) {
+            alert("No hay conexión a internet. No puedes finalizar tickets en este momento.");
+            return;
+        }
+
         const confirmar = window.confirm('¿Estás seguro de que tu problema fue resuelto y deseas cerrar este ticket?');
         if (confirmar) {
             try {
@@ -57,7 +71,7 @@ export default function TicketsPage() {
             setOpenSnackbar(true);
             window.history.replaceState({}, document.title);
         }
-    }, [location]);
+    }, [location, isOffline]); // Añadimos isOffline para que recargue el historial automáticamente al volver el internet
 
     return (
         <Box sx={{ px: { xs: 2, md: 4 }, py: 3, width: '100%', boxSizing: 'border-box' }}>
@@ -70,28 +84,29 @@ export default function TicketsPage() {
 
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
                 <Typography variant="h4" sx={{ fontWeight: 'bold', color: COLOR_GUINDA }}>
-                    {/* Título dinámico según el rol */}
                     {cleanRole === 'ADMINISTRADOR' ? 'Bitácora Global de Tickets' : 'Historial de Tickets'}
                 </Typography>
                 
-                {/* RENDERIZADO CONDICIONAL: El administrador NO ve este botón */}
                 {cleanRole !== 'ADMINISTRADOR' && (
-                    <Button variant="contained" startIcon={<AddIcon />} onClick={() => navigate('/tickets/nuevo')} sx={{ bgcolor: COLOR_GUINDA }}>
-                        Levantar Ticket
+                    <Button 
+                        variant="contained" 
+                        startIcon={<AddIcon />} 
+                        onClick={() => navigate('/tickets/nuevo')} 
+                        disabled={isOffline} // <-- BLOQUEO DEL BOTÓN NUEVO TICKET
+                        sx={{ 
+                            bgcolor: isOffline ? 'grey.400' : COLOR_GUINDA, 
+                            '&:hover': { bgcolor: isOffline ? 'grey.400' : '#5c0a28' }
+                        }}
+                    >
+                        {isOffline ? 'Sin Conexión' : 'Levantar Ticket'}
                     </Button>
                 )}
             </Box>
 
-            <TableContainer component={Paper} elevation={0} sx={{ 
-                border: '1px solid #e2e8f0', // Borde fino en lugar de sombra pesada
-                borderRadius: 2, 
-                overflow: 'hidden' 
-            }}>
-                {/* Se añade minWidth para evitar que se aplaste en pantallas chicas */}
+            <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #e2e8f0', borderRadius: 2, overflow: 'hidden' }}>
                 <Table sx={{ minWidth: 1000 }}>
                     <TableHead>
                         <TableRow sx={{ bgcolor: COLOR_GUINDA }}>
-                            {/* Anchos fijos por columna para forzar la simetría visual */}
                             <TableCell sx={{ color: 'white', fontWeight: 'bold', width: '5%' }}>ID</TableCell>
                             <TableCell sx={{ color: 'white', fontWeight: 'bold', width: '15%' }}>Solicitante</TableCell>
                             <TableCell sx={{ color: 'white', fontWeight: 'bold', width: '15%' }}>Departamento</TableCell>
@@ -119,30 +134,26 @@ export default function TicketsPage() {
                                     <TableCell sx={{ whiteSpace: 'nowrap', fontSize: '0.85rem' }}>{formatearFecha(t.fechaCreacion)}</TableCell>
                                     <TableCell sx={{ whiteSpace: 'nowrap', fontSize: '0.85rem' }}>{formatearFecha(t.fechaFin)}</TableCell>
                                     <TableCell align="center">
-                                        <Chip 
-                                            label={t.estatus} 
-                                            // Cambiamos el CERRADO a 'default' (gris) para que sea más profesional
-                                            color={t.estatus === 'CERRADO' ? 'default' : 'warning'} 
-                                            size="small" 
-                                            sx={{ fontWeight: 'bold', minWidth: '80px' }} 
-                                        />
+                                        <Chip label={t.estatus} color={t.estatus === 'CERRADO' ? 'default' : 'warning'} size="small" sx={{ fontWeight: 'bold', minWidth: '80px' }} />
                                     </TableCell>
                                     <TableCell align="center">
-                                        {/* Lógica de acciones según rol y estatus */}
                                         {t.estatus !== 'CERRADO' ? (
                                             cleanRole !== 'ADMINISTRADOR' ? (
-                                                <Button size="small" variant="outlined" color="inherit" startIcon={<CheckIcon />} onClick={() => handleFinalizarTicket(t.id)}>
+                                                <Button 
+                                                    size="small" 
+                                                    variant="outlined" 
+                                                    color="inherit" 
+                                                    startIcon={<CheckIcon />} 
+                                                    onClick={() => handleFinalizarTicket(t.id)}
+                                                    disabled={isOffline} // <-- BLOQUEO DEL BOTÓN DE FINALIZAR
+                                                >
                                                     Finalizar
                                                 </Button>
                                             ) : (
-                                                <Typography variant="body2" color="textSecondary" sx={{ fontStyle: 'italic' }}>
-                                                    En proceso
-                                                </Typography>
+                                                <Typography variant="body2" color="textSecondary" sx={{ fontStyle: 'italic' }}>En proceso</Typography>
                                             )
                                         ) : (
-                                            <Typography variant="body2" color="textSecondary" sx={{ fontWeight: 'bold' }}>
-                                                Finalizado
-                                            </Typography>
+                                            <Typography variant="body2" color="textSecondary" sx={{ fontWeight: 'bold' }}>Finalizado</Typography>
                                         )}
                                     </TableCell>
                                 </TableRow>

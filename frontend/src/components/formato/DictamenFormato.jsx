@@ -160,7 +160,7 @@ export default function DictamenFormato({ solicitarPdf }) {
                         fullWidth multiline minRows={2} 
                         label="Conclusión Final (Max 200 caracteres)" 
                         name="conclusion" value={dictamen.conclusion} onChange={handleChange}
-                        inputProps={{ maxLength: 200 }} helperText={`${dictamen.conclusion.length}/200 caracteres`}
+                        InputProps={{ maxLength: 200 }} helperText={`${dictamen.conclusion.length}/200 caracteres`}
                     />
                 </Grid>
             </Grid>
