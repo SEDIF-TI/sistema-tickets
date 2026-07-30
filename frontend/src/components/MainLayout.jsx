@@ -2,6 +2,7 @@ import React, { useContext, useEffect, useState } from 'react';
 import { Box, Drawer, AppBar, Toolbar, List, Typography, ListItem, ListItemButton, ListItemIcon, Button, Tooltip, IconButton, CssBaseline, Alert } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext.jsx';
+import { WebSocketContext } from '../context/WebSocketContext.jsx'; // 👈 IMPORTADO
 import api from '../services/api';
 
 // 1. Importar el logo
@@ -37,6 +38,7 @@ const iconMap = {
 
 export default function MainLayout({ children }) {
     const { user, logout } = useContext(AuthContext);
+    const { stompClient, connected } = useContext(WebSocketContext) || {}; // 👈 CONTEXTO WEBSOCKET
     const navigate = useNavigate();
     
     const [avisosActivos, setAvisosActivos] = useState([]);
@@ -48,6 +50,7 @@ export default function MainLayout({ children }) {
     const cleanRole = userRole.replace('ROLE_', '').toUpperCase();
     const estaBloqueado = user?.passwordTemporal;
 
+    // 1. CONSULTA DE AVISOS GENERALES (Polling cada 30 segundos)
     useEffect(() => {
         if (!user || estaBloqueado) return;
 
@@ -63,10 +66,8 @@ export default function MainLayout({ children }) {
                 });
                 
                 setAvisosActivos(paraMi);
-                setAvisosOcultos([]); 
             } catch (error) {
                 console.error("Error al buscar avisos:", error);
-                setAvisosActivos([]);
             }
         };
 
@@ -74,6 +75,34 @@ export default function MainLayout({ children }) {
         const intervalo = setInterval(buscarAvisos, 30000); 
         return () => clearInterval(intervalo);
     }, [user, estaBloqueado, cleanRole]);
+
+    // 2. ESCUCHA EN TIEMPO REAL VÍA WEBSOCKET (ALERTAS DE RESGUARDOS VENCIDOS)
+    useEffect(() => {
+        if (!stompClient || !connected || !user || estaBloqueado) return;
+
+        // Suscripción al tópico broadcast de resguardos
+        const subscription = stompClient.subscribe('/topic/alertas-resguardos', (message) => {
+            try {
+                const resguardo = JSON.parse(message.body);
+                
+                // Construimos el objeto del aviso para la alerta superior
+                const nuevoAvisoAlerta = {
+                    id: `resguardo-${resguardo.id}-${Date.now()}`,
+                    titulo: '⚠️ RESGUARDO VENCIDO',
+                    mensaje: `El resguardo de ${resguardo.solicitanteNombre} (${resguardo.equipoNombre}) ha vencido.`
+                };
+
+                // Agregamos la alerta en tiempo real a los avisos activos
+                setAvisosActivos((prev) => [nuevoAvisoAlerta, ...prev]);
+            } catch (error) {
+                console.error("Error procesando alerta WebSocket de resguardo:", error);
+            }
+        });
+
+        return () => {
+            if (subscription) subscription.unsubscribe();
+        };
+    }, [stompClient, connected, user, estaBloqueado]);
 
     const handleCerrarAviso = (idAviso) => {
         if (!avisosOcultos.includes(idAviso)) {
@@ -87,6 +116,7 @@ export default function MainLayout({ children }) {
         <Box sx={{ display: 'flex', minHeight: '100vh', width: '100vw', bgcolor: '#f4f7f6', overflowX: 'hidden' }}>
             <CssBaseline />
 
+            {/* BANNERS DE ALERTA / AVISOS SUPERIORES */}
             {avisosVisibles.length > 0 && (
                 <Box sx={{ position: 'fixed', top: '75px', left: '50%', transform: 'translateX(-50%)', zIndex: 9999, display: 'flex', flexDirection: 'column', gap: 1.5, width: '90%', maxWidth: '600px' }}>
                     {avisosVisibles.map(aviso => (
@@ -102,20 +132,20 @@ export default function MainLayout({ children }) {
                     display: 'flex', 
                     justifyContent: 'space-between', 
                     alignItems: 'center', 
-                    minHeight: { xs: '80px', sm: '95px' },  //barra superior
+                    minHeight: { xs: '80px', sm: '95px' }, 
                     px: { xs: 1, sm: 3 } 
                 }}>
                     
                     {/* 1. SECCIÓN IZQUIERDA */}
                     <Box sx={{ flex: 1, display: 'flex', justifyContent: 'flex-start' }}></Box>
 
-                    {/* 2. SECCIÓN CENTRAL (Logo Mucho Más Grande) */}
+                    {/* 2. SECCIÓN CENTRAL */}
                     <Box sx={{ flex: 2, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
                         <img 
                             src={logoPuebla} 
                             alt="Logo Puebla" 
                             style={{ 
-                                height: '108px', //logo
+                                height: '108px', 
                                 width: 'auto', 
                                 maxWidth: '100%', 
                                 objectFit: 'contain',
@@ -184,7 +214,7 @@ export default function MainLayout({ children }) {
                 </Drawer>
             )}
 
-            <Box component="main" sx={{ flexGrow: 1, p: 3, mt: { xs: '80px', sm: '95px' }, width: '100%', ml: `${drawerWidth}px` }}> {/* <-- MARGEN SUPERIOR AJUSTADO */}
+            <Box component="main" sx={{ flexGrow: 1, p: 3, mt: { xs: '80px', sm: '95px' }, width: '100%', ml: `${drawerWidth}px` }}>
                 {children}
             </Box>
         </Box>

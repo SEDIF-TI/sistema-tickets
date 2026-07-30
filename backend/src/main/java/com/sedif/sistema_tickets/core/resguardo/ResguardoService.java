@@ -11,7 +11,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.time.DayOfWeek;
 
 @Service
 @RequiredArgsConstructor
@@ -29,25 +28,23 @@ public class ResguardoService {
 
         Resguardo resguardo = new Resguardo();
         resguardo.setSolicitanteNombre(request.solicitanteNombre());
-        resguardo.setSolicitanteNumero(request.solicitanteNumero()); // <-- Ahora compila perfectamente
+        resguardo.setSolicitanteNumero(request.solicitanteNumero());
         resguardo.setEquipoNombre(request.equipoNombre());
         resguardo.setNumeroSerie(request.numeroSerie());
         resguardo.setAccesorios(request.accesorios());
         resguardo.setEstado(EstadoResguardo.ENTREGADO);
         
-        // Mapeo seguro de los nuevos campos
         resguardo.setTelefono(request.telefono());
         resguardo.setDepartamento(request.departamento());
         resguardo.setNumeroInventario(request.numeroInventario());
         resguardo.setCondiciones(request.condiciones());
 
-        // Manejo de la fecha de vencimiento
         if ("Dias".equalsIgnoreCase(request.duracionTipo())) {
             resguardo.setFechaVencimiento(LocalDateTime.now().plusDays(request.duracionCantidad()));
         } else if ("Semanas".equalsIgnoreCase(request.duracionTipo())) {
             resguardo.setFechaVencimiento(LocalDateTime.now().plusWeeks(request.duracionCantidad()));
         } else {
-            resguardo.setFechaVencimiento(null); // Permanente
+            resguardo.setFechaVencimiento(null);
         }
 
         resguardo.setUsuarioCreador(usuario);
@@ -69,55 +66,57 @@ public class ResguardoService {
                 .orElseThrow(() -> new IllegalArgumentException("Resguardo no encontrado"));
         
         resguardo.setEstado(EstadoResguardo.DEVUELTO);
-        // Si tienes campo de auditoría para fecha de modificación, se actualizará automáticamente
         return ResguardoResponse.desdeEntidad(resguardoRepository.save(resguardo));
     }
 
-    // ---> CRON JOB: SE EJECUTA TODOS LOS DÍAS A LAS 9:00 AM <---
-    @Scheduled(cron = "0 0 9 * * *")
     @Transactional
-    public void verificarYNotificarVencimientos() {
-        System.out.println("[CRON] Iniciando verificación de resguardos vencidos a las 9:00 AM...");
-        
-        // Buscamos los que están ENTREGADOS y cuya fecha ya se cumplió
-        List<Resguardo> vencidos = resguardoRepository.findByEstadoAndFechaVencimientoLessThanEqual(
-                EstadoResguardo.ENTREGADO, LocalDateTime.now());
+    @Scheduled(cron = "0 0 8 * * *")
+    public void verificarVencimientos() {
+        LocalDateTime ahora = LocalDateTime.now();
+        // 👈 CORREGIDO: Buscamos resguardos con estado ENTREGADO
+        List<Resguardo> vencidos = resguardoRepository.findByFechaVencimientoBeforeAndEstado(ahora, EstadoResguardo.ENTREGADO);
 
-        for (Resguardo r : vencidos) {
-            // 1. Cambiamos el estado en BD
-            r.setEstado(EstadoResguardo.VENCIDO);
-            resguardoRepository.save(r);
-
-            // 2. Preparamos el mensaje
-            String mensaje = "⚠️ *RESGUARDO VENCIDO* ⚠️\n\n" +
-                             "El préstamo de equipo ha superado su límite de tiempo.\n" +
-                             "👤 *Solicitante:* " + r.getSolicitanteNombre() + " (No. " + r.getSolicitanteNumero() + ")\n" +
-                             "💻 *Equipo:* " + r.getEquipoNombre() + " - SN: " + r.getNumeroSerie() + "\n" +
-                             "Por favor, contacta al usuario para la devolución.";
-
-            // 3. Notificamos por Telegram al creador del resguardo
-            if (r.getUsuarioCreador().getTelegramChatId() != null) {
-                try {
-                    telegramBot.enviarMensaje(r.getUsuarioCreador().getTelegramChatId(), mensaje);
-                } catch (Exception e) {
-                    System.err.println("Error enviando Telegram de resguardo: " + e.getMessage());
-                }
-            }
-
-            // 4. Notificamos por WebSocket (Alerta en pantalla)
-            try {
-                // Emitimos a un canal global de resguardos. En React filtraremos para que solo la vea el creador.
-                ResguardoResponse payload = ResguardoResponse.desdeEntidad(r);
-                messagingTemplate.convertAndSend("/topic/alertas-resguardos", payload);
-            } catch (Exception e) {
-                System.err.println("Error enviando WebSocket de resguardo: " + e.getMessage());
-            }
-        }
-        
         if (vencidos.isEmpty()) {
             System.out.println("[CRON] No hay resguardos vencidos hoy.");
-        } else {
-            System.out.println("[CRON] Se actualizaron y notificaron " + vencidos.size() + " resguardos.");
+            return;
         }
+
+        for (Resguardo r : vencidos) {
+            try {
+                r.setEstado(EstadoResguardo.VENCIDO);
+                resguardoRepository.save(r);
+
+                if (r.getUsuarioCreador() != null && r.getUsuarioCreador().getTelegramChatId() != null) {
+                    try {
+                        String solicitante = r.getSolicitanteNombre() != null ? r.getSolicitanteNombre() : "SIN NOMBRE";
+                        String numero = r.getSolicitanteNumero() != null ? r.getSolicitanteNumero() : "N/A";
+                        String equipo = r.getEquipoNombre() != null ? r.getEquipoNombre() : "EQUIPO";
+                        String serie = r.getNumeroSerie() != null ? r.getNumeroSerie() : "S/N";
+
+                        String mensaje = "⚠️ ALERTA DE RESGUARDO VENCIDO ⚠️\n\n" +
+                                        "El resguardo de " + solicitante + " ha vencido hoy.\n" +
+                                        "👤 Solicitante: " + solicitante + " (No. " + numero + ")\n" +
+                                        "💻 Equipo: " + equipo + " - SN: " + serie + "\n" +
+                                        "Por favor, contacta al usuario para la devolución.";
+
+                        telegramBot.enviarMensaje(r.getUsuarioCreador().getTelegramChatId(), mensaje);
+                    } catch (Exception e) {
+                        System.err.println("[TELEGRAM ERROR] No se pudo enviar mensaje del resguardo ID " + r.getId() + ": " + e.getMessage());
+                    }
+                }
+
+                try {
+                    ResguardoResponse payload = ResguardoResponse.desdeEntidad(r);
+                    messagingTemplate.convertAndSend("/topic/alertas-resguardos", payload);
+                } catch (Exception e) {
+                    System.err.println("[WEBSOCKET ERROR] No se pudo emitir alerta del resguardo ID " + r.getId() + ": " + e.getMessage());
+                }
+
+            } catch (Exception e) {
+                System.err.println("[CRON ERROR] Error procesando el resguardo ID " + r.getId() + ": " + e.getMessage());
+            }
+        }
+
+        System.out.println("[CRON] Se actualizaron y notificaron " + vencidos.size() + " resguardos vencidos.");
     }
 }

@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
 import java.util.List;
+import java.util.Map; // 👈 AGREGADO: Necesario para Map.of
 
 @RestController
 @RequestMapping("/api/v1/resguardos")
@@ -20,7 +21,6 @@ public class ResguardoResource {
     public ResponseEntity<ResguardoResponse> crearResguardo(
             @RequestBody ResguardoRequest request, 
             Principal principal) {
-        // Obtenemos el correo del usuario autenticado a través del objeto Principal
         ResguardoResponse response = resguardoService.crearResguardo(request, principal.getName());
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
@@ -39,6 +39,23 @@ public class ResguardoResource {
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(null);
+        }
+    }
+
+    @PostMapping("/test-alertas")
+    public ResponseEntity<Map<String, Object>> probarAlertas() {
+        try {
+            resguardoService.verificarVencimientos();
+            return ResponseEntity.ok(Map.of(
+                "status", "OK",
+                "mensaje", "El escaneo y notificación de vencimientos se ejecutó correctamente."
+            ));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().body(Map.of(
+                "status", "ERROR",
+                "mensaje", "Fallo al ejecutar verificación: " + e.getMessage()
+            ));
         }
     }
 }
