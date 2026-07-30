@@ -6,12 +6,21 @@ import { AuthContext } from '../../context/AuthContext.jsx';
 
 import { toUpper } from '../../util/formater'; 
 
-const COLOR_GUINDA = '#5c0a28'; 
+// --- NUEVO: Importar el custom hook de red ---
+import { useNetworkStatus } from '../../hooks/useNetworkStatus.jsx';
+// ---------------------------------------------
+
+const COLOR_GUINDA = '#5c0a28'; // Sincronizado con tu tema institucional
 
 export default function FormularioTicket() {
     const { user } = useContext(AuthContext); 
     const navigate = useNavigate();
 
+    // --- NUEVO: Instanciar el estado de la red ---
+    const isOffline = useNetworkStatus();
+    // ---------------------------------------------
+
+    // 2. Estados unificados (Incluyendo el nuevo campo Solicitante)
     // 1. Estados
     const [titulo, setTitulo] = useState('');
     const [descripcion, setDescripcion] = useState('');
@@ -48,6 +57,14 @@ export default function FormularioTicket() {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setMensaje({ tipo: '', texto: '' });
+
+        // --- NUEVO: Bloqueo duro en la lógica ---
+        // Si no hay internet, cortamos la ejecución inmediatamente
+        if (isOffline) {
+            setMensaje({ tipo: 'error', texto: 'No hay conexión a internet. No se puede enviar el ticket.' });
+            return;
+        }
+        // ----------------------------------------
 
         if (!solicitante.trim() || !titulo.trim() || !descripcion.trim()) {
             setMensaje({ tipo: 'error', texto: 'Por favor, completa todos los campos obligatorios.' });
@@ -106,8 +123,9 @@ export default function FormularioTicket() {
                         onChange={(e) => setSolicitante(toUpper(e.target.value))}
                         placeholder="Escribe el nombre completo de la persona afectada"
                         required
-                        inputProps={{ maxLength: 100 }}
+                        InputProps={{ maxLength: 100 }} // Limitación de caracteres
                         helperText={`${solicitante.length}/100 caracteres`}
+                        disabled={isOffline} // <-- Bloqueo opcional del campo
                     />
 
                     <TextField
@@ -119,8 +137,9 @@ export default function FormularioTicket() {
                         onChange={(e) => setTitulo(toUpper(e.target.value))}
                         placeholder="Ej. La impresora no se conecta a la red / Pantalla en negro"
                         required
-                        inputProps={{ maxLength: 100 }}
+                        InputProps={{ maxLength: 100 }} // Limitación de caracteres
                         helperText={`${titulo.length}/100 caracteres`}
+                        disabled={isOffline} // <-- Bloqueo opcional del campo
                     />
 
                     {esSoporte && (
@@ -132,7 +151,8 @@ export default function FormularioTicket() {
                             value={sede}
                             onChange={(e) => setSede(toUpper(e.target.value))}
                             required={esSoporte}
-                            inputProps={{ maxLength: 50 }}
+                            InputProps={{ maxLength: 50 }}
+                            disabled={isOffline}
                         />
                     )}
 
@@ -147,8 +167,9 @@ export default function FormularioTicket() {
                         onChange={(e) => setDescripcion(toUpper(e.target.value))}
                         placeholder="Describe detalladamente qué acciones causan el problema o qué mensajes de error aparecen en pantalla..."
                         required
-                        inputProps={{ maxLength: 500 }}
+                        InputProps={{ maxLength: 500 }} // Limitación de caracteres
                         helperText={`${descripcion.length}/500 caracteres`}
+                        disabled={isOffline} // <-- Bloqueo opcional del campo
                     />
 
                     {/* ---> NUEVO SELECTOR SÓLO PARA ADMINISTRADORES <--- */}
@@ -177,15 +198,16 @@ export default function FormularioTicket() {
                         <Button
                             type="submit"
                             variant="contained"
+                            disabled={isOffline} // <-- BLOQUEO DURO DEL BOTÓN
                             sx={{ 
                                 px: 4, 
                                 py: 1.5, 
                                 fontSize: '1rem', 
-                                bgcolor: COLOR_GUINDA,
-                                '&:hover': { bgcolor: '#4a0820' }
+                                bgcolor: isOffline ? 'grey.400' : COLOR_GUINDA, // <-- Cambio visual extra
+                                '&:hover': { bgcolor: isOffline ? 'grey.400' : '#4a0820' }
                             }}
                         >
-                            Enviar Ticket
+                            {isOffline ? 'Sin Conexión' : 'Enviar Ticket'}
                         </Button>
                     </Box>
                 </form>

@@ -71,7 +71,7 @@ public class SecurityConfig {
         
         // 1. CAMBIO CLAVE: Ponemos tu puerto exacto de React en lugar del asterisco (*)
         // Agregamos también el 5174 por si Vite llega a saltar de puerto en algún momento
-        config.setAllowedOrigins(List.of("http://localhost:5173", "http://localhost:5174")); 
+        config.setAllowedOrigins(List.of("http://localhost:5173", "http://localhost:5174", "http://localhost:4173")); 
         
         config.setAllowedHeaders(List.of("*"));
         

@@ -5,6 +5,9 @@ import { AuthContext } from '../context/AuthContext.jsx';
 import { WebSocketContext } from '../context/WebSocketContext.jsx'; // 👈 IMPORTADO
 import api from '../services/api';
 
+// --- custom hook ---
+import { useNetworkStatus } from '../hooks/useNetworkStatus.jsx';
+
 // 1. Importar el logo
 import logoPuebla from '../assets/logo-puebla.png'; 
 
@@ -20,6 +23,12 @@ import CampaignIcon from '@mui/icons-material/Campaign';
 import AssignmentIcon from '@mui/icons-material/Assignment'; 
 import DescriptionIcon from '@mui/icons-material/Description'; 
 import ComputerIcon from '@mui/icons-material/Computer';
+import WifiOffIcon from '@mui/icons-material/WifiOff';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import CloseIcon from '@mui/icons-material/Close';
+// Agrega estas dos líneas en tu bloque de importaciones de iconos
+import InventoryIcon from '@mui/icons-material/Inventory';
+import HomeRepairServiceIcon from '@mui/icons-material/HomeRepairService';
 
 const drawerWidth = 65; 
 const COLOR_GUINDA = '#801A36';
@@ -33,7 +42,9 @@ const iconMap = {
     'CampaignIcon': CampaignIcon,
     'AssignmentIcon': AssignmentIcon,
     'DescriptionIcon': DescriptionIcon,
-    'ComputerIcon': ComputerIcon
+    'ComputerIcon': ComputerIcon,
+    'InventoryIcon': InventoryIcon,
+    'HomeRepairServiceIcon': HomeRepairServiceIcon
 };
 
 export default function MainLayout({ children }) {
@@ -44,17 +55,40 @@ export default function MainLayout({ children }) {
     const [avisosActivos, setAvisosActivos] = useState([]);
     const [avisosOcultos, setAvisosOcultos] = useState([]); 
 
+    // --- 1. Usar el custom hook que ya importaste ---
+    const isOffline = useNetworkStatus();
+
+    // --- 2. Estados para la recuperación de red (mensaje verde) ---
+    const [wasOffline, setWasOffline] = useState(false);
+    const [mostrarRecuperacion, setMostrarRecuperacion] = useState(false);
+
     const handleLogout = () => { logout(); navigate('/login'); };
 
     const userRole = user?.rol || user?.role || user?.rolNombre || '';
     const cleanRole = userRole.replace('ROLE_', '').toUpperCase();
     const estaBloqueado = user?.passwordTemporal;
 
+    // --- 3. Efecto para mostrar alerta cuando regresa el internet ---
+    useEffect(() => {
+        if (isOffline) {
+            setWasOffline(true);           
+            setMostrarRecuperacion(false); 
+        } else if (!isOffline && wasOffline) {
+            setMostrarRecuperacion(true);
+            setWasOffline(false);
+            const timer = setTimeout(() => setMostrarRecuperacion(false), 5000);
+            return () => clearTimeout(timer);
+        }
+    }, [isOffline, wasOffline]);
+    // --------------------------------------------------------------
+
     // 1. CONSULTA DE AVISOS GENERALES (Polling cada 30 segundos)
     useEffect(() => {
         if (!user || estaBloqueado) return;
 
         const buscarAvisos = async () => {
+            // Si el sistema está offline, detenemos la petición para no saturar la red ni la consola
+            if (isOffline) return;
             try {
                 const response = await api.get('/v1/avisos/activos');
                 const datosAvisos = Array.isArray(response.data) ? response.data : [];
@@ -74,7 +108,7 @@ export default function MainLayout({ children }) {
         buscarAvisos();
         const intervalo = setInterval(buscarAvisos, 30000); 
         return () => clearInterval(intervalo);
-    }, [user, estaBloqueado, cleanRole]);
+    }, [user, estaBloqueado, cleanRole, isOffline]);
 
     // 2. ESCUCHA EN TIEMPO REAL VÍA WEBSOCKET (ALERTAS DE RESGUARDOS VENCIDOS)
     useEffect(() => {
@@ -116,9 +150,47 @@ export default function MainLayout({ children }) {
         <Box sx={{ display: 'flex', minHeight: '100vh', width: '100vw', bgcolor: '#f4f7f6', overflowX: 'hidden' }}>
             <CssBaseline />
 
+            {/* --- Renderizado del Banner Offline PWA (ROJO) --- */}
+            {isOffline && cleanRole === 'EMPLEADO' && (
+                <Box sx={{ position: 'fixed', top: '75px', left: '50%', transform: 'translateX(-50%)', zIndex: 9999, display: 'flex', flexDirection: 'column', width: '90%', maxWidth: '600px', mt: 2 }}>
+                    <Alert severity="error" variant="filled" icon={<WifiOffIcon />} sx={{ width: '100%', fontWeight: 'bold', boxShadow: 3 }}>
+                        Te encuentras sin conexión. Estamos trabajando en ello.
+                    </Alert>
+                </Box>
+            )}
+            {/* ------------------------------------------------- */}
+
+           {/* --- Renderizado del Banner de Recuperación (VERDE SUAVE) --- */}
+            {mostrarRecuperacion && cleanRole === 'EMPLEADO' && (
+                <Box sx={{ position: 'fixed', top: '75px', left: '50%', transform: 'translateX(-50%)', zIndex: 9999, width: '90%', maxWidth: '600px', mt: 2 }}>
+                    <Box sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        bgcolor: '#edf7ed', // <-- Fondo verde pastel suave
+                        color: '#1e4620',   // <-- Letras en verde oscuro
+                        px: 2,
+                        py: 1.5,
+                        borderRadius: '4px',
+                        boxShadow: 3
+                    }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                            <CheckCircleIcon sx={{ color: '#1e4620' }} /> {/* <-- Icono verde oscuro */}
+                            <Typography sx={{ fontWeight: 'bold', fontSize: '0.875rem' }}>
+                                Conexión restablecida. Compruebe su navegador.
+                            </Typography>
+                        </Box>
+                        <IconButton size="small" onClick={() => setMostrarRecuperacion(false)} sx={{ color: '#1e4620', p: 0.5 }}>
+                            <CloseIcon fontSize="small" />
+                        </IconButton>
+                    </Box>
+                </Box>
+            )}
+            {/* ----------------------------------------------------------------------- */}
+
             {/* BANNERS DE ALERTA / AVISOS SUPERIORES */}
             {avisosVisibles.length > 0 && (
-                <Box sx={{ position: 'fixed', top: '75px', left: '50%', transform: 'translateX(-50%)', zIndex: 9999, display: 'flex', flexDirection: 'column', gap: 1.5, width: '90%', maxWidth: '600px' }}>
+                <Box sx={{ position: 'fixed', top: '75px', left: '50%', transform: 'translateX(-50%)', zIndex: 9998, display: 'flex', flexDirection: 'column', gap: 1.5, width: '90%', maxWidth: '600px', mt: (isOffline || mostrarRecuperacion) && cleanRole === 'EMPLEADO' ? 8 : 0 }}>
                     {avisosVisibles.map(aviso => (
                         <Alert key={aviso.id} severity="warning" variant="filled" onClose={() => handleCerrarAviso(aviso.id)} sx={{ width: '100%', fontWeight: 'bold', boxShadow: 3 }}>
                             {aviso.titulo}: {aviso.mensaje}

@@ -33,7 +33,7 @@ public class TicketService {
     private final SimpMessagingTemplate messagingTemplate;
 
     @Transactional
-    public Ticket crearTicket(TicketRequestRecord request, String correoUsuario) {
+    public TicketResponse crearTicket(TicketRequestRecord request, String correoUsuario) {
         Usuario usuario = usuarioRepository.findByCorreo(correoUsuario)
                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
 
@@ -122,7 +122,7 @@ public class TicketService {
             System.err.println("❌ [SISTEMA] Error al emitir por WebSocket: " + e.getMessage());
         }
 
-        return ticketGuardado;
+        return mapearATicketResponse(ticketGuardado);
     }
 
     private Usuario resolverAsignacion(Usuario usuarioArea) {
@@ -197,7 +197,7 @@ public class TicketService {
     }
 
     @Transactional
-    public Ticket finalizarTicketPorEmpleado(Long ticketId, String correoUsuario) {
+    public TicketResponse finalizarTicketPorEmpleado(Long ticketId, String correoUsuario) {
         Usuario usuario = usuarioRepository.findByCorreo(correoUsuario)
                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
         Ticket ticket = ticketRepository.findById(ticketId)
@@ -216,7 +216,7 @@ public class TicketService {
             messagingTemplate.convertAndSend("/topic/tickets-soporte", mapearATicketResponse(ticketGuardado));
         } catch (Exception e) {}
 
-        return ticketGuardado;
+        return mapearATicketResponse(ticketGuardado);
     }
 
     @Transactional(readOnly = true)
@@ -233,7 +233,7 @@ public class TicketService {
     }
 
     @Transactional
-    public Ticket atenderTicket(Long ticketId) {
+    public TicketResponse atenderTicket(Long ticketId) {
         Ticket ticket = ticketRepository.findById(ticketId)
                 .orElseThrow(() -> new IllegalArgumentException("Ticket no encontrado"));
 
@@ -254,11 +254,11 @@ public class TicketService {
             messagingTemplate.convertAndSend("/topic/tickets-soporte", mapearATicketResponse(ticketGuardado));
         } catch (Exception e) {}
 
-        return ticketGuardado;
+        return mapearATicketResponse(ticketGuardado);
     }   
 
     @Transactional
-    public Ticket resolverTicket(Long ticketId, String justificacion) {
+    public TicketResponse resolverTicket(Long ticketId, String justificacion, Integer planTrabajoClave) {
         Ticket ticket = ticketRepository.findById(ticketId)
                 .orElseThrow(() -> new IllegalArgumentException("Ticket no encontrado"));
 
@@ -267,20 +267,27 @@ public class TicketService {
 
         ticket.setEstatus(estatusResuelto);
         ticket.setFechaFin(LocalDateTime.now()); 
+        
+        // RECUPERAMOS LA LÓGICA DEL CONTROLADOR ANTERIOR
+        if (justificacion != null) ticket.setJustificacion(justificacion);
+        if (planTrabajoClave != null) ticket.setPlanTrabajoClave(planTrabajoClave);
+        
         Ticket ticketGuardado = ticketRepository.save(ticket);
 
+        // GUARDAMOS EN EL HISTORIAL
         Bitacora bitacora = new Bitacora();
         bitacora.setTicket(ticketGuardado);
         bitacora.setEstatusRegistrado("CERRADO");
         bitacora.setJustificacion(justificacion);
         bitacoraRepository.save(bitacora);
 
-        // NUEVO: Emitir actualización de estado al frontend
+        // EMITIMOS AL FRONTEND
         try {
             messagingTemplate.convertAndSend("/topic/tickets-soporte", mapearATicketResponse(ticketGuardado));
         } catch (Exception e) {}
 
-        return ticketGuardado;
+        // DEVOLVEMOS EL DTO SEGURO
+        return mapearATicketResponse(ticketGuardado);
     }  
 
     @Transactional(readOnly = true)
