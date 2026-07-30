@@ -120,7 +120,7 @@ export default function MainLayout({ children }) {
             {isOffline && cleanRole === 'EMPLEADO' && (
                 <Box sx={{ position: 'fixed', top: '75px', left: '50%', transform: 'translateX(-50%)', zIndex: 9999, display: 'flex', flexDirection: 'column', width: '90%', maxWidth: '600px', mt: 2 }}>
                     <Alert severity="error" variant="filled" icon={<WifiOffIcon />} sx={{ width: '100%', fontWeight: 'bold', boxShadow: 3 }}>
-                        Estás navegando sin conexión. Funcionalidad de reportes suspendida.
+                        Te encuentras sin conexión. Estamos trabajando en ello.
                     </Alert>
                 </Box>
             )}
@@ -143,7 +143,7 @@ export default function MainLayout({ children }) {
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                             <CheckCircleIcon sx={{ color: '#1e4620' }} /> {/* <-- Icono verde oscuro */}
                             <Typography sx={{ fontWeight: 'bold', fontSize: '0.875rem' }}>
-                                Conexión recuperada. Ya puedes continuar navegando y generando reportes.
+                                Conexión restablecida. Compruebe su navegador.
                             </Typography>
                         </Box>
                         <IconButton size="small" onClick={() => setMostrarRecuperacion(false)} sx={{ color: '#1e4620', p: 0.5 }}>

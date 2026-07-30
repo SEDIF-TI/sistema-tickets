@@ -1,118 +1,142 @@
 import React, { useState } from 'react';
-// Importamos los componentes del Dialog de Material UI
-import { Box, Typography, Paper, Tabs, Tab, Dialog, DialogTitle, DialogContent, DialogActions, Button } from '@mui/material';
+import { 
+    Box, Typography, Paper, Tabs, Tab, FormControl, InputLabel, Select, MenuItem, 
+    Dialog, DialogTitle, DialogContent, IconButton 
+} from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
 import api from "../services/api";
 
+// Importaciones
 import DictamenFormato from "./formato/DictamenFormato.jsx";
+import FormularioResguardo from "./formato/FormularioResguardo.jsx";
 import ReporteActividadesFormato from "./formato/ReporteActividadesFormato.jsx";
 import MantenimientoPreventivoFormato from "./formato/MantenimientoPreventivoFormato.jsx";
-import EntradaEquipoFormato from "./formato/EntradaEquipoFormato.jsx";
 
 const COLOR_GUINDA = '#801A36';
 
-export default function GeneradorDocumentos({user}) {
+export default function GeneradorDocumentos({ user }) {
     const [tabIndex, setTabIndex] = useState(0);
+    const [subFormatoTecnico, setSubFormatoTecnico] = useState('DICTAMEN');
 
-    // --- ESTADOS PARA CONTROLAR EL MODAL ---
+    // --- ESTADOS PARA CONTROLAR EL MODAL DEL PDF ---
     const [openModal, setOpenModal] = useState(false);
     const [pdfUrl, setPdfUrl] = useState("");
     const [nombrePdfActual, setNombrePdfActual] = useState("");
 
     const solicitarPdf = async (endpoint, payload, nombreArchivo) => {
         try {
-            const response = await api.post(`/v1/documentos/${endpoint}`, payload, { responseType: 'blob' });
+            // --- SOLUCIÓN DEFINITIVA A LAS RUTAS DUPLICADAS ---
+            // 1. Limpiamos cualquier rastro de "/v1/documentos/" que los hijos puedan enviar por error
+            let cleanEndpoint = endpoint;
+            if (cleanEndpoint.includes('/v1/documentos/')) {
+                cleanEndpoint = cleanEndpoint.replace('/v1/documentos/', '');
+            }
+            if (cleanEndpoint.startsWith('/')) {
+                cleanEndpoint = cleanEndpoint.substring(1);
+            }
+
+            // 2. Construimos la ruta limpia de forma segura
+            const rutaFinal = `/v1/documentos/${cleanEndpoint}`;
+            console.log("🚀 URL limpia que se enviará al backend:", rutaFinal);
+
+            // 3. Hacemos la petición
+            const response = await api.post(rutaFinal, payload, { responseType: 'blob' });
             
-            // Creamos la URL temporal
+            // 4. Generamos el visor
             const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
-            
-            // Guardamos los datos y ABRIMOS EL MODAL
             setPdfUrl(url);
             setNombrePdfActual(nombreArchivo);
             setOpenModal(true);
-
         } catch (error) {
             console.error("Error al generar el PDF:", error);
-            alert("Hubo un error al generar el documento. Verifica que el backend esté listo.");
+            alert("Hubo un error al generar el documento. Revisa la consola.");
         }
     };
 
-    // Función para cerrar el modal y limpiar la memoria
     const handleCloseModal = () => {
-        setOpenModal(false);
-        // Limpiamos la URL de la memoria para que no sature el navegador
-        setTimeout(() => window.URL.revokeObjectURL(pdfUrl), 100);
+        if (pdfUrl) {
+            window.URL.revokeObjectURL(pdfUrl);
+        }
         setPdfUrl("");
+        setOpenModal(false);
     };
 
     return (
-        /* CORRECCIÓN: Quitamos maxWidth: 1000 y mx: 'auto' para que use todo el ancho disponible */
         <Box sx={{ p: 3, width: '100%', boxSizing: 'border-box' }}>
             <Typography variant="h5" fontWeight="bold" sx={{ color: COLOR_GUINDA, mb: 3 }}>
                 Generador de Documentos Oficiales
             </Typography>
 
+            {/* BARRA DE PESTAÑAS */}
             <Paper sx={{ mb: 3, borderRadius: 2, overflow: 'hidden', width: '100%' }}>
                 <Tabs 
                     value={tabIndex} 
                     onChange={(e, newValue) => setTabIndex(newValue)} 
-                    centered 
                     variant="scrollable"
                     scrollButtons="auto"
                     TabIndicatorProps={{ style: { backgroundColor: COLOR_GUINDA } }}
                     sx={{ '& .Mui-selected': { color: `${COLOR_GUINDA} !important`, fontWeight: 'bold' } }}
                 >
-                    <Tab label="Dictamen Técnico" />
+                    <Tab label="Dictámenes y Resguardos" />
                     <Tab label="Reporte de Actividades" />
                     <Tab label="Mantenimiento Preventivo" />
-                    <Tab label="Entrada de Equipo" />
                 </Tabs>
             </Paper>
 
-            {/* Renderizado condicional de los componentes hijos */}
-            {tabIndex === 0 && <DictamenFormato solicitarPdf={solicitarPdf} />}
-            {tabIndex === 1 && <ReporteActividadesFormato solicitarPdf={solicitarPdf} />}
-            {tabIndex === 2 && <MantenimientoPreventivoFormato solicitarPdf={solicitarPdf} usuarioLogueado={user} />}
-            {tabIndex === 3 && <EntradaEquipoFormato solicitarPdf={solicitarPdf} usuarioLogueado={user} />}
+            <Box sx={{ width: '100%' }}>
+                {/* PESTAÑA 0: Dictámenes y Resguardos */}
+                {tabIndex === 0 && (
+                    <Box>
+                        <Paper sx={{ p: 3, mb: 3, backgroundColor: '#f9f9f9', borderRadius: 2 }} elevation={0} variant="outlined">
+                            <FormControl fullWidth>
+                                <InputLabel id="select-subformato-label">Formato a Generar</InputLabel>
+                                <Select
+                                    labelId="select-subformato-label"
+                                    value={subFormatoTecnico}
+                                    label="Formato a Generar"
+                                    onChange={(e) => setSubFormatoTecnico(e.target.value)}
+                                    sx={{ backgroundColor: 'white' }}
+                                >
+                                    <MenuItem value="DICTAMEN">Dictamen Técnico</MenuItem>
+                                    <MenuItem value="RESGUARDO">Responsiva de Resguardo</MenuItem>
+                                </Select>
+                            </FormControl>
+                        </Paper>
+                        {subFormatoTecnico === 'DICTAMEN' && <DictamenFormato solicitarPdf={solicitarPdf} />}
+                        {subFormatoTecnico === 'RESGUARDO' && <FormularioResguardo solicitarPdf={solicitarPdf} />}
+                    </Box>
+                )}
 
-            {/* ==========================================
-                COMPONENTE MODAL PARA VISUALIZAR EL PDF
-                ========================================== */}
-            <Dialog
-                open={openModal}
-                onClose={handleCloseModal}
-                maxWidth="lg" 
-                fullWidth
-            >
-                <DialogTitle sx={{ color: COLOR_GUINDA, fontWeight: 'bold' }}>
-                    Vista Previa: {nombrePdfActual}
-                </DialogTitle>
+                {/* PESTAÑA 1: Reporte de Actividades */}
+                {tabIndex === 1 && <ReporteActividadesFormato solicitarPdf={solicitarPdf} />}
                 
-                <DialogContent dividers sx={{ height: '80vh', p: 0 }}>
-                    {pdfUrl && (
-                        <iframe
-                            src={pdfUrl}
-                            width="100%"
-                            height="100%"
-                            style={{ border: 'none' }}
-                            title="Vista previa del documento"
+                {/* PESTAÑA 2: Mantenimiento Preventivo */}
+                {tabIndex === 2 && <MantenimientoPreventivoFormato solicitarPdf={solicitarPdf} usuarioLogueado={user} />}
+            </Box>
+
+            {/* MODAL DEL PDF VISUALIZADOR COMPLETADO */}
+            <Dialog open={openModal} onClose={handleCloseModal} maxWidth="lg" fullWidth>
+                <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', bgcolor: '#f5f5f5' }}>
+                    <Typography variant="h6" sx={{ fontWeight: 'bold' }}>{nombrePdfActual}</Typography>
+                    <IconButton onClick={handleCloseModal}>
+                        <CloseIcon />
+                    </IconButton>
+                </DialogTitle>
+                <DialogContent dividers sx={{ height: '82vh', p: 0, overflow: 'hidden' }}>
+                    {pdfUrl ? (
+                        <iframe 
+                            src={pdfUrl} 
+                            width="100%" 
+                            height="100%" 
+                            title="Vista previa PDF"
+                            style={{ border: 'none', display: 'block' }}
                         />
+                    ) : (
+                        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+                            <Typography>Cargando documento...</Typography>
+                        </Box>
                     )}
                 </DialogContent>
-                
-                <DialogActions>
-                    <Button onClick={handleCloseModal} color="inherit">
-                        Cerrar
-                    </Button>
-                    <Button 
-                        variant="contained" 
-                        sx={{ backgroundColor: COLOR_GUINDA, '&:hover': { backgroundColor: '#5c1226' } }}
-                        component="a"
-                        href={pdfUrl}
-                        download={nombrePdfActual}
-                    >
-                        Descargar Documento
-                    </Button>
-                </DialogActions>
             </Dialog>
         </Box>
     );

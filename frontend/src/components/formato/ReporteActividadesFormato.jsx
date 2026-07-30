@@ -25,7 +25,7 @@ export default function ReporteActividadesFormato({ solicitarPdf }) {
     });
 
     const usuarioLogueado = JSON.parse(localStorage.getItem('user')) || {};
-    const idRealUsuario = usuarioLogueado.usuarioId; 
+    const idRealUsuario = usuarioLogueado.usuarioId || usuarioLogueado.id || usuarioLogueado.pn_id; 
 
     const handleCloseNotificacion = () => {
         setNotificacion({ ...notificacion, abierto: false });
@@ -46,51 +46,38 @@ export default function ReporteActividadesFormato({ solicitarPdf }) {
     const handleGenerarPdf = async () => {
         if (!validarFechas()) return;
         
-        try {
-            const idSeguro = usuarioLogueado.usuarioId || usuarioLogueado.id || usuarioLogueado.pn_id || 0;
-            const payloadDocumento = {
-                ...fechas,
-                usuarioId: String(idSeguro),
-                rol: usuarioLogueado.rol || ''
-            };
+        const payloadDocumento = {
+            ...fechas,
+            usuarioId: String(idRealUsuario || 0),
+            rol: usuarioLogueado.rol || ''
+        };
 
-            const response = await api.post('/v1/documentos/reporte-actividades', payloadDocumento, { responseType: 'blob' });
-            
-            const url = window.URL.createObjectURL(new Blob([response.data]));
-            const link = document.createElement('a');
-            link.href = url;
-            link.setAttribute('download', `Reporte_Actividades_${fechas.fechaInicio}_al_${fechas.fechaFin}.pdf`);
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-            
-        } catch (error) {
-            console.error("Error al generar PDF:", error);
-            setNotificacion({ abierto: true, mensaje: "Error al descargar el PDF.", tipo: "error" });
-        }
+        // CORRECCIÓN: Quitamos el prefijo /v1/documentos/ porque solicitarPdf ya lo tiene
+        await solicitarPdf('reporte-actividades', payloadDocumento, `Reporte_Actividades_${fechas.fechaInicio}.pdf`);
     };
 
     const handleGenerarExcel = async () => {
         if (!validarFechas()) return;
-        try {
-            const idSeguro = usuarioLogueado.usuarioId || usuarioLogueado.id || usuarioLogueado.pn_id || 0;
-            const payloadDocumento = {
-                ...fechas,
-                usuarioId: String(idSeguro),
-                rol: usuarioLogueado.rol || ''
-            };
+        
+        const payloadDocumento = {
+            ...fechas,
+            usuarioId: String(idRealUsuario || 0),
+            rol: usuarioLogueado.rol || ''
+        };
 
-            const response = await api.post('/v1/documentos/reporte-actividades/excel', payloadDocumento, { responseType: 'blob' });
-            const url = window.URL.createObjectURL(new Blob([response.data]));
-            const link = document.createElement('a');
-            link.href = url;
-            link.setAttribute('download', `Reporte_Actividades_${fechas.fechaInicio}_al_${fechas.fechaFin}.xlsx`);
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
+        try {
+             // CORRECCIÓN: Quitamos el /api inicial, ya que api.js tiene baseURL: '/api'
+             const response = await api.post('/v1/documentos/reporte-actividades/excel', payloadDocumento, { responseType: 'blob' });
+             const url = window.URL.createObjectURL(new Blob([response.data]));
+             const link = document.createElement('a');
+             link.href = url;
+             link.setAttribute('download', `Reporte_Actividades_${fechas.fechaInicio}.xlsx`);
+             document.body.appendChild(link);
+             link.click();
+             link.remove();
         } catch (error) {
-            console.error("Error al generar Excel:", error);
-            setNotificacion({ abierto: true, mensaje: "Error al descargar el Excel.", tipo: "error" });
+             console.error("Error al generar Excel:", error);
+             setNotificacion({ abierto: true, mensaje: "Error al descargar el Excel.", tipo: "error" });
         }
     };
 
@@ -125,10 +112,9 @@ export default function ReporteActividadesFormato({ solicitarPdf }) {
     };
 
     return (
+        // ... (El JSX se mantiene exactamente igual al que ya tenías)
         <>
             <Paper sx={{ p: { xs: 3, md: 4 }, borderRadius: 2, boxShadow: 2, width: '100%', boxSizing: 'border-box' }}>
-                
-                {/* ENCABEZADO DIVIDIDO */}
                 <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', md: 'center' }, mb: 4, gap: 2 }}>
                     <Box>
                         <Typography variant="h6" sx={{ color: COLOR_GUINDA, fontWeight: 'bold' }}>
@@ -148,95 +134,36 @@ export default function ReporteActividadesFormato({ solicitarPdf }) {
                     </Button>
                 </Box>
 
-                {/* BARRA DE FILTROS Y DESCARGAS */}
                 <Paper elevation={0} sx={{ bgcolor: '#f8fafc', p: 3, borderRadius: 2, border: '1px solid #e2e8f0' }}>
                     <Grid container spacing={3} alignItems="flex-end">
-                        
-                        {/* SECCIÓN DE FECHAS */}
                         <Grid item xs={12} md={3}>
-                            <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mb: 1, fontWeight: 'bold', ml: 0.5 }}>
-                                Fecha de Inicio
-                            </Typography>
-                            <TextField 
-                                fullWidth 
-                                size="small"
-                                type="date" 
-                                value={fechas.fechaInicio} 
-                                onChange={(e) => setFechas({...fechas, fechaInicio: e.target.value})} 
-                                sx={{ bgcolor: 'white' }}
-                            />
+                            <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mb: 1, fontWeight: 'bold', ml: 0.5 }}>Fecha de Inicio</Typography>
+                            <TextField fullWidth size="small" type="date" value={fechas.fechaInicio} onChange={(e) => setFechas({...fechas, fechaInicio: e.target.value})} sx={{ bgcolor: 'white' }} />
                         </Grid>
                         <Grid item xs={12} md={3}>
-                            <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mb: 1, fontWeight: 'bold', ml: 0.5 }}>
-                                Fecha Fin
-                            </Typography>
-                            <TextField 
-                                fullWidth 
-                                size="small"
-                                type="date" 
-                                value={fechas.fechaFin} 
-                                onChange={(e) => setFechas({...fechas, fechaFin: e.target.value})} 
-                                sx={{ bgcolor: 'white' }}
-                            />
+                            <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mb: 1, fontWeight: 'bold', ml: 0.5 }}>Fecha Fin</Typography>
+                            <TextField fullWidth size="small" type="date" value={fechas.fechaFin} onChange={(e) => setFechas({...fechas, fechaFin: e.target.value})} sx={{ bgcolor: 'white' }} />
                         </Grid>
-
-                        {/* SECCIÓN DE BOTONES DE DESCARGA */}
                         <Grid item xs={12} md={6} sx={{ display: 'flex', justifyContent: { xs: 'flex-start', md: 'flex-end' }, gap: 2 }}>
-                            <Button 
-                                variant="contained" 
-                                onClick={handleGenerarPdf} 
-                                startIcon={<PictureAsPdfIcon />} 
-                                sx={{ bgcolor: COLOR_GUINDA, '&:hover': { bgcolor: '#5e1227' }, flexGrow: { xs: 1, md: 0 }, px: 3 }}
-                            >
-                                Descargar PDF
-                            </Button>
-                            
-                            <Button 
-                                variant="contained" 
-                                onClick={handleGenerarExcel} 
-                                startIcon={<TableViewIcon />} 
-                                sx={{ bgcolor: '#1D6F42', '&:hover': { bgcolor: '#155331' }, flexGrow: { xs: 1, md: 0 }, px: 3 }}
-                            >
-                                Descargar Excel
-                            </Button>
+                            <Button variant="contained" onClick={handleGenerarPdf} startIcon={<PictureAsPdfIcon />} sx={{ bgcolor: COLOR_GUINDA, '&:hover': { bgcolor: '#5e1227' }, flexGrow: { xs: 1, md: 0 }, px: 3 }}>Descargar PDF</Button>
+                            <Button variant="contained" onClick={handleGenerarExcel} startIcon={<TableViewIcon />} sx={{ bgcolor: '#1D6F42', '&:hover': { bgcolor: '#155331' }, flexGrow: { xs: 1, md: 0 }, px: 3 }}>Descargar Excel</Button>
                         </Grid>
-
                     </Grid>
                 </Paper>
-
-                {/* MODAL DE REGISTRO MANUAL */}
+                {/* ... (El resto del modal sigue igual) */}
                 <Dialog open={modalAbierto} onClose={() => setModalAbierto(false)} maxWidth="sm" fullWidth>
                     <DialogTitle sx={{ bgcolor: COLOR_GUINDA, color: 'white' }}>Registrar Actividad Manual</DialogTitle>
                     <DialogContent sx={{ mt: 2 }}>
-                        <TextField
-                            select fullWidth label="Clave del Plan de Trabajo *" name="planTrabajoClave"
-                            value={actividad.planTrabajoClave} onChange={handleChangeActividad}
-                            variant="outlined" margin="dense" sx={{ mb: 2 }}
-                        >
+                        <TextField select fullWidth label="Clave del Plan de Trabajo *" name="planTrabajoClave" value={actividad.planTrabajoClave} onChange={handleChangeActividad} variant="outlined" margin="dense" sx={{ mb: 2 }}>
                             <MenuItem value="1">1 - Mantenimiento preventivo equipo oficinas centrales</MenuItem>
                             <MenuItem value="5">5 - Mantenimiento de Sistemas Institucionales</MenuItem>
                             <MenuItem value="6">6 - Mantenimiento Preventivo Servidores</MenuItem>
                             <MenuItem value="7">7 - Soporte técnico a equipo de cómputo</MenuItem>
                             <MenuItem value="11">11 - Realización de respaldos de BD</MenuItem>
                         </TextField>
-
-                        <TextField
-                            fullWidth label="Actividad Solicitada (Ej. Desarrollo de Módulo, Reunión) *" name="actividadSolicitada"
-                            value={actividad.actividadSolicitada} onChange={handleChangeActividad}
-                            variant="outlined" margin="dense" sx={{ mb: 2 }}
-                        />
-
-                        <TextField
-                            fullWidth label="Situación Actual (Ej. EN PROCESO, COMPLETADO) *" name="situacionActual"
-                            value={actividad.situacionActual} onChange={handleChangeActividad}
-                            variant="outlined" margin="dense" sx={{ mb: 2 }}
-                        />
-
-                        <TextField
-                            fullWidth multiline rows={3} label="Actividad de Solución / Avance *" name="justificacion"
-                            value={actividad.justificacion} onChange={handleChangeActividad}
-                            variant="outlined" margin="dense" sx={{ mb: 2 }}
-                        />
+                        <TextField fullWidth label="Actividad Solicitada *" name="actividadSolicitada" value={actividad.actividadSolicitada} onChange={handleChangeActividad} variant="outlined" margin="dense" sx={{ mb: 2 }} />
+                        <TextField fullWidth label="Situación Actual *" name="situacionActual" value={actividad.situacionActual} onChange={handleChangeActividad} variant="outlined" margin="dense" sx={{ mb: 2 }} />
+                        <TextField fullWidth multiline rows={3} label="Actividad de Solución *" name="justificacion" value={actividad.justificacion} onChange={handleChangeActividad} variant="outlined" margin="dense" sx={{ mb: 2 }} />
                     </DialogContent>
                     <DialogActions sx={{ p: 2, pt: 0 }}>
                         <Button onClick={() => setModalAbierto(false)} color="inherit">Cancelar</Button>
@@ -244,17 +171,8 @@ export default function ReporteActividadesFormato({ solicitarPdf }) {
                     </DialogActions>
                 </Dialog>
             </Paper>
-
-            {/* NOTIFICACIÓN FLOTANTE */}
-            <Snackbar 
-                open={notificacion.abierto} 
-                autoHideDuration={4000} 
-                onClose={handleCloseNotificacion}
-                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-            >
-                <Alert onClose={handleCloseNotificacion} severity={notificacion.tipo} sx={{ width: '100%', boxShadow: 3 }}>
-                    {notificacion.mensaje}
-                </Alert>
+            <Snackbar open={notificacion.abierto} autoHideDuration={4000} onClose={handleCloseNotificacion} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
+                <Alert onClose={handleCloseNotificacion} severity={notificacion.tipo} sx={{ width: '100%', boxShadow: 3 }}>{notificacion.mensaje}</Alert>
             </Snackbar>
         </>
     );
