@@ -24,6 +24,10 @@ import AdminAvisosPage from './pages/admin/AdminAvisosPage.jsx';
 import AdminAreasPage from './pages/admin/AdminAreasPage';
 import DashboardPage from './pages/admin/DashboardPage.jsx';
 import AdminEquiposPage from './pages/admin/AdminEquiposPage.jsx';
+import {GestionTaller} from './pages/soporte/GestionTaller.jsx';
+
+// Módulo de Correos Institucionales (Ajusta la ruta si lo guardaste en otra carpeta)
+import { GestionCorreos } from './pages/soporte/GestionCorreos.jsx';
 
 // Componentes Adicionales
 import GeneradorDocumentos from './components/GeneradorDocumentos.jsx'; 
@@ -53,7 +57,7 @@ function AppContent() {
         );
     }
 
-    // ✅ REDIRECCIÓN DINÁMICA: La ruta inicial por defecto es la primera vista asignada en la BD
+    // REDIRECCIÓN DINÁMICA: La ruta inicial por defecto es la primera vista asignada en la BD
     const tieneVistas = user.vistasPermitidas && user.vistasPermitidas.length > 0;
     const rutaPorDefecto = tieneVistas ? user.vistasPermitidas[0].ruta : '/perfil';
 
@@ -69,9 +73,13 @@ function AppContent() {
             <Route path="/admin/avisos" element={<MainLayout><AdminAvisosPage /></MainLayout>} />
             <Route path="/admin/bitacora" element={<MainLayout><TicketsPage /></MainLayout>} />
             <Route path="/admin/equipos" element={<MainLayout><AdminEquiposPage /></MainLayout>} />
+            
+            {/* RUTA NUEVA: Correos Institucionales */}
+            <Route path="/admin/correos" element={<MainLayout><GestionCorreos /></MainLayout>} />
 
             {/* Rutas de Soporte / Documentos */}
             <Route path="/soporte/bandeja" element={<MainLayout><PanelSoporte /></MainLayout>} />
+            <Route path="/soporte/taller" element={<MainLayout><GestionTaller /></MainLayout>} />
             <Route path="/documentos/crear" element={<MainLayout><GeneradorDocumentos /></MainLayout>} />
 
             {/* Ruta Compartida de Tickets */}

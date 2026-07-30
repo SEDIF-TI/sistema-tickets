@@ -44,6 +44,12 @@ public class TicketService {
         nuevoTicket.setTitulo(request.titulo());
         nuevoTicket.setDescripcion(request.descripcion());
         nuevoTicket.setSede(request.sede());
+        
+        // Guardamos el nombre de quien reporta / tiene el resguardo
+        if (request.solicitante() != null && !request.solicitante().isBlank()) {
+            nuevoTicket.setSolicitanteNombre(request.solicitante());
+        }
+
         nuevoTicket.setUsuarioArea(usuario); 
         nuevoTicket.setEstatus(estatusAbierto); 
         nuevoTicket.setFechaCreacion(LocalDateTime.now());
@@ -54,10 +60,21 @@ public class TicketService {
                            : "NORMAL"; 
         nuevoTicket.setPrioridad(prioridad);
 
-        if (usuario.getRol() != null && "SOPORTE".equals(usuario.getRol().getNombre())) {
+        // ---> NUEVA LÓGICA DE ASIGNACIÓN <---
+        if (request.usuarioSoporteId() != null) {
+            // 1. Asignación directa (Manual por Administrador)
+            Usuario soporteElegido = usuarioRepository.findById(request.usuarioSoporteId())
+                    .orElseThrow(() -> new IllegalArgumentException("Usuario de soporte no encontrado"));
+            nuevoTicket.setUsuarioSoporte(soporteElegido);
+            System.out.println("DEBUG: Ticket asignado manualmente por el Administrador a: " + soporteElegido.getNombre());
+            
+        } else if (usuario.getRol() != null && "SOPORTE".equals(usuario.getRol().getNombre())) {
+            // 2. Auto-asignación (Si un soporte crea el ticket)
             nuevoTicket.setUsuarioSoporte(usuario);
             System.out.println("DEBUG: Ticket auto-asignado al técnico creador: " + usuario.getNombre());
+            
         } else {
+            // 3. Balanceador automático (Si un usuario normal lo crea)
             Usuario soporteAsignado = resolverAsignacion(usuario);
             if (soporteAsignado != null) {
                 nuevoTicket.setUsuarioSoporte(soporteAsignado);

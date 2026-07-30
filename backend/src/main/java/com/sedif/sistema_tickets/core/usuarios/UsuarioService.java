@@ -195,4 +195,12 @@ public class UsuarioService {
         
         usuarioRepository.save(usuario);
     }
+    
+    // Método para listar solo los usuarios de soporte
+        public List<UsuarioResponse> listarSoporte() {
+            return usuarioRepository.findByRolNombre("SOPORTE")
+                    .stream()
+                    .map(UsuarioResponse::desdeEntidad) // <--- USAMOS TU MÉTODO ESTÁTICO AQUÍ
+                    .toList();
+        }
 }
