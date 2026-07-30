@@ -5,6 +5,9 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import theme from './theme/theme.js';
+// Agrega estas dos líneas en tu bloque de importaciones de iconos
+import InventoryIcon from '@mui/icons-material/Inventory';
+import HomeRepairServiceIcon from '@mui/icons-material/HomeRepairService';
 
 // Contextos
 import { AuthContext, AuthProvider } from './context/AuthContext.jsx';
@@ -25,6 +28,7 @@ import AdminAreasPage from './pages/admin/AdminAreasPage';
 import DashboardPage from './pages/admin/DashboardPage.jsx';
 import AdminEquiposPage from './pages/admin/AdminEquiposPage.jsx';
 import {GestionTaller} from './pages/soporte/GestionTaller.jsx';
+import GestionResguardos from './pages/soporte/GestionResguardos.jsx';
 
 // Módulo de Correos Institucionales (Ajusta la ruta si lo guardaste en otra carpeta)
 import { GestionCorreos } from './pages/soporte/GestionCorreos.jsx';
@@ -80,6 +84,7 @@ function AppContent() {
             {/* Rutas de Soporte / Documentos */}
             <Route path="/soporte/bandeja" element={<MainLayout><PanelSoporte /></MainLayout>} />
             <Route path="/soporte/taller" element={<MainLayout><GestionTaller /></MainLayout>} />
+            <Route path="/soporte/resguardos" element={<MainLayout><GestionResguardos /></MainLayout>} />
             <Route path="/documentos/crear" element={<MainLayout><GeneradorDocumentos /></MainLayout>} />
 
             {/* Ruta Compartida de Tickets */}

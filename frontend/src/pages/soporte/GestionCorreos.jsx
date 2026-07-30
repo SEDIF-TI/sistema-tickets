@@ -3,18 +3,18 @@ import {
   Box, Paper, Typography, Button, TextField, MenuItem, Table, TableBody, TableCell, 
   TableContainer, TableHead, TableRow, Chip, IconButton, Tooltip, Dialog, DialogTitle, 
   DialogContent, DialogActions, Grid, Alert, Snackbar, CircularProgress, InputAdornment, 
-  Card, CardContent, Divider, Stack, useTheme 
+  Card, CardContent, Divider, Stack 
 } from '@mui/material';
 import {
   Add as AddIcon, Search as SearchIcon, Edit as EditIcon, Delete as DeleteIcon,
   PauseCircleOutlined as PauseIcon, CheckCircleOutlined as CheckIcon, Email as EmailIcon,
   Refresh as RefreshIcon, MarkEmailRead as EmailReadIcon, Block as BlockIcon,
-  PictureAsPdf as PdfIcon // Agregamos el ícono de PDF
+  PictureAsPdf as PdfIcon
 } from '@mui/icons-material';
 
 import { correoService } from '../../services/correoService';
-import api from '../../services/api'; // Importamos tu instancia de axios
-import { toUpper } from '../../util/formater'; // Importamos tu formateador
+import api from '../../services/api';
+import { toUpper } from '../../util/formater';
 
 const INITIAL_FORM_STATE = {
   id: null,
@@ -30,8 +30,6 @@ const INITIAL_FORM_STATE = {
 };
 
 export const GestionCorreos = () => {
-  const theme = useTheme();
-
   // Estados de datos
   const [correos, setCorreos] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -40,10 +38,14 @@ export const GestionCorreos = () => {
   const [filtroTexto, setFiltroTexto] = useState('');
   const [filtroEstado, setFiltroEstado] = useState('');
 
-  // Modal y Formulario
+  // Modal y Formulario de Edición/Creación
   const [modalAbierto, setModalAbierto] = useState(false);
   const [modoEdicion, setModoEdicion] = useState(false);
   const [formData, setFormData] = useState(INITIAL_FORM_STATE);
+
+  // Modal y Visor de PDF
+  const [modalPdfAbierto, setModalPdfAbierto] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState('');
 
   // Alertas / Mensajes (Snackbar)
   const [snackbar, setSnackbar] = useState({ open: false, mensaje: '', tipo: 'info' });
@@ -100,13 +102,9 @@ export const GestionCorreos = () => {
     setModalAbierto(true);
   };
 
-  // 1. ESTANDARIZACIÓN A MAYÚSCULAS CON EL FORMATEADOR
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    // Si el campo es 'correo', lo forzamos a minúsculas por limpieza. 
-    // Todo lo demás pasa por el formateador toUpper.
     const formattedValue = name === 'correo' ? value.toLowerCase() : toUpper(value);
-    
     setFormData((prev) => ({ ...prev, [name]: formattedValue }));
   };
 
@@ -148,7 +146,9 @@ export const GestionCorreos = () => {
     }
   };
 
-  // 2. LÓGICA PARA GENERAR Y DESCARGAR EL DICTAMEN EN PDF
+  // =========================================================
+  // LÓGICA PARA VISUALIZAR EL DICTAMEN EN EL MODAL PDF
+  // =========================================================
   const handleGenerarDictamen = async (row) => {
     try {
       mostrarMensaje('Generando documento PDF...', 'info');
@@ -157,58 +157,52 @@ export const GestionCorreos = () => {
       const nombreTecnico = usuarioLogueado.nombre || 'SOPORTE TÉCNICO';
       const nombreCompletoUsuario = `${row.nombre} ${row.apellidoPaterno} ${row.apellidoMaterno}`.trim();
 
-      // Mapeamos los datos del correo al DictamenRequest
       const dictamenPayload = {
-        folioTicket: row.id || 0, // Usamos el ID del registro como folio
+        folioTicket: row.id || 0,
         fecha: new Date().toLocaleDateString('es-MX'),
-        
-        // Datos del Usuario
         direccionUsuario: 'N/A',
         departamentoUsuario: row.area || 'N/A',
         nombreUsuario: `C. ${nombreCompletoUsuario}`,
         telefonoUsuario: row.extension || 'N/A',
         tipoReporte: 'GESTIÓN Y ASIGNACIÓN DE CORREO INSTITUCIONAL',
-        
-        // Datos del "Equipo" (Adaptado a Correo)
         cve: 'N/A',
         descripcionEquipo: `CUENTA DE CORREO: ${row.correo}`,
         marca: `CUOTA: ${row.cuotaAlmacenamiento}`,
         modelo: 'N/A',
         serie: 'N/A',
         noResguardo: 'N/A',
-        
-        // Análisis Técnico
         fallaReportada: `SOLICITUD PARA CUENTA DE CORREO INSTITUCIONAL. ESTADO: ${row.estado}`,
         diagnostico: `VERIFICACIÓN Y CONFIGURACIÓN DE PARÁMETROS EN EL SERVIDOR DE CORREOS.`,
         hallazgos: `CARGO: ${row.cargo || 'N/A'}`,
         conclusion: `SE PROCESÓ LA SOLICITUD DE LA CUENTA DE CORREO INSTITUCIONAL DE MANERA EXITOSA.`,
-
-        // Firmas
         realizadoPor: nombreTecnico.startsWith('C. ') ? nombreTecnico : `C. ${nombreTecnico}`,
         revisadoPor: 'C. MARCO POLO OLIVARES GONZALEZ',
       };
 
-      // NOTA: Ajusta la ruta '/api/documentos/dictamen' según la URL exacta de tu controlador
-      const response = await api.post('/api/documentos/dictamen', dictamenPayload, { 
+      // ¡Corregido con /v1!
+      const response = await api.post('/v1/documentos/dictamen', dictamenPayload, { 
         responseType: 'blob' 
       });
 
-      // Crear URL del Blob y forzar descarga
-      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `Dictamen_Correo_${row.correo}.pdf`);
-      document.body.appendChild(link);
-      link.click();
+      // Crear URL temporal en memoria y abrir modal
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const urlTemporal = URL.createObjectURL(blob);
+      setPdfUrl(urlTemporal);
+      setModalPdfAbierto(true);
       
-      // Limpieza
-      link.parentNode.removeChild(link);
-      window.URL.revokeObjectURL(url);
-      
-      mostrarMensaje('PDF descargado exitosamente', 'success');
+      mostrarMensaje('PDF cargado exitosamente', 'success');
     } catch (error) {
       console.error(error);
-      mostrarMensaje('Error al descargar el PDF', 'error');
+      mostrarMensaje('Error al obtener el PDF', 'error');
+    }
+  };
+
+  const handleCerrarModalPdf = () => {
+    setModalPdfAbierto(false);
+    // Liberamos la memoria de la URL temporal al cerrar
+    if (pdfUrl) {
+      URL.revokeObjectURL(pdfUrl);
+      setPdfUrl('');
     }
   };
 
@@ -352,8 +346,7 @@ export const GestionCorreos = () => {
                     <TableCell align="right" sx={{ pr: 2 }}>
                       <Stack direction="row" spacing={0.5} justifyContent="flex-end">
                         
-                        {/* 3. BOTÓN PARA DESCARGAR PDF */}
-                        <Tooltip title="Descargar Dictamen">
+                        <Tooltip title="Generar Dictamen">
                           <IconButton size="small" color="secondary" onClick={() => handleGenerarDictamen(row)}>
                             <PdfIcon fontSize="small" />
                           </IconButton>
@@ -403,7 +396,6 @@ export const GestionCorreos = () => {
         <Box component="form" onSubmit={handleGuardar}>
           <DialogContent sx={{ py: 2 }}>
             <Grid container spacing={2}>
-              {/* SECCIÓN 1: DATOS DEL TITULAR */}
               <Grid item xs={12}><Typography variant="subtitle2" color="primary" sx={{ fontWeight: 700, mb: 1 }}>Datos del Titular</Typography></Grid>
               <Grid item xs={12} sm={4}><TextField fullWidth size="small" label="Nombre(s)" name="nombre" required value={formData.nombre} onChange={handleInputChange} /></Grid>
               <Grid item xs={12} sm={4}><TextField fullWidth size="small" label="Apellido Paterno" name="apellidoPaterno" required value={formData.apellidoPaterno} onChange={handleInputChange} /></Grid>
@@ -412,7 +404,6 @@ export const GestionCorreos = () => {
               <Grid item xs={12} sm={4}><TextField fullWidth size="small" label="Cargo" name="cargo" placeholder="Ej. ANALISTA A" value={formData.cargo} onChange={handleInputChange} /></Grid>
               <Grid item xs={12} sm={3}><TextField fullWidth size="small" label="Extensión" name="extension" placeholder="Ej. 104" value={formData.extension} onChange={handleInputChange} /></Grid>
 
-              {/* SECCIÓN 2: CONFIGURACIÓN DE LA CUENTA */}
               <Grid item xs={12} sx={{ mt: 1 }}><Typography variant="subtitle2" color="primary" sx={{ fontWeight: 700, mb: 1 }}>Configuración de la Cuenta</Typography></Grid>
               <Grid item xs={12} sm={6}><TextField fullWidth size="small" type="email" label="Correo Institucional" name="correo" required placeholder="usuario@sedif.gob.mx" value={formData.correo} onChange={handleInputChange} /></Grid>
               <Grid item xs={12} sm={3}>
@@ -442,6 +433,52 @@ export const GestionCorreos = () => {
             </Button>
           </DialogActions>
         </Box>
+      </Dialog>
+
+      {/* ==============================================
+          MODAL PARA VISUALIZAR EL DICTAMEN PDF 
+      ============================================== */}
+      <Dialog 
+        open={modalPdfAbierto} 
+        onClose={handleCerrarModalPdf} 
+        maxWidth="md" 
+        fullWidth
+      >
+        <DialogTitle sx={{ bgcolor: '#801A36', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography variant="h6" sx={{ fontWeight: 600 }}>Vista Previa del Dictamen Oficial</Typography>
+        </DialogTitle>
+        <DialogContent dividers sx={{ height: '75vh', p: 0, overflow: 'hidden' }}>
+          {pdfUrl ? (
+            <iframe 
+              src={pdfUrl} 
+              width="100%" 
+              height="100%" 
+              style={{ border: 'none' }} 
+              title="Visor PDF"
+            />
+          ) : (
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+              <CircularProgress />
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={handleCerrarModalPdf} color="inherit">
+            Cerrar Visor
+          </Button>
+          <Button 
+            variant="contained" 
+            sx={{ bgcolor: '#801A36', '&:hover': { bgcolor: '#5e1227' } }}
+            onClick={() => {
+              const link = document.createElement('a');
+              link.href = pdfUrl;
+              link.download = 'Dictamen_Correo.pdf';
+              link.click();
+            }}
+          >
+            Descargar PDF
+          </Button>
+        </DialogActions>
       </Dialog>
 
       {/* NOTIFICACIONES SNACKBAR */}
