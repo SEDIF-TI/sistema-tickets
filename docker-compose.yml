@@ -12,5 +12,27 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
+  # 2. Backend
+  backend:
+    build: 
+      context: ./backend
+    container_name: sistema_tickets_backend
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres-db
+    restart: always
+
+  # 3. Frontend en React + Nginx
+  frontend:
+    build:
+      context: ./frontend
+    container_name: sistema_tickets_frontend
+    ports:
+      - "80:80" 
+    depends_on:
+      - backend
+    restart: always
+
 volumes:
   postgres_data:
