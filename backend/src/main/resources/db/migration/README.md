@@ -1,70 +1,61 @@
 # Migraciones Flyway
 
-Esta carpeta contiene el versionado del esquema de base de datos.
+Versionado del esquema de base de datos. **Flyway está activo.**
 
-## Estado actual: PENDIENTE DE ACTIVAR
+## Migraciones actuales
 
-Flyway está **desactivado** (`spring.flyway.enabled=false` en
-`application.properties`) porque todavía no existe la migración base.
+| Archivo | Contenido |
+|---|---|
+| `V1__baseline_esquema_inicial.sql` | Baseline: las 12 tablas tal como existen hoy en producción, tomadas del volcado real. |
+| `V2__add_indexes.sql` | Índices sobre claves foráneas y columnas de filtrado. |
+| `V3__integridad_referencial_y_columnas_obsoletas.sql` | FK faltante en `equipo_reparacion` y documentación del esquema. |
 
-El proyecto viene funcionando con `spring.jpa.hibernate.ddl-auto=update`, es
-decir, Hibernate creando y modificando las tablas por su cuenta a partir de las
-entidades Java. La base de datos ya está en producción con datos reales, así que
-**no se puede generar el baseline adivinando el esquema desde las entidades**:
-cualquier diferencia de tipo, longitud o restricción produciría un `V1` que
-miente sobre la estructura real, y la primera migración posterior rompería.
+## Cómo se comporta al arrancar
 
-## Cómo activarlo (procedimiento)
+La configuración es `baseline-on-migrate=true` con `baseline-version=1`:
 
-1. **Volcar el esquema real** de la base de datos actual, sin datos:
-
-   ```bash
-   pg_dump --schema-only --no-owner --no-privileges \
-           -U postgres -d sistema_tickets_db > esquema_actual.sql
-   ```
-
-2. **Crear `V1__baseline.sql`** en esta carpeta con ese volcado. Debe reflejar
-   la base de datos tal y como está hoy, sin inventar nada.
-
-3. **Crear `V2__add_indexes.sql`** con los índices que faltan. En PostgreSQL las
-   claves foráneas **no** se indexan solas, y estas se consultan constantemente:
-
-   ```sql
-   CREATE INDEX IF NOT EXISTS idx_usuario_rol      ON usuario (fn_rol_id);
-   CREATE INDEX IF NOT EXISTS idx_usuario_area     ON usuario (fn_area_id);
-   CREATE INDEX IF NOT EXISTS idx_ticket_estatus   ON ticket (fn_estatus_id);
-   CREATE INDEX IF NOT EXISTS idx_ticket_soporte   ON ticket (fn_usuario_soporte_id);
-   CREATE INDEX IF NOT EXISTS idx_ticket_area      ON ticket (fn_usuario_area_id);
-   ```
-
-   > Verifica los nombres reales de tabla y columna contra el volcado del paso 1
-   > antes de aplicarlo.
-
-4. **Activar Flyway** en `application.properties`:
-
-   ```properties
-   spring.flyway.enabled=true
-   ```
-
-   `baseline-on-migrate=true` y `baseline-version=1` ya están configurados: sobre
-   la base de datos existente, Flyway marcará `V1` como aplicada sin volver a
-   ejecutarla, y solo correrá de `V2` en adelante.
-
-5. **Cambiar a `validate`** en desarrollo, una vez comprobado que todo cuadra:
-
-   ```properties
-   spring.jpa.hibernate.ddl-auto=validate
-   ```
-
-   En el perfil `prod` ya está forzado a `validate`.
+- **Sobre la base de datos existente** (la que ya tiene los datos), Flyway marca `V1` como aplicada **sin ejecutarla** y solo corre de `V2` en adelante. Los índices se crean; nada se recrea ni se pierde.
+- **Sobre una base vacía** (un entorno nuevo, o el contenedor de Docker recién creado), `V1` crea el esquema completo. Usa `IF NOT EXISTS` en todo, así que es segura en ambos escenarios.
 
 ## Reglas de trabajo
 
-- **Nunca** se modifica una migración ya aplicada. Flyway guarda un checksum: si
-  cambia, el arranque falla. Para corregir algo, se añade una migración nueva.
-- Numeración incremental sin huecos: `V1__`, `V2__`, `V3__`…
-- Nombres descriptivos en minúsculas con guion bajo:
-  `V4__add_columna_telegram_chat_id.sql`.
-- Doble guion bajo entre la versión y la descripción: `V4__descripcion.sql`.
-- Toda migración debe ser revisada antes de llegar a producción: es la única vía
-  por la que cambia el esquema.
+- **Nunca se modifica una migración ya aplicada.** Flyway guarda un checksum de cada archivo: si cambia, el arranque falla. Para corregir algo, se añade una migración nueva.
+- Numeración incremental sin huecos: `V4__`, `V5__`, …
+- Nombre descriptivo en minúsculas con guion bajo, y doble guion bajo tras la versión: `V4__add_columna_folio.sql`.
+- Toda migración debe revisarse antes de llegar a producción: es la única vía por la que cambia el esquema.
+
+## Estado de `ddl-auto`
+
+| Perfil | Valor | Motivo |
+|---|---|---|
+| desarrollo | `update` | Comodidad al iterar sobre las entidades. |
+| `prod` | `validate` | Hibernate **nunca** modifica el esquema en producción; solo comprueba que las entidades cuadren con las tablas. |
+
+Cuando el equipo confirme que las entidades están estables, conviene pasar
+desarrollo también a `validate`, para que cualquier cambio de esquema entre
+obligatoriamente por una migración.
+
+## Deuda técnica documentada
+
+Estas situaciones están registradas en `V3` mediante `COMMENT ON COLUMN`, de
+modo que quedan visibles desde el propio esquema:
+
+**Columnas duplicadas en `resguardo`.** Cuatro columnas de una versión
+anterior conviven con sus equivalentes `s_*`, que son las que la entidad usa
+realmente:
+
+```
+condiciones  ·  departamento  ·  numero_inventario  ·  telefono
+```
+
+Están a `NULL` en todos los registros revisados. **No se eliminaron**: borrar
+columnas es irreversible y conviene confirmar antes que ningún reporte ni
+consulta externa las lee. Cuando se confirme, basta una `V4` con los
+`DROP COLUMN IF EXISTS`.
+
+**Columnas sin mapear en la entidad.** `ticket.s_justificacion`,
+`ticket.plan_trabajo_clave`, `usuario.s_apellido_paterno` y
+`usuario.s_apellido_materno` existen en la base de datos y contienen datos
+históricos, pero no están en las entidades Java. Hibernate las ignora y
+quedan a `NULL` en los registros nuevos. Decidir si se recuperan o se retiran
+es una decisión de producto, no de infraestructura.

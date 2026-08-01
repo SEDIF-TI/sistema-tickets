@@ -1,93 +1,96 @@
 package com.sedif.sistema_tickets.core.taller;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import com.sedif.sistema_tickets.exception.ApiResponse;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
-import java.util.Map;
 
+/**
+ * Taller de reparaciones: equipos que el area de TI recibe para diagnostico y
+ * reparacion, con su historial.
+ *
+ * <p>Correcciones de seguridad respecto a la version anterior:</p>
+ * <ul>
+ *   <li><b>{@code @CrossOrigin(origins = "*")} eliminado.</b> Anulaba la
+ *       politica CORS del proyecto y permitia que cualquier sitio web
+ *       consultara este endpoint desde el navegador de un usuario con sesion
+ *       abierta. El origen permitido lo decide WebConfig.</li>
+ *   <li>No exigia ningun rol y su ruta {@code /api/taller} quedaba fuera de
+ *       todo patron protegido de SecurityConfig: bastaba estar autenticado.</li>
+ *   <li>Los {@code try/catch} que devolvian {@code Map.of("mensaje", ...)} con
+ *       el texto de la excepcion filtraban detalles internos al cliente
+ *       (nombres de clase, mensajes de Hibernate). Ahora la traduccion la hace
+ *       GlobalExceptionHandler, que no expone la causa tecnica.</li>
+ * </ul>
+ */
 @RestController
 @RequestMapping("/api/taller")
-@CrossOrigin(origins = "*")
+@RequiredArgsConstructor
+@PreAuthorize("hasAnyRole('ADMINISTRADOR', 'SOPORTE')")
 public class EquipoReparacionResource {
 
     private final EquipoReparacionService equipoService;
 
-    @Autowired
-    public EquipoReparacionResource(EquipoReparacionService equipoService) {
-        this.equipoService = equipoService;
-    }
-
-    // Obtenemos todos los equipos o filtramos por término de búsqueda
+    /** Listado del taller, con filtro opcional por texto. */
     @GetMapping
-    public ResponseEntity<List<EquipoReparacionDTO>> obtenerTodos(
+    public ResponseEntity<ApiResponse<List<EquipoReparacionDTO>>> obtenerTodos(
             @RequestParam(required = false) String filtro) {
-        if (filtro != null && !filtro.trim().isEmpty()) {
-            return ResponseEntity.ok(equipoService.buscarPorFiltro(filtro));
-        }
-        return ResponseEntity.ok(equipoService.obtenerTodos());
+
+        List<EquipoReparacionDTO> resultado =
+                (filtro != null && !filtro.isBlank())
+                        ? equipoService.buscarPorFiltro(filtro)
+                        : equipoService.obtenerTodos();
+
+        return ResponseEntity.ok(ApiResponse.ok(resultado));
     }
 
-    // Obtener un registro por ID
     @GetMapping("/{id}")
-    public ResponseEntity<?> obtenerPorId(@PathVariable Long id) {
-        try {
-            EquipoReparacionDTO dto = equipoService.obtenerPorId(id);
-            return ResponseEntity.ok(dto);
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(Map.of("mensaje", e.getMessage()));
-        }
+    public ResponseEntity<ApiResponse<EquipoReparacionDTO>> obtenerPorId(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.ok(equipoService.obtenerPorId(id)));
     }
 
-    // Registrar nuevo equipo en taller
+    /** Registra la entrada de un equipo al taller. */
     @PostMapping
-    public ResponseEntity<?> registrarIngreso(
-            @RequestBody EquipoReparacion equipo,
+    public ResponseEntity<ApiResponse<EquipoReparacionDTO>> registrarIngreso(
+            @Valid @RequestBody EquipoReparacion equipo,
             @RequestParam(required = false) Long tecnicoId) {
-        try {
-            EquipoReparacionDTO creado = equipoService.registrarIngreso(equipo, tecnicoId);
-            return ResponseEntity.status(HttpStatus.CREATED).body(creado);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("mensaje", "Error al registrar el ingreso al taller: " + e.getMessage()));
-        }
+
+        EquipoReparacionDTO creado = equipoService.registrarIngreso(equipo, tecnicoId);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.ok(creado, "Equipo registrado en el taller."));
     }
 
-    // Actualizar datos del equipo/diagnóstico
+    /** Actualiza diagnostico, solucion y datos del equipo. */
     @PutMapping("/{id}")
-    public ResponseEntity<?> actualizar(
+    public ResponseEntity<ApiResponse<EquipoReparacionDTO>> actualizar(
             @PathVariable Long id,
-            @RequestBody EquipoReparacion equipo,
+            @Valid @RequestBody EquipoReparacion equipo,
             @RequestParam(required = false) Long tecnicoId) {
-        try {
-            EquipoReparacionDTO actualizado = equipoService.actualizar(id, equipo, tecnicoId);
-            return ResponseEntity.ok(actualizado);
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(Map.of("mensaje", e.getMessage()));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("mensaje", "Error al actualizar el registro: " + e.getMessage()));
-        }
+
+        return ResponseEntity.ok(ApiResponse.ok(
+                equipoService.actualizar(id, equipo, tecnicoId), "Registro actualizado."));
     }
 
-    // Cambiar rápidamente el estado del ciclo de vida (RECIBIDO, EN_DIAGNOSTICO, ENTREGADO, etc.)
+    /** Avanza el equipo en su ciclo de vida dentro del taller. */
     @PatchMapping("/{id}/estado")
-    public ResponseEntity<?> cambiarEstado(
+    public ResponseEntity<ApiResponse<EquipoReparacionDTO>> cambiarEstado(
             @PathVariable Long id,
-            @RequestBody Map<String, String> body) {
-        String nuevoEstado = body.get("estado");
-        if (nuevoEstado == null || nuevoEstado.trim().isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("mensaje", "El estado es requerido."));
-        }
-        try {
-            EquipoReparacionDTO actualizado = equipoService.cambiarEstado(id, nuevoEstado);
-            return ResponseEntity.ok(actualizado);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("mensaje", "Error al cambiar estado: " + e.getMessage()));
-        }
+            @Valid @RequestBody CambioEstadoRequest request) {
+
+        return ResponseEntity.ok(ApiResponse.ok(
+                equipoService.cambiarEstado(id, request.estado()), "Estado actualizado."));
     }
 }

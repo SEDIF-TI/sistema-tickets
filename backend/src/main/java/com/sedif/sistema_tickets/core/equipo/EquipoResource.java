@@ -1,72 +1,92 @@
 package com.sedif.sistema_tickets.core.equipo;
 
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import com.sedif.sistema_tickets.exception.ApiResponse;
+import com.sedif.sistema_tickets.exception.PageResponse;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
 import java.util.List;
 
+/**
+ * Catalogo de equipos para los dictamenes tecnicos.
+ *
+ * <p>Correcciones respecto a la version anterior:</p>
+ * <ul>
+ *   <li>No exigia ningun rol y su ruta quedaba fuera de todo patron protegido:
+ *       bastaba estar autenticado para modificar y borrar el catalogo.</li>
+ *   <li>El controlador manipulaba {@code EquipoRepository} directamente, sin
+ *       transacciones y con la logica de negocio dentro de la capa web. Ahora
+ *       delega en {@link EquipoService}.</li>
+ *   <li>{@code /upsert} devolvia {@code 200 OK} con cuerpo {@code null} cuando
+ *       la descripcion venia vacia: un exito aparente que ocultaba que no se
+ *       habia guardado nada. Ahora responde 400 con el motivo.</li>
+ *   <li>El listado devolvia el catalogo completo sin paginar.</li>
+ * </ul>
+ */
 @RestController
 @RequestMapping("/api/v1/equipos")
 @RequiredArgsConstructor
-public class EquipoResource { // <-- CAMBIADO A RESOURCE
+@PreAuthorize("hasAnyRole('ADMINISTRADOR', 'SOPORTE')")
+public class EquipoResource {
 
-    private final EquipoRepository equipoRepository;
+    private final EquipoService equipoService;
 
-    // 1. Endpoint para el Autocomplete del Frontend
+    /** Autocompletado del formulario de dictamen. */
     @GetMapping("/buscar")
-    public ResponseEntity<List<Equipo>> buscarEquipos(@RequestParam String q) {
-        if (q == null || q.trim().isEmpty()) {
-            return ResponseEntity.ok(List.of());
-        }
-        
-        List<Equipo> resultados = equipoRepository.findByDescripcionContainingIgnoreCase(q.trim());
-        return ResponseEntity.ok(resultados);
+    public ResponseEntity<ApiResponse<List<Equipo>>> buscarEquipos(@RequestParam String q) {
+        return ResponseEntity.ok(ApiResponse.ok(equipoService.buscar(q)));
     }
 
-    // 2. Endpoint "Just In Time" que guarda o actualiza el catálogo silenciosamente
-    @PostMapping("/upsert")
-    public ResponseEntity<Equipo> registrarOActualizar(@RequestBody Equipo equipoRequest) {
-        // Si la descripción está vacía, no hacemos nada (evita errores)
-        if (equipoRequest.getDescripcion() == null || equipoRequest.getDescripcion().trim().isEmpty()) {
-            return ResponseEntity.ok(null); 
-        }
-
-        // Buscamos si existe por descripción
-        Equipo equipo = equipoRepository.findByDescripcionIgnoreCase(equipoRequest.getDescripcion().trim())
-                .orElse(new Equipo());
-
-        // Solo actualizamos si los nuevos valores no son nulos
-        equipo.setDescripcion(equipoRequest.getDescripcion().toUpperCase());
-        if (equipoRequest.getMarca() != null) equipo.setMarca(equipoRequest.getMarca().toUpperCase());
-        if (equipoRequest.getModelo() != null) equipo.setModelo(equipoRequest.getModelo().toUpperCase());
-
-        return ResponseEntity.ok(equipoRepository.save(equipo));
-    }
-
-    // 3. Listar TODOS los equipos para el panel de administración
+    /** Listado paginado para el panel de administracion del catalogo. */
     @GetMapping
-    public ResponseEntity<List<Equipo>> listarTodos() {
-        return ResponseEntity.ok(equipoRepository.findAll());
+    public ResponseEntity<ApiResponse<PageResponse<Equipo>>> listarTodos(
+            @PageableDefault(size = 10, sort = "descripcion", direction = Sort.Direction.ASC)
+            Pageable pageable) {
+
+        return ResponseEntity.ok(ApiResponse.ok(equipoService.listarPaginado(pageable)));
     }
 
-    // 4. Actualizar un equipo manualmente (Admin)
+    /**
+     * Alta o actualizacion silenciosa desde el formulario de dictamen: evita
+     * volver a teclear marca y modelo de equipos que se repiten.
+     */
+    @PostMapping("/upsert")
+    public ResponseEntity<ApiResponse<Equipo>> registrarOActualizar(
+            @Valid @RequestBody Equipo equipoRequest) {
+
+        return ResponseEntity.ok(ApiResponse.ok(
+                equipoService.registrarOActualizar(equipoRequest), "Catalogo actualizado."));
+    }
+
     @PutMapping("/{id}")
-    public ResponseEntity<Equipo> actualizarEquipo(@PathVariable Long id, @RequestBody Equipo request) {
-        return equipoRepository.findById(id).map(equipo -> {
-            equipo.setDescripcion(request.getDescripcion());
-            equipo.setMarca(request.getMarca());
-            equipo.setModelo(request.getModelo());
-            return ResponseEntity.ok(equipoRepository.save(equipo));
-        }).orElse(ResponseEntity.notFound().build());
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    public ResponseEntity<ApiResponse<Equipo>> actualizarEquipo(
+            @PathVariable Long id,
+            @Valid @RequestBody Equipo request) {
+
+        return ResponseEntity.ok(ApiResponse.ok(
+                equipoService.actualizar(id, request), "Equipo actualizado."));
     }
 
-    // 5. Eliminar un equipo del catálogo (Admin)
+    /** Borrado del catalogo. Solo ADMINISTRADOR. */
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> eliminarEquipo(@PathVariable Long id) {
-        if (equipoRepository.existsById(id)) {
-            equipoRepository.deleteById(id);
-            return ResponseEntity.noContent().build();
-        }
-        return ResponseEntity.notFound().build();
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    public ResponseEntity<ApiResponse<Void>> eliminarEquipo(@PathVariable Long id) {
+        equipoService.eliminar(id);
+        return ResponseEntity.ok(ApiResponse.ok("Equipo eliminado del catalogo."));
     }
 }
