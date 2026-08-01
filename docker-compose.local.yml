@@ -1,0 +1,32 @@
+# =========================================================================
+# OVERRIDE LOCAL — desarrollo en tu equipo
+# =========================================================================
+# Publica los puertos para poder entrar desde el navegador y conectarte a
+# la base de datos con un cliente SQL.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.local.yml up -d
+#
+# NO usar en un servidor expuesto a internet: abre la base de datos al
+# exterior, cosa que en produccion no debe ocurrir nunca.
+# =========================================================================
+
+services:
+
+  postgres-db:
+    ports:
+      # 5433 en el host para no chocar con un PostgreSQL instalado
+      # localmente, que ya suele ocupar el 5432.
+      - "5433:5432"
+
+  backend:
+    ports:
+      - "8080:8080"
+    environment:
+      # Logs mas hablados para depurar.
+      LOGGING_LEVEL_COM_SEDIF_SISTEMA_TICKETS: DEBUG
+
+  frontend:
+    ports:
+      # El contenedor escucha en 8080 (Nginx sin privilegios); se expone
+      # en el 80 del host.
+      - "80:8080"

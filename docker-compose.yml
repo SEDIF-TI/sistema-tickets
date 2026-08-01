@@ -1,0 +1,92 @@
+# =========================================================================
+# COMPOSE BASE — definicion comun de los tres servicios
+# =========================================================================
+# Este archivo NO publica puertos al exterior: eso depende del entorno.
+#
+#   Desarrollo local:
+#     docker compose -f docker-compose.yml -f docker-compose.local.yml up -d
+#
+#   Produccion:
+#     docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Todas las credenciales se leen del archivo .env de esta misma carpeta.
+# Ningun valor sensible se escribe aqui.
+# =========================================================================
+
+services:
+
+  # ----------------------------------------------------------------------
+  # Base de datos PostgreSQL
+  # ----------------------------------------------------------------------
+  postgres-db:
+    image: postgres:17-alpine
+    container_name: sistema_tickets_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - interna
+    # El backend espera a que la base este realmente lista para aceptar
+    # conexiones, no solo a que el contenedor haya arrancado.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ----------------------------------------------------------------------
+  # Backend Spring Boot
+  # ----------------------------------------------------------------------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: sistema_tickets_backend
+    restart: unless-stopped
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+    environment:
+      # Dentro de la red de Compose el host es el nombre del servicio.
+      DB_HOST: postgres-db
+      DB_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      APP_JWT_SECRET: ${APP_JWT_SECRET}
+      APP_JWT_EXPIRATION: ${APP_JWT_EXPIRATION:-3600000}
+      APP_CORS_ALLOWED_ORIGINS: ${APP_CORS_ALLOWED_ORIGINS}
+      TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_BOT_ENABLED: ${TELEGRAM_BOT_ENABLED:-false}
+    networks:
+      - interna
+
+  # ----------------------------------------------------------------------
+  # Frontend React + Nginx
+  # ----------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # Se resuelve al construir la imagen: Vite la incrusta en el bundle.
+        VITE_API_URL: ${VITE_API_URL:-/api}
+    container_name: sistema_tickets_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    networks:
+      - interna
+
+networks:
+  interna:
+    driver: bridge
+
+volumes:
+  postgres_data:

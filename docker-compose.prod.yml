@@ -1,0 +1,44 @@
+# =========================================================================
+# OVERRIDE DE PRODUCCION — servidor tras un reverse proxy
+# =========================================================================
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# No publica ningun puerto al host. Backend y frontend se conectan a la red
+# del reverse proxy (Nginx Proxy Manager), que es quien termina el TLS y
+# enruta el trafico. La base de datos permanece SOLO en la red interna: no
+# es accesible ni siquiera desde el proxy.
+#
+# Requisito previo: la red externa debe existir. Si no, crearla con:
+#   docker network create npm_red
+# =========================================================================
+
+services:
+
+  postgres-db:
+    # Sin 'ports': la base de datos nunca se expone fuera de la red interna.
+    networks:
+      - interna
+
+  backend:
+    environment:
+      # Activa application-prod.properties: ddl-auto=validate, Flyway
+      # obligatorio, sin SQL en los logs y errores sin detalle interno.
+      SPRING_PROFILES_ACTIVE: prod
+    networks:
+      - interna
+      - proxy
+
+  frontend:
+    build:
+      args:
+        # En produccion el frontend llama a /api y el reverse proxy
+        # redirige esa ruta al backend: mismo origen, sin CORS.
+        VITE_API_URL: /api
+    networks:
+      - proxy
+
+networks:
+  proxy:
+    # Red creada fuera de este compose, compartida con el reverse proxy.
+    external: true
+    name: npm_red

@@ -1,6 +1,81 @@
-/backend/target/
-/frontend/node_modules/
+# =========================================================================
+# .gitignore raiz — sistema-tickets
+# =========================================================================
+
+# --- SECRETOS: nunca se versionan ---------------------------------------
+# Se ignora .env en cualquier nivel del arbol, junto con sus variantes.
+# La excepcion explicita (!) mantiene .env.example dentro de git, que es
+# la plantilla que el equipo copia al clonar.
 .env
-.DS_Store
-.vscode
+.env.*
+**/.env
+**/.env.*
+!.env.example
+!**/.env.example
+
+# Claves y certificados
+*.pem
+*.key
+*.p12
+*.jks
+*.keystore
+*.crt
+
+# Archivos de configuracion con credenciales reales.
+# application.properties y application-prod.properties SI se versionan:
+# no contienen secretos, solo referencias ${VARIABLE}.
+application-local.properties
+application-secret.properties
+**/src/main/resources/application-local.properties
+
+# --- Backend (Maven / Java) ---------------------------------------------
+backend/target/
+target/
+*.class
+*.jar
+*.war
+!**/.mvn/wrapper/maven-wrapper.jar
+HELP.md
+
+# --- Frontend (Node / Vite) ---------------------------------------------
+frontend/node_modules/
 node_modules/
+frontend/dist/
+dist/
+dist-ssr/
+*.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# --- Editores / IDE -----------------------------------------------------
+.vscode/
+!.vscode/extensions.json
+.idea/
+*.iml
+*.iws
+*.ipr
+.settings/
+.project
+.classpath
+.factorypath
+
+# --- Sistema operativo --------------------------------------------------
+.DS_Store
+Thumbs.db
+
+# --- Logs y temporales --------------------------------------------------
+logs/
+*.log
+*.tmp
+*.bak
+
+# --- Volumenes y datos locales de Docker --------------------------------
+postgres_data/
+pgdata/
+
+# --- Respaldos de base de datos (pueden contener datos personales) ------
+*.sql.gz
+*.dump
+backup/

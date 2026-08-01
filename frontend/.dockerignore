@@ -1,0 +1,41 @@
+# =========================================================================
+# .dockerignore del frontend
+# =========================================================================
+# node_modules es lo mas importante de excluir: se reinstala dentro del
+# contenedor con 'npm ci'. Copiar el local rompe builds (binarios nativos
+# compilados para otro SO) y multiplica el tamano del contexto.
+# =========================================================================
+
+# --- Dependencias y build ---
+node_modules/
+dist/
+dist-ssr/
+build/
+.vite/
+
+# --- SECRETOS ---
+# Recordatorio: en Vite TODA variable VITE_* acaba embebida en el bundle
+# publico. Nunca pongas secretos de backend en un .env del frontend.
+.env
+.env.*
+!.env.example
+*.local
+
+# --- Git y metadatos ---
+.git/
+.gitignore
+
+# --- IDE ---
+.vscode/
+.idea/
+
+# --- Documentacion ---
+README.md
+*.md
+
+# --- Logs ---
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*

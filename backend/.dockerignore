@@ -1,0 +1,48 @@
+# =========================================================================
+# .dockerignore del backend
+# =========================================================================
+# Excluye del contexto de build todo lo que no necesita el Dockerfile.
+# Dos motivos: builds mas rapidos y, sobre todo, que ningun secreto ni
+# artefacto local acabe dentro de una capa de la imagen.
+# =========================================================================
+
+# --- SECRETOS: jamas dentro de la imagen ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.jks
+*.keystore
+
+# --- Artefactos de compilacion ---
+# El jar se construye DENTRO del contenedor; copiar el local invalidaria
+# la cache y podria meter un binario obsoleto en la imagen.
+target/
+*.jar
+*.war
+*.class
+
+# --- Git y metadatos ---
+.git/
+.gitignore
+.gitattributes
+
+# --- IDE ---
+.idea/
+.vscode/
+*.iml
+.settings/
+.project
+.classpath
+
+# --- Documentacion y notas ---
+HELP.md
+README.md
+*.md
+
+# --- Logs y temporales ---
+logs/
+*.log
+*.tmp
