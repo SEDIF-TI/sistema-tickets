@@ -8,17 +8,24 @@ import com.sedif.sistema_tickets.core.telegram.SedifTelegramBot;
 import com.sedif.sistema_tickets.core.ticket.bitacora.Bitacora;
 import com.sedif.sistema_tickets.core.ticket.bitacora.BitacoraRepository;
 import com.sedif.sistema_tickets.core.ticket.filtros.TicketFiltroStrategy;
+import com.sedif.sistema_tickets.exception.MessageConstants;
+import com.sedif.sistema_tickets.exception.PageResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 // ---> IMPORTACIÓN NECESARIA PARA WEBSOCKETS
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class TicketService {
 
@@ -66,21 +73,21 @@ public class TicketService {
             Usuario soporteElegido = usuarioRepository.findById(request.usuarioSoporteId())
                     .orElseThrow(() -> new IllegalArgumentException("Usuario de soporte no encontrado"));
             nuevoTicket.setUsuarioSoporte(soporteElegido);
-            System.out.println("DEBUG: Ticket asignado manualmente por el Administrador a: " + soporteElegido.getNombre());
+            log.debug("Ticket asignado manualmente al tecnico id={}", soporteElegido.getId());
             
         } else if (usuario.getRol() != null && "SOPORTE".equals(usuario.getRol().getNombre())) {
             // 2. Auto-asignación (Si un soporte crea el ticket)
             nuevoTicket.setUsuarioSoporte(usuario);
-            System.out.println("DEBUG: Ticket auto-asignado al técnico creador: " + usuario.getNombre());
+            log.debug("Ticket auto-asignado al tecnico que lo creo.");
             
         } else {
             // 3. Balanceador automático (Si un usuario normal lo crea)
             Usuario soporteAsignado = resolverAsignacion(usuario);
             if (soporteAsignado != null) {
                 nuevoTicket.setUsuarioSoporte(soporteAsignado);
-                System.out.println("DEBUG: Ticket #" + nuevoTicket.getId() + " asignado por balanceador a: " + soporteAsignado.getNombre());
+                log.debug("Ticket asignado por el balanceador al tecnico id={}", soporteAsignado.getId());
             } else {
-                System.err.println("WARNING: Ticket creado sin técnico asignado.");
+                log.warn("Ticket creado sin tecnico asignado: no hay soporte disponible.");
             }
         }
 
@@ -105,22 +112,16 @@ public class TicketService {
 
             try {
                 telegramBot.enviarMensaje(ticketGuardado.getUsuarioSoporte().getTelegramChatId(), mensaje);
-                System.out.println("[SISTEMA] Notificación de Telegram enviada con éxito.");
+                log.debug("Notificacion de Telegram enviada para el ticket id={}", ticketGuardado.getId());
             } catch (Exception e) {
-                System.err.println("[SISTEMA] Error al enviar notificación a Telegram: " + e.getMessage());
+                log.warn("No se pudo enviar la notificacion de Telegram del ticket id={}", ticketGuardado.getId(), e);
             }
         } else {
-            System.out.println("[SISTEMA] Telegram ignorado: El técnico asignado no tiene un ChatID vinculado.");
+            log.debug("Telegram omitido: el tecnico asignado no tiene ChatID vinculado.");
         }
 
         // ---> NUEVO: EMITIR EL EVENTO WEBSOCKET HACIA REACT
-        try {
-            TicketResponse responsePayload = mapearATicketResponse(ticketGuardado);
-            messagingTemplate.convertAndSend("/topic/tickets-soporte", responsePayload);
-            System.out.println("✅ [SISTEMA] WebSocket emitido al canal /topic/tickets-soporte");
-        } catch (Exception e) {
-            System.err.println("❌ [SISTEMA] Error al emitir por WebSocket: " + e.getMessage());
-        }
+        emitirEventoTicket(ticketGuardado);
 
         return mapearATicketResponse(ticketGuardado);
     }
@@ -133,13 +134,17 @@ public class TicketService {
             }
         }
 
-        return usuarioRepository.findAll().stream()
-                .filter(u -> u.getRol() != null && "SOPORTE".equals(u.getRol().getNombre()) && Boolean.TRUE.equals(u.getDisponibleSoporte()))
-                .min((u1, u2) -> {
-                    long carga1 = ticketRepository.countByUsuarioSoporteAndEstatusNombre(u1, "ABIERTO");
-                    long carga2 = ticketRepository.countByUsuarioSoporteAndEstatusNombre(u2, "ABIERTO");
-                    return Long.compare(carga1, carga2);
-                }).orElse(null);
+        // Balanceo por carga resuelto en una sola consulta.
+        //
+        // La version anterior hacia findAll() de TODOS los usuarios y despues,
+        // dentro del comparador, una consulta COUNT por cada tecnico y en cada
+        // comparacion: un problema N+1 en el camino critico de creacion de
+        // tickets. La consulta del repositorio ya devuelve a los tecnicos
+        // disponibles ordenados por carga ascendente.
+        List<Usuario> disponibles =
+                usuarioRepository.buscarTecnicosDisponiblesOrdenadosPorCarga("SOPORTE", "ABIERTO");
+
+        return disponibles.isEmpty() ? null : disponibles.get(0);
     }
 
     public List<TicketResponse> obtenerTodosLosTickets() {
@@ -150,13 +155,14 @@ public class TicketService {
 
     public List<TicketResponse> obtenerTicketsSegunRol(Long usuarioSolicitanteId) {
         Usuario usuario = usuarioRepository.findById(usuarioSolicitanteId)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+                .orElseThrow(() -> new IllegalArgumentException(MessageConstants.USUARIO_NO_ENCONTRADO));
 
         String nivel = usuario.getRol().getNivelVision(); 
         TicketFiltroStrategy estrategia = estrategiasFiltro.get(nivel);
 
         if (estrategia == null) {
-            throw new RuntimeException("Error crítico: No existe una estrategia programada para el nivel de visión: " + nivel);
+            throw new IllegalStateException(
+                    "El rol del usuario no tiene un nivel de visibilidad valido. Contacte al administrador.");
         }
 
         return estrategia.obtenerTickets(usuario).stream()
@@ -211,10 +217,7 @@ public class TicketService {
         ticket.setFechaFin(LocalDateTime.now());
         Ticket ticketGuardado = ticketRepository.save(ticket);
 
-        // NUEVO: Emitir actualización de estado al frontend
-        try {
-            messagingTemplate.convertAndSend("/topic/tickets-soporte", mapearATicketResponse(ticketGuardado));
-        } catch (Exception e) {}
+        emitirEventoTicket(ticketGuardado);
 
         return mapearATicketResponse(ticketGuardado);
     }
@@ -249,10 +252,7 @@ public class TicketService {
         bitacora.setJustificacion("El técnico va en camino para atender el reporte.");
         bitacoraRepository.save(bitacora);
 
-        // NUEVO: Emitir actualización de estado al frontend
-        try {
-            messagingTemplate.convertAndSend("/topic/tickets-soporte", mapearATicketResponse(ticketGuardado));
-        } catch (Exception e) {}
+        emitirEventoTicket(ticketGuardado);
 
         return mapearATicketResponse(ticketGuardado);
     }   
@@ -281,27 +281,133 @@ public class TicketService {
         bitacora.setJustificacion(justificacion);
         bitacoraRepository.save(bitacora);
 
-        // EMITIMOS AL FRONTEND
-        try {
-            messagingTemplate.convertAndSend("/topic/tickets-soporte", mapearATicketResponse(ticketGuardado));
-        } catch (Exception e) {}
+        emitirEventoTicket(ticketGuardado);
 
         // DEVOLVEMOS EL DTO SEGURO
         return mapearATicketResponse(ticketGuardado);
     }  
 
+    /**
+     * Bandeja de tickets del usuario, paginada y filtrada segun su rol.
+     *
+     * <p><b>Correccion de seguridad.</b> La version anterior solo distinguia
+     * entre SOPORTE y "todo lo demas": cualquier EMPLEADO caia en
+     * {@code obtenerTodosLosTickets()} y recibia titulos, descripciones,
+     * solicitantes y areas de TODA la institucion. Fuga de datos entre areas
+     * (control de acceso a nivel de objeto, OWASP A01).</p>
+     *
+     * <p>Ahora la visibilidad se decide por {@code Rol.nivelVision}:</p>
+     * <ul>
+     *   <li>{@code GLOBAL} (ADMINISTRADOR): todos los tickets.</li>
+     *   <li>{@code PERSONAL} (SOPORTE): los asignados a el y los que creo.</li>
+     *   <li>{@code AREA} (EMPLEADO): solo los de su area.</li>
+     * </ul>
+     */
     @Transactional(readOnly = true)
-    public List<TicketResponse> obtenerTicketsParaBandeja(String correoUsuario) {
-        Usuario usuario = usuarioRepository.findByCorreo(correoUsuario)
-                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
+    public PageResponse<TicketResponse> obtenerTicketsParaBandeja(String correoUsuario, Pageable pageable) {
+        Usuario usuario = usuarioRepository.findByCorreoOrUsername(correoUsuario, correoUsuario)
+                .orElseThrow(() -> new IllegalArgumentException(MessageConstants.USUARIO_NO_ENCONTRADO));
 
-        if (usuario.getRol() != null && "SOPORTE".equals(usuario.getRol().getNombre())) {
-            return ticketRepository.findByUsuarioSoporteId(usuario.getId())
-                    .stream()
-                    .map(this::mapearATicketResponse)
-                    .toList();
+        if (usuario.getRol() == null) {
+            throw new IllegalStateException("El usuario no tiene un rol asignado.");
         }
-        
-        return obtenerTodosLosTickets();
+
+        String nivelVision = usuario.getRol().getNivelVision();
+        Page<Ticket> pagina = switch (nivelVision == null ? "" : nivelVision.toUpperCase()) {
+            case "GLOBAL" -> ticketRepository.buscarTodosPaginado(pageable);
+
+            case "PERSONAL" -> ticketRepository.buscarPorSoporteOCreadorPaginado(usuario.getId(), pageable);
+
+            case "AREA" -> {
+                if (usuario.getArea() == null) {
+                    // Sin area no hay nada que mostrar. Devolver todo seria
+                    // repetir exactamente el fallo que se esta corrigiendo.
+                    log.warn("Usuario id={} con vision AREA pero sin area asignada.", usuario.getId());
+                    yield Page.empty(pageable);
+                }
+                yield ticketRepository.buscarPorAreaPaginado(usuario.getArea().getId(), pageable);
+            }
+
+            // Nivel desconocido: se niega el acceso en lugar de conceder todo.
+            default -> {
+                log.error("Nivel de vision no reconocido: '{}' (usuario id={})", nivelVision, usuario.getId());
+                throw new IllegalStateException(
+                        "El rol del usuario no tiene un nivel de visibilidad valido. Contacte al administrador.");
+            }
+        };
+
+        return PageResponse.de(pagina, this::mapearATicketResponse);
+    }
+
+    /**
+     * Historial del area del usuario, paginado.
+     *
+     * <p>Un ADMINISTRADOR no tiene area propia, asi que recibe la vision
+     * global que le corresponde en lugar de una lista vacia.</p>
+     */
+    @Transactional(readOnly = true)
+    public PageResponse<TicketResponse> obtenerTicketsDeMiAreaPaginado(String correoUsuario, Pageable pageable) {
+        Usuario usuario = usuarioRepository.findByCorreoOrUsername(correoUsuario, correoUsuario)
+                .orElseThrow(() -> new IllegalArgumentException(MessageConstants.USUARIO_NO_ENCONTRADO));
+
+        boolean esAdministrador = usuario.getRol() != null
+                && "GLOBAL".equalsIgnoreCase(usuario.getRol().getNivelVision());
+
+        if (esAdministrador) {
+            return PageResponse.de(ticketRepository.buscarTodosPaginado(pageable), this::mapearATicketResponse);
+        }
+
+        if (usuario.getArea() == null) {
+            throw new IllegalStateException("Su cuenta no tiene un area asignada. Contacte al administrador.");
+        }
+
+        return PageResponse.de(
+                ticketRepository.buscarPorAreaPaginado(usuario.getArea().getId(), pageable),
+                this::mapearATicketResponse);
+    }
+
+    /**
+     * Publica el estado del ticket en el canal de soporte.
+     *
+     * <p>Antes cada emision estaba envuelta en un {@code catch (Exception e) {}}
+     * vacio: si el canal fallaba, el panel de soporte dejaba de actualizarse en
+     * tiempo real y no quedaba ni rastro del problema. Ahora el fallo se
+     * registra con su causa y se avisa por el canal de errores.</p>
+     *
+     * <p>No se propaga la excepcion a proposito: la notificacion es accesoria y
+     * el ticket ya se guardo correctamente. Perder el aviso en vivo no debe
+     * deshacer la operacion de negocio.</p>
+     */
+    private void emitirEventoTicket(Ticket ticket) {
+        try {
+            messagingTemplate.convertAndSend("/topic/tickets-soporte", mapearATicketResponse(ticket));
+        } catch (Exception e) {
+            log.error("Fallo al emitir el evento WebSocket del ticket id={}. "
+                    + "El panel de soporte no se actualizara en tiempo real.", ticket.getId(), e);
+            notificarFalloTiempoReal(ticket.getId(), e);
+        }
+    }
+
+    /**
+     * Avisa a los clientes conectados de que la sincronizacion en vivo fallo,
+     * para que recarguen manualmente en lugar de quedarse con datos obsoletos
+     * sin saberlo.
+     */
+    private void notificarFalloTiempoReal(Long ticketId, Exception causa) {
+        try {
+            // Se tipa el payload para desambiguar la sobrecarga de
+            // convertAndSend(String, Object) frente a (String, Map headers).
+            Map<String, String> aviso = new HashMap<>();
+            aviso.put("tipo", "SINCRONIZACION_FALLIDA");
+            aviso.put("ticketId", String.valueOf(ticketId));
+            aviso.put("mensaje", "No se pudo sincronizar el ticket en tiempo real. Actualice la vista.");
+            aviso.put("causa", causa.getClass().getSimpleName());
+
+            messagingTemplate.convertAndSend("/topic/errores", (Object) aviso);
+        } catch (Exception e) {
+            // Si tambien falla el canal de errores, el broker esta caido por
+            // completo: solo queda dejar constancia en el log del servidor.
+            log.error("El canal de errores WebSocket tampoco responde.", e);
+        }
     }
 }
