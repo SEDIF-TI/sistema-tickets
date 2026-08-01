@@ -3,7 +3,10 @@ package com.sedif.sistema_tickets.core.resguardo;
 import com.sedif.sistema_tickets.core.usuarios.Usuario;
 import com.sedif.sistema_tickets.core.usuarios.UsuarioRepository;
 import com.sedif.sistema_tickets.core.telegram.SedifTelegramBot;
+import com.sedif.sistema_tickets.exception.PageResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Pageable;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -13,6 +16,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class ResguardoService {
 
@@ -39,13 +43,8 @@ public class ResguardoService {
         resguardo.setNumeroInventario(request.numeroInventario());
         resguardo.setCondiciones(request.condiciones());
 
-        if ("Dias".equalsIgnoreCase(request.duracionTipo())) {
-            resguardo.setFechaVencimiento(LocalDateTime.now().plusDays(request.duracionCantidad()));
-        } else if ("Semanas".equalsIgnoreCase(request.duracionTipo())) {
-            resguardo.setFechaVencimiento(LocalDateTime.now().plusWeeks(request.duracionCantidad()));
-        } else {
-            resguardo.setFechaVencimiento(null);
-        }
+        resguardo.setFechaVencimiento(calcularVencimiento(
+                request.duracionTipo(), request.duracionCantidad()));
 
         resguardo.setUsuarioCreador(usuario);
         resguardoRepository.save(resguardo);
@@ -53,8 +52,68 @@ public class ResguardoService {
         return ResguardoResponse.desdeEntidad(resguardo);
     }
 
+    /**
+     * Calcula la fecha en que vence el prestamo.
+     *
+     * <p>Se extrajo a un metodo propio porque la version anterior solo
+     * contemplaba "Dias" y "Semanas": cualquier otro valor caia en el
+     * {@code else} y dejaba el resguardo <b>sin fecha de vencimiento</b>, de
+     * modo que nunca aparecia como vencido y el equipo podia quedarse prestado
+     * indefinidamente sin que nadie lo detectara.</p>
+     *
+     * @return la fecha de vencimiento, o {@code null} si el prestamo es
+     *         indefinido de forma deliberada.
+     */
+    private LocalDateTime calcularVencimiento(String tipo, Integer cantidad) {
+        if (tipo == null || cantidad == null || cantidad <= 0) {
+            return null;
+        }
+
+        LocalDateTime ahora = LocalDateTime.now();
+        return switch (tipo.trim().toUpperCase()) {
+            case "DIAS" -> ahora.plusDays(cantidad);
+            case "SEMANAS" -> ahora.plusWeeks(cantidad);
+            case "MESES" -> ahora.plusMonths(cantidad);
+            case "INDEFINIDO" -> null;
+            default -> {
+                // Un tipo no reconocido es un error de integracion, no una
+                // peticion de prestamo indefinido: se deja constancia.
+                log.warn("Tipo de duracion no reconocido: '{}'. El resguardo queda sin vencimiento.", tipo);
+                yield null;
+            }
+        };
+    }
+
+    @Transactional(readOnly = true)
     public List<ResguardoResponse> listarTodos() {
         return resguardoRepository.findAllByOrderByFechaCreacionDesc()
+                .stream()
+                .map(ResguardoResponse::desdeEntidad)
+                .toList();
+    }
+
+    /**
+     * Historial paginado. Con 40 resguardos ya registrados y creciendo, traer
+     * la tabla completa en cada consulta no se sostiene.
+     */
+    @Transactional(readOnly = true)
+    public PageResponse<ResguardoResponse> listarPaginado(Pageable pageable) {
+        return PageResponse.de(resguardoRepository.findAll(pageable), ResguardoResponse::desdeEntidad);
+    }
+
+    /**
+     * Resguardos proximos a vencer, para poder avisar al usuario ANTES de que
+     * el prestamo caduque en lugar de reclamarlo despues.
+     *
+     * @param dias ventana de anticipacion (por defecto 7).
+     */
+    @Transactional(readOnly = true)
+    public List<ResguardoResponse> listarPorVencer(int dias) {
+        LocalDateTime ahora = LocalDateTime.now();
+        LocalDateTime limite = ahora.plusDays(dias);
+
+        return resguardoRepository
+                .findByEstadoAndFechaVencimientoBetween(EstadoResguardo.ENTREGADO, ahora, limite)
                 .stream()
                 .map(ResguardoResponse::desdeEntidad)
                 .toList();
@@ -63,21 +122,28 @@ public class ResguardoService {
     @Transactional
     public ResguardoResponse devolverEquipo(Long resguardoId) {
         Resguardo resguardo = resguardoRepository.findById(resguardoId)
-                .orElseThrow(() -> new IllegalArgumentException("Resguardo no encontrado"));
-        
+                .orElseThrow(() -> new IllegalArgumentException("Resguardo no encontrado."));
+
+        // Un resguardo ya devuelto no puede devolverse dos veces: sin esta
+        // comprobacion, un doble clic reescribia la fecha de modificacion y
+        // falseaba la trazabilidad.
+        if (resguardo.getEstado() == EstadoResguardo.DEVUELTO) {
+            throw new IllegalStateException("Este resguardo ya fue devuelto.");
+        }
+
         resguardo.setEstado(EstadoResguardo.DEVUELTO);
         return ResguardoResponse.desdeEntidad(resguardoRepository.save(resguardo));
     }
 
     @Transactional
-    @Scheduled(cron = "0 0 8 * * *")
+    @Scheduled(cron = "${app.resguardos.revision-vencimientos-cron:0 0 6 * * *}")
     public void verificarVencimientos() {
         LocalDateTime ahora = LocalDateTime.now();
         // 👈 CORREGIDO: Buscamos resguardos con estado ENTREGADO
         List<Resguardo> vencidos = resguardoRepository.findByFechaVencimientoBeforeAndEstado(ahora, EstadoResguardo.ENTREGADO);
 
         if (vencidos.isEmpty()) {
-            System.out.println("[CRON] No hay resguardos vencidos hoy.");
+            log.debug("Revision de vencimientos: no hay resguardos vencidos hoy.");
             return;
         }
 
@@ -101,7 +167,7 @@ public class ResguardoService {
 
                         telegramBot.enviarMensaje(r.getUsuarioCreador().getTelegramChatId(), mensaje);
                     } catch (Exception e) {
-                        System.err.println("[TELEGRAM ERROR] No se pudo enviar mensaje del resguardo ID " + r.getId() + ": " + e.getMessage());
+                        log.warn("No se pudo enviar el aviso de Telegram del resguardo id={}", r.getId(), e);
                     }
                 }
 
@@ -109,14 +175,14 @@ public class ResguardoService {
                     ResguardoResponse payload = ResguardoResponse.desdeEntidad(r);
                     messagingTemplate.convertAndSend("/topic/alertas-resguardos", payload);
                 } catch (Exception e) {
-                    System.err.println("[WEBSOCKET ERROR] No se pudo emitir alerta del resguardo ID " + r.getId() + ": " + e.getMessage());
+                    log.warn("No se pudo emitir la alerta WebSocket del resguardo id={}", r.getId(), e);
                 }
 
             } catch (Exception e) {
-                System.err.println("[CRON ERROR] Error procesando el resguardo ID " + r.getId() + ": " + e.getMessage());
+                log.error("Error al procesar el vencimiento del resguardo id={}", r.getId(), e);
             }
         }
 
-        System.out.println("[CRON] Se actualizaron y notificaron " + vencidos.size() + " resguardos vencidos.");
+        log.info("Revision de vencimientos: {} resguardos marcados como VENCIDO.", vencidos.size());
     }
 }
