@@ -297,6 +297,38 @@ const theme = createTheme({
       },
     },
 
+    // Cabeceras de columna ordenables: la flecha solo debe verse al pasar el
+    // cursor o cuando el orden esta activo, para no saturar la cabecera.
+    MuiTableSortLabel: {
+      styleOverrides: {
+        root: {
+          color: 'inherit',
+          '&:hover': { color: 'inherit', opacity: 0.85 },
+          '&.Mui-active': {
+            color: 'inherit',
+            '& .MuiTableSortLabel-icon': { color: 'inherit !important' },
+          },
+        },
+      },
+    },
+
+    MuiTablePagination: {
+      styleOverrides: {
+        // En movil los controles se apilan y el selector de filas se oculta:
+        // ocupa mas de lo que aporta en una pantalla estrecha.
+        toolbar: { flexWrap: 'wrap', gap: 4, minHeight: 56 },
+        selectLabel: { margin: 0 },
+        displayedRows: { margin: 0 },
+      },
+    },
+
+    // Barra de filtros sobre las tablas.
+    MuiToolbar: {
+      styleOverrides: {
+        root: { '&.barra-filtros': { paddingLeft: 16, paddingRight: 16, gap: 12 } },
+      },
+    },
+
     // --- Superposiciones ---
     MuiDialog: {
       styleOverrides: {
