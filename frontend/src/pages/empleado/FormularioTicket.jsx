@@ -1,215 +1,292 @@
-import { useState, useEffect, useContext } from 'react';
-import { Box, Typography, TextField, Button, Alert, Paper, MenuItem } from '@mui/material';
+import { useState, useEffect, useMemo } from 'react';
+import {
+    Box, Typography, Button, Paper, Stack, Divider, Alert, CircularProgress
+} from '@mui/material';
+import SendIcon from '@mui/icons-material/Send';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import ConfirmationNumberIcon from '@mui/icons-material/ConfirmationNumber';
 import { useNavigate } from 'react-router-dom';
-import api from '../../services/api';
-import { AuthContext } from '../../context/AuthContext.jsx';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 
-import { toUpper } from '../../util/formater'; 
-
-// --- NUEVO: Importar el custom hook de red ---
+import { ticketService } from '../../services/ticketService';
+import { userService } from '../../services/userService';
+import { useNotification } from '../../context/NotificationContext.jsx';
 import { useNetworkStatus } from '../../hooks/useNetworkStatus.jsx';
-// ---------------------------------------------
+import { useRol } from '../../hooks/useRol.jsx';
+import { esquemaTicket } from '../../util/esquemas';
 
-const COLOR_GUINDA = '#5c0a28'; // Sincronizado con tu tema institucional
+import CampoFormulario from '../../components/CampoFormulario';
 
+/**
+ * Alta de un ticket de soporte.
+ *
+ * Cambios respecto a la versión anterior:
+ *  - Cada campo tenía su `useState` y la validación era una cadena de `if` en
+ *    el manejador de envío: el usuario veía un solo error genérico arriba, sin
+ *    saber qué campo corregir. Ahora valida React Hook Form contra un esquema
+ *    que espeja las anotaciones del DTO de Java, y el error sale bajo su campo.
+ *  - No había protección contra el doble envío: pulsar dos veces con la red
+ *    lenta creaba dos tickets.
+ *  - El campo `prioridad` no se enviaba nunca, así que todos los tickets
+ *    nacían en NORMAL y la gráfica de prioridades del panel era una sola barra.
+ *  - El color guinda estaba escrito a mano y no coincidía con el del tema.
+ *  - El rol se deducía probando `user.rol`, `user.role` y `'ADMIN'`; el backend
+ *    solo envía `user.rol` (ver `JwtResponse`).
+ */
 export default function FormularioTicket() {
-    const { user } = useContext(AuthContext); 
     const navigate = useNavigate();
+    // El aviso de éxito lo muestra la pantalla de destino, que recibe el
+    // mensaje por `state` al navegar.
+    const { notificarError } = useNotification();
+    const { esAdministrador, esSoporte, esTecnico } = useRol();
 
-    // --- NUEVO: Instanciar el estado de la red ---
-    const isOffline = useNetworkStatus();
-    // ---------------------------------------------
+    const estadoRed = useNetworkStatus();
+    const sinConexion = Boolean(estadoRed.sinConexion ?? estadoRed);
 
-    // 2. Estados unificados (Incluyendo el nuevo campo Solicitante)
-    // 1. Estados
-    const [titulo, setTitulo] = useState('');
-    const [descripcion, setDescripcion] = useState('');
-    const [solicitante, setSolicitante] = useState(''); 
-    const [sede, setSede] = useState(''); 
-    const [mensaje, setMensaje] = useState({ tipo: '', texto: '' });
-    
-    // ---> NUEVOS ESTADOS PARA ASIGNACIÓN
-    const [usuarioSoporteId, setUsuarioSoporteId] = useState(''); 
-    const [tecnicosSoporte, setTecnicosSoporte] = useState([]);
+    const [prioridades, setPrioridades] = useState([]);
+    const [tecnicos, setTecnicos] = useState([]);
+    const [cargandoCatalogos, setCargandoCatalogos] = useState(true);
 
-    // 2. Validación de Roles
-    // Simplificamos la validación del Admin basado en tu lógica
-    const esAdmin = user?.rol === 'ADMINISTRADOR' || user?.role === 'ADMINISTRADOR' || user?.rol === 'ADMIN' || user?.role === 'ADMIN';
-    const esSoporte = user?.rol === 'SOPORTE' || user?.role === 'SOPORTE' || esAdmin;
+    // La sede solo se pide a quien levanta tickets de sedes ajenas.
+    const esquema = useMemo(() => esquemaTicket(esTecnico), [esTecnico]);
 
-    // ---> 3. NUEVO: CARGAR TÉCNICOS SI ES ADMINISTRADOR
+    const {
+        control,
+        handleSubmit,
+        formState: { isSubmitting },
+    } = useForm({
+        resolver: zodResolver(esquema),
+        // Se valida al salir del campo, no en cada tecla: marcar en rojo
+        // mientras se escribe la primera letra es hostil.
+        mode: 'onBlur',
+        defaultValues: {
+            solicitante: '',
+            titulo: '',
+            descripcion: '',
+            sede: '',
+            prioridad: 'NORMAL',
+            usuarioSoporteId: '',
+        },
+    });
+
+    // --- Catálogos --------------------------------------------------------
     useEffect(() => {
-        if (esAdmin) {
-            const cargarSoporte = async () => {
-                try {
-                    // Reemplaza con la ruta base correcta de tu api axios si es diferente
-                    const response = await api.get('/v1/admin/usuarios/soporte');
-                    setTecnicosSoporte(response.data);
-                } catch (error) {
-                    console.error("Error al cargar técnicos de soporte:", error);
-                }
-            };
-            cargarSoporte();
-        }
-    }, [esAdmin]);
+        let cancelado = false;
 
-    // 4. Lógica de envío
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        setMensaje({ tipo: '', texto: '' });
+        const cargar = async () => {
+            try {
+                // Las dos peticiones van en paralelo: son independientes.
+                const [respPrioridades, respTecnicos] = await Promise.all([
+                    ticketService.getPrioridades(),
+                    esAdministrador ? userService.getSoporte() : Promise.resolve(null),
+                ]);
 
-        // --- NUEVO: Bloqueo duro en la lógica ---
-        // Si no hay internet, cortamos la ejecución inmediatamente
-        if (isOffline) {
-            setMensaje({ tipo: 'error', texto: 'No hay conexión a internet. No se puede enviar el ticket.' });
-            return;
-        }
-        // ----------------------------------------
+                if (cancelado) return;
 
-        if (!solicitante.trim() || !titulo.trim() || !descripcion.trim()) {
-            setMensaje({ tipo: 'error', texto: 'Por favor, completa todos los campos obligatorios.' });
+                setPrioridades(respPrioridades?.data ?? []);
+                setTecnicos(respTecnicos?.data ?? []);
+            } catch (error) {
+                if (!cancelado) notificarError(error);
+            } finally {
+                if (!cancelado) setCargandoCatalogos(false);
+            }
+        };
+
+        cargar();
+        return () => { cancelado = true; };
+    }, [esAdministrador, notificarError]);
+
+    // --- Envío ------------------------------------------------------------
+    const enviar = async (datos) => {
+        if (sinConexion) {
+            notificarError('No hay conexión con el servidor. Inténtalo de nuevo cuando se restablezca.');
             return;
         }
 
         try {
-            const payload = {
-                titulo,
-                descripcion,
-                solicitante,
-                sede: esSoporte ? sede : null,
-                // ---> NUEVO: Enviamos el ID del soporte (null si no se selecciona nada)
-                usuarioSoporteId: usuarioSoporteId ? parseInt(usuarioSoporteId) : null
-            };
+            const respuesta = await ticketService.create({
+                titulo: datos.titulo.trim(),
+                descripcion: datos.descripcion.trim(),
+                solicitante: datos.solicitante.trim(),
+                sede: esTecnico ? datos.sede?.trim() || null : null,
+                prioridad: datos.prioridad,
+                usuarioSoporteId: datos.usuarioSoporteId
+                    ? Number(datos.usuarioSoporteId)
+                    : null,
+            });
 
-            await api.post('/v1/tickets', payload);
-            
-            if (user?.rol === 'SOPORTE' || user?.role === 'SOPORTE') {
-                navigate('/soporte/bandeja', {
-                    state: { mensajeExito: '¡Ticket creado correctamente!' }
-                });
-            } else {
-                navigate('/empleado/historial', {
-                    state: { mensajeExito: '¡Ticket creado correctamente!' }
-                });
-            }
-            
+            const mensaje = respuesta?.mensaje || 'Ticket creado correctamente.';
+
+            // Cada rol vuelve a la pantalla donde verá el ticket recién creado.
+            navigate(esSoporte ? '/soporte/bandeja' : '/empleado/historial', {
+                state: { mensajeExito: mensaje },
+            });
         } catch (error) {
-            console.error("Error al crear:", error);
-            setMensaje({ tipo: 'error', texto: 'Hubo un error al crear el ticket. Intente de nuevo.' });
+            notificarError(error);
         }
     };
 
+    const opcionesPrioridad = prioridades.map((p) => ({
+        valor: p.valor,
+        etiqueta: p.etiqueta,
+    }));
+
+    const opcionesTecnico = [
+        { valor: '', etiqueta: 'Asignación automática (por carga de trabajo)' },
+        ...tecnicos.map((t) => ({
+            valor: String(t.id),
+            etiqueta: `${t.nombre}${t.disponibleSoporte ? '' : ' — ocupado'}`,
+        })),
+    ];
+
+    if (cargandoCatalogos) {
+        return (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+                <CircularProgress aria-label="Cargando el formulario" />
+            </Box>
+        );
+    }
+
     return (
-        <Box sx={{ maxWidth: 800, mx: 'auto', p: { xs: 1, sm: 3 } }}>
-            <Paper elevation={3} sx={{ p: { xs: 3, sm: 4 }, borderRadius: 3 }}>
-                <Typography variant="h5" sx={{ color: COLOR_GUINDA, fontWeight: 'bold', mb: 3 }}>
-                    Levantar Nuevo Ticket de Soporte
+        <Box sx={{ maxWidth: 780, mx: 'auto' }}>
+            <Box sx={{ mb: 3 }}>
+                <Typography
+                    variant="h4"
+                    component="h2"
+                    color="primary.main"
+                    sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
+                >
+                    <ConfirmationNumberIcon fontSize="large" aria-hidden="true" />
+                    Levantar un ticket
                 </Typography>
-                
-                {mensaje.texto && (
-                    <Alert severity={mensaje.tipo} sx={{ mb: 3, fontWeight: 'bold' }}>
-                        {mensaje.texto}
-                    </Alert>
-                )}
+                <Typography variant="body2" color="text.secondary">
+                    Describe la falla con el mayor detalle posible: ayuda al técnico
+                    a llegar preparado.
+                </Typography>
+            </Box>
 
-                <form onSubmit={handleSubmit}>
-                    
-                    <TextField
-                        fullWidth
-                        label="Nombre del que tiene la falla *"
-                        variant="outlined"
-                        margin="normal"
-                        value={solicitante}
-                        onChange={(e) => setSolicitante(toUpper(e.target.value))}
-                        placeholder="Escribe el nombre completo de la persona afectada"
-                        required
-                        InputProps={{ maxLength: 100 }} // Limitación de caracteres
-                        helperText={`${solicitante.length}/100 caracteres`}
-                        disabled={isOffline} // <-- Bloqueo opcional del campo
-                    />
+            {sinConexion && (
+                <Alert severity="warning" sx={{ mb: 3 }}>
+                    Sin conexión con el servidor. Puedes escribir el reporte, pero no
+                    podrás enviarlo hasta que se restablezca.
+                </Alert>
+            )}
 
-                    <TextField
-                        fullWidth
-                        label="Falla principal *"
-                        variant="outlined"
-                        margin="normal"
-                        value={titulo}
-                        onChange={(e) => setTitulo(toUpper(e.target.value))}
-                        placeholder="Ej. La impresora no se conecta a la red / Pantalla en negro"
-                        required
-                        InputProps={{ maxLength: 100 }} // Limitación de caracteres
-                        helperText={`${titulo.length}/100 caracteres`}
-                        disabled={isOffline} // <-- Bloqueo opcional del campo
-                    />
-
-                    {esSoporte && (
-                        <TextField
-                            fullWidth
-                            label="Sede *"
-                            variant="outlined"
-                            margin="normal"
-                            value={sede}
-                            onChange={(e) => setSede(toUpper(e.target.value))}
-                            required={esSoporte}
-                            InputProps={{ maxLength: 50 }}
-                            disabled={isOffline}
+            <Paper variant="outlined" sx={{ p: { xs: 2.5, sm: 4 } }}>
+                {/* noValidate: la validación la hace el esquema, no el navegador,
+                    que mostraría mensajes en el idioma del sistema operativo. */}
+                <form onSubmit={handleSubmit(enviar)} noValidate>
+                    <Stack spacing={3}>
+                        <CampoFormulario
+                            control={control}
+                            nombre="solicitante"
+                            etiqueta="Persona afectada"
+                            obligatorio
+                            maximo={100}
+                            mayusculas
+                            ayuda="Quién tiene el problema, aunque no seas tú."
+                            placeholder="NOMBRE COMPLETO"
                         />
-                    )}
 
-                    <TextField
-                        fullWidth
-                        label="Favor de describir la falla *"
-                        variant="outlined"
-                        margin="normal"
-                        multiline
-                        rows={4}
-                        value={descripcion}
-                        onChange={(e) => setDescripcion(toUpper(e.target.value))}
-                        placeholder="Describe detalladamente qué acciones causan el problema o qué mensajes de error aparecen en pantalla..."
-                        required
-                        InputProps={{ maxLength: 500 }} // Limitación de caracteres
-                        helperText={`${descripcion.length}/500 caracteres`}
-                        disabled={isOffline} // <-- Bloqueo opcional del campo
-                    />
+                        <CampoFormulario
+                            control={control}
+                            nombre="titulo"
+                            etiqueta="Falla principal"
+                            obligatorio
+                            maximo={255}
+                            mayusculas
+                            ayuda="Resume el problema en una línea."
+                            placeholder="EJ. LA IMPRESORA NO SE CONECTA A LA RED"
+                        />
 
-                    {/* ---> NUEVO SELECTOR SÓLO PARA ADMINISTRADORES <--- */}
-                    {esAdmin && (
-                        <TextField
-                            select
-                            fullWidth
-                            label="Asignar directamente a Soporte (Opcional)"
-                            variant="outlined"
-                            margin="normal"
-                            value={usuarioSoporteId}
-                            onChange={(e) => setUsuarioSoporteId(e.target.value)}
+                        {/* La sede solo la piden soporte y administración: el
+                            empleado siempre reporta desde la suya. */}
+                        {esTecnico && (
+                            <CampoFormulario
+                                control={control}
+                                nombre="sede"
+                                etiqueta="Sede"
+                                obligatorio
+                                maximo={255}
+                                mayusculas
+                                ayuda="Dónde se encuentra el equipo con la falla."
+                            />
+                        )}
+
+                        <CampoFormulario
+                            control={control}
+                            nombre="descripcion"
+                            etiqueta="Descripción de la falla"
+                            obligatorio
+                            maximo={5000}
+                            mayusculas
+                            multiline
+                            rows={5}
+                            ayuda="Qué acciones provocan el problema y qué mensajes aparecen."
+                            placeholder="AL ENCENDER EL EQUIPO APARECE UNA PANTALLA AZUL Y SE REINICIA…"
+                        />
+
+                        <CampoFormulario
+                            control={control}
+                            nombre="prioridad"
+                            etiqueta="Prioridad"
+                            obligatorio
+                            opciones={opcionesPrioridad}
+                            ayuda="Urgente solo si impide trabajar por completo."
+                        />
+
+                        {esAdministrador && (
+                            <>
+                                <Divider>
+                                    <Typography variant="caption" color="text.secondary">
+                                        Asignación
+                                    </Typography>
+                                </Divider>
+
+                                <CampoFormulario
+                                    control={control}
+                                    nombre="usuarioSoporteId"
+                                    etiqueta="Técnico asignado"
+                                    opciones={opcionesTecnico}
+                                    ayuda="Si no eliges a nadie, se asigna al técnico con menos carga."
+                                />
+                            </>
+                        )}
+                    </Stack>
+
+                    {/* En móvil los botones se apilan a lo ancho. */}
+                    <Stack
+                        direction={{ xs: 'column-reverse', sm: 'row' }}
+                        spacing={2}
+                        justifyContent="flex-end"
+                        sx={{ mt: 4 }}
+                    >
+                        <Button
+                            variant="text"
+                            color="inherit"
+                            startIcon={<ArrowBackIcon />}
+                            onClick={() => navigate(-1)}
+                            disabled={isSubmitting}
+                            fullWidth={false}
+                            sx={{ width: { xs: '100%', sm: 'auto' } }}
                         >
-                            <MenuItem value="">
-                                <em>-- Selección Automática (Balanceador) --</em>
-                            </MenuItem>
-                            {tecnicosSoporte.map((tecnico) => (
-                                <MenuItem key={tecnico.id} value={tecnico.id}>
-                                    {tecnico.nombre} {tecnico.disponibleSoporte ? '(Disponible)' : '(Ocupado)'}
-                                </MenuItem>
-                            ))}
-                        </TextField>
-                    )}
-                    
-                    <Box sx={{ mt: 4, display: 'flex', justifyContent: 'flex-end' }}>
+                            Cancelar
+                        </Button>
+
                         <Button
                             type="submit"
                             variant="contained"
-                            disabled={isOffline} // <-- BLOQUEO DURO DEL BOTÓN
-                            sx={{ 
-                                px: 4, 
-                                py: 1.5, 
-                                fontSize: '1rem', 
-                                bgcolor: isOffline ? 'grey.400' : COLOR_GUINDA, // <-- Cambio visual extra
-                                '&:hover': { bgcolor: isOffline ? 'grey.400' : '#4a0820' }
-                            }}
+                            size="large"
+                            startIcon={!isSubmitting && <SendIcon />}
+                            // isSubmitting bloquea el doble envío: antes, dos
+                            // pulsaciones seguidas creaban dos tickets.
+                            disabled={isSubmitting || sinConexion}
+                            sx={{ width: { xs: '100%', sm: 'auto' } }}
                         >
-                            {isOffline ? 'Sin Conexión' : 'Enviar Ticket'}
+                            {isSubmitting ? 'Enviando…' : 'Enviar ticket'}
                         </Button>
-                    </Box>
+                    </Stack>
                 </form>
             </Paper>
         </Box>

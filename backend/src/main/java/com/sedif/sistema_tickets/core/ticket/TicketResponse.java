@@ -36,6 +36,10 @@ public record TicketResponse(
     String estatus,
     /** Texto legible del estado: solo para mostrar. */
     String estatusEtiqueta,
+    /** Constante de la prioridad ({@code ALTA}, {@code URGENTE}...). */
+    String prioridad,
+    /** Texto legible de la prioridad: solo para mostrar. */
+    String prioridadEtiqueta,
     Long usuarioAreaId,
     Long usuarioSoporteId,
     String justificacion

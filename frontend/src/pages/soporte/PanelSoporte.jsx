@@ -1,4 +1,5 @@
 import { useState, useEffect, useContext, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
     Box, Typography, Chip, Tooltip, Dialog, DialogTitle, DialogContent,
     DialogActions, Button, TextField, MenuItem, Paper, Stack, Divider, Alert,
@@ -21,6 +22,9 @@ import { formatearFechaHora, tiempoRelativo, truncar, toUpper } from '../../util
 import {
     OPCIONES_ESTADO_TICKET, colorEstado, etiquetaEstado, estaCerrado, estaEnProceso,
 } from '../../util/estadoTicket';
+import {
+    colorPrioridad, etiquetaPrioridad, esDestacada,
+} from '../../util/prioridadTicket';
 
 import DynamicTable from '../../components/DynamicTable';
 import AccionesTabla from '../../components/AccionesTabla';
@@ -45,7 +49,8 @@ const MINIMO_JUSTIFICACION = 10;
 export default function PanelSoporte() {
     const { stompClient, isConnected } = useWebSocket();
     const { user } = useContext(AuthContext);
-    const { notificar, notificarError, notificarAdvertencia } = useNotification();
+    const location = useLocation();
+    const { notificar, notificarError, notificarAdvertencia, notificarInfo } = useNotification();
 
     const theme = useTheme();
     // Los diálogos pasan a pantalla completa en el teléfono: el técnico
@@ -83,6 +88,15 @@ export default function PanelSoporte() {
     // `recargar` es estable (useCallback sin dependencias en el hook), así que
     // se puede usar dentro de efectos sin reengancharlos en cada render.
     const { recargar } = tabla;
+
+    // Mensaje traído desde la pantalla de alta de ticket. Sin esto, un técnico
+    // que levantaba un ticket volvía aquí sin ninguna confirmación.
+    useEffect(() => {
+        if (location.state?.mensajeExito) {
+            notificarInfo(location.state.mensajeExito);
+            window.history.replaceState({}, document.title);
+        }
+    }, [location, notificarInfo]);
 
     // --- Catálogo del plan de trabajo -------------------------------------
     // Se pide una sola vez: es un catálogo fijo, no cambia entre resoluciones.
@@ -230,6 +244,24 @@ export default function PanelSoporte() {
                 <Typography variant="body2" color="text.secondary">
                     {formatearFechaHora(t.fechaFin)}
                 </Typography>
+            ),
+        },
+        {
+            id: 'prioridad',
+            etiqueta: 'Prioridad',
+            alineacion: 'center',
+            ancho: 120,
+            ordenable: true,
+            render: (t) => (
+                <Chip
+                    label={t.prioridadEtiqueta || etiquetaPrioridad(t.prioridad)}
+                    size="small"
+                    color={colorPrioridad(t.prioridad)}
+                    // Solo lo urgente y lo alto se rellenan: destacarlo todo
+                    // equivale a no destacar nada.
+                    variant={esDestacada(t.prioridad) ? 'filled' : 'outlined'}
+                    sx={{ minWidth: 84 }}
+                />
             ),
         },
         {

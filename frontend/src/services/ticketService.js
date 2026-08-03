@@ -26,6 +26,13 @@ export const ticketService = {
      */
     getPlanTrabajo: () => api.get('/v1/tickets/plan-trabajo'),
 
+    /**
+     * Catálogo de prioridades para el formulario de alta. Se sirve desde el
+     * enum `Prioridad` del backend, de modo que pantalla y validación del
+     * servidor no puedan discrepar.
+     */
+    getPrioridades: () => api.get('/v1/tickets/prioridades'),
+
     create: (data) => api.post('/v1/tickets', data),
 
     /** Cierre por parte de quien solicitó el ticket. */

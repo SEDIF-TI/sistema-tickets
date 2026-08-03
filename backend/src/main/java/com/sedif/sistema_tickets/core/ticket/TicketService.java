@@ -10,10 +10,13 @@ import com.sedif.sistema_tickets.exception.MessageConstants;
 import com.sedif.sistema_tickets.exception.PageResponse;
 import com.sedif.sistema_tickets.util.enums.EstadoTicket;
 import com.sedif.sistema_tickets.util.enums.PlanTrabajo;
+import com.sedif.sistema_tickets.util.enums.Prioridad;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 // ---> IMPORTACIÓN NECESARIA PARA WEBSOCKETS
@@ -61,10 +64,11 @@ public class TicketService {
         nuevoTicket.setFechaCreacion(LocalDateTime.now());
         nuevoTicket.setCreadoPor(usuario.getCorreo());
         
-        String prioridad = (request.prioridad() != null && !request.prioridad().isBlank()) 
-                           ? request.prioridad() 
-                           : "NORMAL"; 
-        nuevoTicket.setPrioridad(prioridad);
+        // Una prioridad no reconocida cae en NORMAL en lugar de rechazar el
+        // alta: el ticket es lo importante, y la prioridad puede corregirse
+        // despues.
+        nuevoTicket.setPrioridad(
+                Prioridad.desde(request.prioridad()).orElseGet(Prioridad::porDefecto));
 
         // ---> NUEVA LÓGICA DE ASIGNACIÓN <---
         if (request.usuarioSoporteId() != null) {
@@ -198,6 +202,8 @@ public class TicketService {
                 t.getEstado() != null ? t.getEstado().name() : null,
                 // ...y etiqueta legible para mostrarla en pantalla.
                 t.getEstado() != null ? t.getEstado().getEtiqueta() : null,
+                t.getPrioridad() != null ? t.getPrioridad().name() : null,
+                t.getPrioridad() != null ? t.getPrioridad().getEtiqueta() : null,
                 t.getUsuarioArea()!= null ? t.getUsuarioArea().getId() : null,
                 t.getUsuarioSoporte() != null ? t.getUsuarioSoporte().getId() : null,
                 justificacion
@@ -384,23 +390,24 @@ public class TicketService {
 
         String textoBusqueda = normalizarFiltro(busqueda);
         EstadoTicket filtroEstado = normalizarEstado(estatus);
+        Pageable paginaSegura = sanearOrden(pageable);
 
         String nivelVision = usuario.getRol().getNivelVision();
         Page<Ticket> pagina = switch (nivelVision == null ? "" : nivelVision.toUpperCase()) {
-            case "GLOBAL" -> ticketRepository.buscarTodosPaginado(textoBusqueda, filtroEstado, pageable);
+            case "GLOBAL" -> ticketRepository.buscarTodosPaginado(textoBusqueda, filtroEstado, paginaSegura);
 
             case "PERSONAL" -> ticketRepository.buscarPorSoporteOCreadorPaginado(
-                    usuario.getId(), textoBusqueda, filtroEstado, pageable);
+                    usuario.getId(), textoBusqueda, filtroEstado, paginaSegura);
 
             case "AREA" -> {
                 if (usuario.getArea() == null) {
                     // Sin area no hay nada que mostrar. Devolver todo seria
                     // repetir exactamente el fallo que se esta corrigiendo.
                     log.warn("Usuario id={} con vision AREA pero sin area asignada.", usuario.getId());
-                    yield Page.empty(pageable);
+                    yield Page.empty(paginaSegura);
                 }
                 yield ticketRepository.buscarPorAreaPaginado(
-                        usuario.getArea().getId(), textoBusqueda, filtroEstado, pageable);
+                        usuario.getArea().getId(), textoBusqueda, filtroEstado, paginaSegura);
             }
 
             // Nivel desconocido: se niega el acceso en lugar de conceder todo.
@@ -429,13 +436,14 @@ public class TicketService {
 
         String textoBusqueda = normalizarFiltro(busqueda);
         EstadoTicket filtroEstado = normalizarEstado(estatus);
+        Pageable paginaSegura = sanearOrden(pageable);
 
         boolean esAdministrador = usuario.getRol() != null
                 && "GLOBAL".equalsIgnoreCase(usuario.getRol().getNivelVision());
 
         if (esAdministrador) {
             return PageResponse.de(
-                    ticketRepository.buscarTodosPaginado(textoBusqueda, filtroEstado, pageable),
+                    ticketRepository.buscarTodosPaginado(textoBusqueda, filtroEstado, paginaSegura),
                     this::mapearATicketResponse);
         }
 
@@ -445,7 +453,7 @@ public class TicketService {
 
         return PageResponse.de(
                 ticketRepository.buscarPorAreaPaginado(
-                        usuario.getArea().getId(), textoBusqueda, filtroEstado, pageable),
+                        usuario.getArea().getId(), textoBusqueda, filtroEstado, paginaSegura),
                 this::mapearATicketResponse);
     }
 
@@ -461,6 +469,68 @@ public class TicketService {
         return Arrays.stream(PlanTrabajo.values())
                 .map(meta -> new PlanTrabajoResponse(meta.getClave(), meta.getDescripcion()))
                 .toList();
+    }
+
+    /**
+     * Catalogo de prioridades, para el desplegable del formulario de alta.
+     *
+     * <p>Se sirve desde el enum en lugar de escribirlo en el JSX, para que la
+     * pantalla y la validacion del servidor no puedan discrepar.</p>
+     */
+    public List<CatalogoResponse> obtenerCatalogoPrioridades() {
+        return Arrays.stream(Prioridad.values())
+                .map(p -> new CatalogoResponse(p.name(), p.getEtiqueta()))
+                .toList();
+    }
+
+    /**
+     * Campos por los que se admite ordenar la bandeja.
+     *
+     * <p>El {@code Pageable} se construye con lo que llega en la URL, asi que
+     * sin esta lista un cliente podria ordenar por cualquier atributo de la
+     * entidad —incluidos los de las relaciones, como la contrasena del usuario
+     * asignado— y deducir informacion a partir del orden del resultado.</p>
+     */
+    private static final java.util.Set<String> CAMPOS_ORDENABLES = java.util.Set.of(
+            "id", "titulo", "fechaCreacion", "fechaFin", "estado", "prioridad");
+
+    /**
+     * Depura la ordenacion recibida del cliente.
+     *
+     * <p>Descarta los campos que no estan en {@link #CAMPOS_ORDENABLES}.</p>
+     *
+     * <p><b>Limitacion conocida.</b> La prioridad esta mapeada como
+     * {@code EnumType.STRING}, asi que ordenar por ella ordena por el texto
+     * guardado: sale "ALTA, BAJA, NORMAL, URGENTE" en orden alfabetico y lo
+     * urgente no queda arriba. Para el uso previsto —agrupar los tickets de la
+     * misma prioridad— es suficiente, y la bandeja destaca lo urgente por
+     * color, no por posicion. Resolverlo correctamente exige una columna con el
+     * peso numerico; se deja anotado por si llega a molestar.</p>
+     */
+    private Pageable sanearOrden(Pageable pageable) {
+        if (pageable.getSort().isUnsorted()) {
+            return pageable;
+        }
+
+        List<Sort.Order> permitidos = pageable.getSort().stream()
+                .filter(orden -> {
+                    boolean valido = CAMPOS_ORDENABLES.contains(orden.getProperty());
+                    if (!valido) {
+                        log.warn("Orden por campo no permitido: '{}'. Se ignora.", orden.getProperty());
+                    }
+                    return valido;
+                })
+                .toList();
+
+        if (permitidos.isEmpty()) {
+            // Sin criterio valido se usa el de siempre, para no devolver
+            // paginas en orden arbitrario.
+            return PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(),
+                    Sort.by(Sort.Direction.DESC, "fechaCreacion"));
+        }
+
+        return PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(),
+                Sort.by(permitidos));
     }
 
     /**

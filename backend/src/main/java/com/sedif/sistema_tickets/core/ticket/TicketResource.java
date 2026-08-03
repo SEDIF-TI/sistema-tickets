@@ -102,6 +102,17 @@ public class TicketResource {
     }
 
     /**
+     * Catalogo de prioridades para el formulario de alta.
+     *
+     * <p>Disponible para cualquier usuario autenticado: todos levantan
+     * tickets.</p>
+     */
+    @GetMapping("/prioridades")
+    public ResponseEntity<ApiResponse<List<CatalogoResponse>>> obtenerPrioridades() {
+        return ResponseEntity.ok(ApiResponse.ok(ticketService.obtenerCatalogoPrioridades()));
+    }
+
+    /**
      * Cierre del ticket por parte de quien lo solicito. El servicio comprueba
      * que el ticket pertenezca al area de ese usuario.
      */

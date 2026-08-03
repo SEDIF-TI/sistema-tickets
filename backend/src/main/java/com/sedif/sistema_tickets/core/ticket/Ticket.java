@@ -4,6 +4,7 @@ import com.sedif.sistema_tickets.core.usuarios.Usuario;
 import java.time.LocalDateTime;
 import com.sedif.sistema_tickets.util.audit.Auditable;
 import com.sedif.sistema_tickets.util.enums.EstadoTicket;
+import com.sedif.sistema_tickets.util.enums.Prioridad;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -59,8 +60,16 @@ public class Ticket extends Auditable {
     @JoinColumn(name = "fn_usuario_soporte_id")
     private Usuario usuarioSoporte;
 
+    /**
+     * Prioridad de atencion.
+     *
+     * <p>Era un {@code String} libre: el enum {@link Prioridad} ya existia pero
+     * nadie lo usaba, asi que la columna admitia cualquier texto y un error de
+     * escritura creaba una categoria nueva en la grafica del panel.</p>
+     */
+    @Enumerated(EnumType.STRING)
     @Column(name = "s_prioridad", nullable = false, length = 20)
-    private String prioridad;
+    private Prioridad prioridad;
 
     @Column(name = "d_fecha_fin")
     private LocalDateTime fechaFin;
