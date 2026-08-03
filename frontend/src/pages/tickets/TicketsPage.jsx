@@ -12,29 +12,14 @@ import { useNetworkStatus } from '../../hooks/useNetworkStatus.jsx';
 import { useTablaPaginada } from '../../hooks/useTablaPaginada.jsx';
 import { formatearFechaHora, tiempoRelativo, truncar } from '../../util/formater';
 
+import {
+    OPCIONES_ESTADO_TICKET, colorEstado, etiquetaEstado, estaCerrado,
+} from '../../util/estadoTicket';
+
 import DynamicTable from '../../components/DynamicTable';
 import AccionesTabla from '../../components/AccionesTabla';
 import ConfirmationDialog from '../../components/ConfirmationDialog';
 
-/** Estados posibles de un ticket, para el filtro. */
-const OPCIONES_ESTATUS = [
-    { valor: '', etiqueta: 'Todos los estados' },
-    { valor: 'ABIERTO', etiqueta: 'Abierto' },
-    { valor: 'EN PROCESO', etiqueta: 'En proceso' },
-    { valor: 'PENDIENTE', etiqueta: 'Pendiente' },
-    { valor: 'CERRADO', etiqueta: 'Cerrado' },
-];
-
-/** Color del distintivo según el estado. */
-const colorEstatus = (estatus) => {
-    switch ((estatus || '').toUpperCase()) {
-        case 'CERRADO': return 'default';
-        case 'EN PROCESO': return 'info';
-        case 'PENDIENTE': return 'warning';
-        case 'ABIERTO': return 'primary';
-        default: return 'default';
-    }
-};
 
 /**
  * Historial de tickets del usuario, o bitácora global si es administrador.
@@ -151,10 +136,10 @@ export default function TicketsPage() {
             ancho: 130,
             render: (t) => (
                 <Chip
-                    label={t.estatus}
+                    label={t.estatusEtiqueta || etiquetaEstado(t.estatus)}
                     size="small"
-                    color={colorEstatus(t.estatus)}
-                    variant={t.estatus === 'CERRADO' ? 'outlined' : 'filled'}
+                    color={colorEstado(t.estatus)}
+                    variant={estaCerrado(t.estatus) ? 'outlined' : 'filled'}
                     sx={{ minWidth: 96 }}
                 />
             ),
@@ -166,7 +151,7 @@ export default function TicketsPage() {
             ancho: 110,
             sinOrden: true,
             render: (t) => {
-                const cerrado = t.estatus === 'CERRADO';
+                const cerrado = estaCerrado(t.estatus);
 
                 // El administrador observa la bitácora; no cierra tickets ajenos.
                 if (esAdministrador) {
@@ -248,7 +233,7 @@ export default function TicketsPage() {
                         etiqueta: 'Estado',
                         valor: filtroEstatus,
                         valorPorDefecto: '',
-                        opciones: OPCIONES_ESTATUS,
+                        opciones: OPCIONES_ESTADO_TICKET,
                         onChange: setFiltroEstatus,
                         ancho: 190,
                     },

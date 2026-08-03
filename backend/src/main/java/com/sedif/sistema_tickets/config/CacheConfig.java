@@ -30,7 +30,6 @@ public class CacheConfig {
 
     public static final String CACHE_ROLES = "roles";
     public static final String CACHE_AREAS = "areas";
-    public static final String CACHE_ESTATUS = "estatus";
     public static final String CACHE_VISTAS = "vistas";
 
     @Bean
@@ -38,7 +37,6 @@ public class CacheConfig {
         return new ConcurrentMapCacheManager(
                 CACHE_ROLES,
                 CACHE_AREAS,
-                CACHE_ESTATUS,
                 CACHE_VISTAS
         );
     }

@@ -288,7 +288,7 @@ public class DocumentoService {
                 table.addCell(crearCeldaAuxiliar(areaTicket, fontNorm, Element.ALIGN_LEFT));
                 table.addCell(crearCeldaAuxiliar(t.getTitulo() != null ? t.getTitulo() : "", fontNorm, Element.ALIGN_LEFT));
                 table.addCell(crearCeldaAuxiliar(t.getFechaFin() != null ? t.getFechaFin().format(formatter) : "", fontNorm, Element.ALIGN_CENTER));
-                String estatus = (t.getEstatus() != null && t.getEstatus().getNombre() != null) ? t.getEstatus().getNombre() : "CERRADO";
+                String estatus = t.getEstado() != null ? t.getEstado().getEtiqueta() : "Cerrado";
                 table.addCell(crearCeldaAuxiliar(estatus, fontNorm, Element.ALIGN_LEFT));
                 String responsableTicket = (t.getUsuarioSoporte() != null && t.getUsuarioSoporte().getNombre() != null) 
                                      ? t.getUsuarioSoporte().getNombre() : "Sin Asignar";
@@ -376,7 +376,7 @@ public class DocumentoService {
                 row.createCell(2).setCellValue(areaTicket);
                 row.createCell(3).setCellValue(t.getTitulo() != null ? t.getTitulo() : "");
                 row.createCell(4).setCellValue(t.getFechaFin() != null ? t.getFechaFin().format(formatter) : "");
-                String estatus = (t.getEstatus() != null && t.getEstatus().getNombre() != null) ? t.getEstatus().getNombre() : "CERRADO";
+                String estatus = t.getEstado() != null ? t.getEstado().getEtiqueta() : "Cerrado";
                 row.createCell(5).setCellValue(estatus);
                 String responsableTicket = (t.getUsuarioSoporte() != null && t.getUsuarioSoporte().getNombre() != null) 
                                      ? t.getUsuarioSoporte().getNombre() : "Sin Asignar";

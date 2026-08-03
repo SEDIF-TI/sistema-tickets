@@ -9,6 +9,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import com.sedif.sistema_tickets.core.ticket.Ticket;
+import com.sedif.sistema_tickets.util.enums.EstadoTicket;
 import com.sedif.sistema_tickets.core.ticket.TicketRepository;
 import com.sedif.sistema_tickets.core.actividad.ActividadExtra;
 import com.sedif.sistema_tickets.core.actividad.ActividadExtraRepository;
@@ -88,14 +89,14 @@ public class DocumentoResource {
 
         if ("ADMINISTRADOR".equalsIgnoreCase(rol)) {
             ticketsCerrados = ticketRepository.findAll().stream()
-                .filter(t -> t.getEstatus() != null && t.getEstatus().getId() == 5L)
+                .filter(t -> t.getEstado() == EstadoTicket.CERRADO)
                 .filter(t -> t.getFechaFin() != null)
                 .filter(t -> !t.getFechaFin().isBefore(inicioDia) && !t.getFechaFin().isAfter(finDia))
                 .collect(Collectors.toList());
             actividadesExtra = actividadExtraRepository.findByFechaActividadBetween(inicioDia, finDia);
         } else {
             ticketsCerrados = ticketRepository.findByUsuarioSoporteId(usuarioId).stream()
-                .filter(t -> t.getEstatus() != null && t.getEstatus().getId() == 5L)
+                .filter(t -> t.getEstado() == EstadoTicket.CERRADO)
                 .filter(t -> t.getFechaFin() != null)
                 .filter(t -> !t.getFechaFin().isBefore(inicioDia) && !t.getFechaFin().isAfter(finDia))
                 .collect(Collectors.toList());
@@ -124,14 +125,14 @@ public class DocumentoResource {
 
         if ("ADMINISTRADOR".equalsIgnoreCase(rol)) {
             ticketsCerrados = ticketRepository.findAll().stream()
-                .filter(t -> t.getEstatus() != null && t.getEstatus().getId() == 5L)
+                .filter(t -> t.getEstado() == EstadoTicket.CERRADO)
                 .filter(t -> t.getFechaFin() != null)
                 .filter(t -> !t.getFechaFin().isBefore(inicioDia) && !t.getFechaFin().isAfter(finDia))
                 .collect(Collectors.toList());
             actividadesExtra = actividadExtraRepository.findByFechaActividadBetween(inicioDia, finDia);
         } else {
             ticketsCerrados = ticketRepository.findByUsuarioSoporteId(usuarioId).stream()
-                .filter(t -> t.getEstatus() != null && t.getEstatus().getId() == 5L)
+                .filter(t -> t.getEstado() == EstadoTicket.CERRADO)
                 .filter(t -> t.getFechaFin() != null)
                 .filter(t -> !t.getFechaFin().isBefore(inicioDia) && !t.getFechaFin().isAfter(finDia))
                 .collect(Collectors.toList());

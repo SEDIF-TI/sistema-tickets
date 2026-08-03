@@ -2,8 +2,8 @@ package com.sedif.sistema_tickets.core.ticket;
 
 import com.sedif.sistema_tickets.core.usuarios.Usuario;
 import java.time.LocalDateTime;
-import com.sedif.sistema_tickets.core.estatusticket.Estatus; 
 import com.sedif.sistema_tickets.util.audit.Auditable;
+import com.sedif.sistema_tickets.util.enums.EstadoTicket;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -35,9 +35,21 @@ public class Ticket extends Auditable {
     @Column(name = "s_justificacion", columnDefinition = "TEXT")
     private String justificacion;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "fn_estadoticket_id", nullable = false)
-    private Estatus estatus; 
+    /**
+     * Estado del ticket.
+     *
+     * <p>Antes era un {@code @ManyToOne} contra la tabla catalogo
+     * {@code estadoticket}, retirada en la migracion V4: eran tres filas fijas
+     * que obligaban a un JOIN en cada consulta y dejaban el sistema inservible
+     * si la tabla llegaba vacia a una base nueva.</p>
+     *
+     * <p>Se guarda como texto ({@code EnumType.STRING}) y no por su posicion:
+     * con {@code ORDINAL}, insertar un valor nuevo en medio del enum
+     * reinterpretaria en silencio todos los registros historicos.</p>
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "s_estado", nullable = false, length = 20)
+    private EstadoTicket estado;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "fn_usuario_area_id", nullable = false)

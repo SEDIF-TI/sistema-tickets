@@ -3,9 +3,25 @@ package com.sedif.sistema_tickets.core.ticket;
 import java.time.LocalDateTime;
 
 /**
- * Esta clase es un "Data Transfer Object" (DTO)
- * Sirve para enviar al cliente solo la información necesaria
- * y evitar errores de recursión o datos innecesarios.
+ * Datos de un ticket tal como los consume el frontend.
+ *
+ * <p>Es un DTO: se envia solo lo necesario, sin exponer las entidades JPA ni
+ * arrastrar sus relaciones perezosas.</p>
+ *
+ * <p><b>Sobre el estado.</b> Viajan dos campos a proposito:</p>
+ * <ul>
+ *   <li>{@code estatus} es el nombre de la constante del enum
+ *       ({@code ABIERTO}, {@code EN_PROCESO}, {@code CERRADO}). Es el valor
+ *       <b>estable</b>, el que la interfaz debe comparar para decidir que
+ *       acciones muestra. Cambiar un texto visible nunca debe apagar un boton,
+ *       que es justo lo que ocurriria si la logica dependiera de la etiqueta.</li>
+ *   <li>{@code estatusEtiqueta} es el texto legible ("En proceso"), pensado
+ *       solo para pintarse en pantalla y en los documentos.</li>
+ * </ul>
+ *
+ * <p>El nombre {@code estatus} se mantiene aunque el enum se llame
+ * {@code EstadoTicket}: es el que ya leen las pantallas y renombrarlo obligaria
+ * a tocarlas todas sin ganar nada.</p>
  */
 public record TicketResponse(
     Long id,
@@ -14,9 +30,12 @@ public record TicketResponse(
     String sede,
     LocalDateTime fechaCreacion,
     LocalDateTime fechaFin,
-    String solicitante,     
+    String solicitante,
     String departamento,
-    String estatus, // <-- Cambiado a Long
+    /** Constante del enum: valor estable para la logica de la interfaz. */
+    String estatus,
+    /** Texto legible del estado: solo para mostrar. */
+    String estatusEtiqueta,
     Long usuarioAreaId,
     Long usuarioSoporteId,
     String justificacion

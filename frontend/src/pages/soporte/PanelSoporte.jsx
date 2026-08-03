@@ -18,33 +18,15 @@ import { useNetworkStatus } from '../../hooks/useNetworkStatus.jsx';
 import { useTablaPaginada } from '../../hooks/useTablaPaginada.jsx';
 import { formatearFechaHora, tiempoRelativo, truncar, toUpper } from '../../util/formater';
 
+import {
+    OPCIONES_ESTADO_TICKET, colorEstado, etiquetaEstado, estaCerrado, estaEnProceso,
+} from '../../util/estadoTicket';
+
 import DynamicTable from '../../components/DynamicTable';
 import AccionesTabla from '../../components/AccionesTabla';
 
-/** Estados por los que puede filtrarse la bandeja. */
-const OPCIONES_ESTATUS = [
-    { valor: '', etiqueta: 'Todos los estados' },
-    { valor: 'ABIERTO', etiqueta: 'Abierto' },
-    { valor: 'EN PROCESO', etiqueta: 'En proceso' },
-    { valor: 'CERRADO', etiqueta: 'Cerrado' },
-];
-
 /** Longitud mínima de la justificación, para que sirva como constancia. */
 const MINIMO_JUSTIFICACION = 10;
-
-const colorEstatus = (estatus) => {
-    switch ((estatus || '').toUpperCase()) {
-        case 'CERRADO':
-        case 'RESUELTO': return 'default';
-        case 'EN PROCESO': return 'info';
-        case 'ABIERTO':
-        case 'ASIGNADO': return 'warning';
-        default: return 'primary';
-    }
-};
-
-/** Un ticket cerrado ya no admite acciones del técnico. */
-const estaCerrado = (estatus) => ['CERRADO', 'RESUELTO'].includes((estatus || '').toUpperCase());
 
 /**
  * Bandeja de trabajo del técnico de soporte.
@@ -257,9 +239,9 @@ export default function PanelSoporte() {
             ancho: 130,
             render: (t) => (
                 <Chip
-                    label={t.estatus}
+                    label={t.estatusEtiqueta || etiquetaEstado(t.estatus)}
                     size="small"
-                    color={colorEstatus(t.estatus)}
+                    color={colorEstado(t.estatus)}
                     variant={estaCerrado(t.estatus) ? 'outlined' : 'filled'}
                     sx={{ minWidth: 96 }}
                 />
@@ -273,7 +255,7 @@ export default function PanelSoporte() {
             sinOrden: true,
             render: (t) => {
                 const cerrado = estaCerrado(t.estatus);
-                const enProceso = (t.estatus || '').toUpperCase() === 'EN PROCESO';
+                const enProceso = estaEnProceso(t.estatus);
                 const enviandoEste = avisando === t.id;
 
                 return (
@@ -352,7 +334,7 @@ export default function PanelSoporte() {
                         etiqueta: 'Estado',
                         valor: filtroEstatus,
                         valorPorDefecto: '',
-                        opciones: OPCIONES_ESTATUS,
+                        opciones: OPCIONES_ESTADO_TICKET,
                         onChange: setFiltroEstatus,
                         ancho: 190,
                     },

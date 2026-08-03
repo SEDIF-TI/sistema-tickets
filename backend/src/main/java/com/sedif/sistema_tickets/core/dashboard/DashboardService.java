@@ -2,7 +2,8 @@ package com.sedif.sistema_tickets.core.dashboard;
 
 import com.sedif.sistema_tickets.core.ticket.TicketRepository;
 import com.sedif.sistema_tickets.core.usuarios.UsuarioRepository;
-import com.sedif.sistema_tickets.core.aviso.AvisoRepository; // <-- Importante
+import com.sedif.sistema_tickets.core.aviso.AvisoRepository;
+import com.sedif.sistema_tickets.util.enums.EstadoTicket;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import java.util.List;
@@ -31,13 +32,31 @@ public class DashboardService {
             .build();
     }
 
+    /**
+     * Convierte los pares (etiqueta, conteo) que devuelven las consultas
+     * agregadas.
+     *
+     * <p>Los valores que llegan como enum se muestran por su etiqueta legible:
+     * la grafica de estados dibujaria si no "EN_PROCESO", con guion bajo, en
+     * lugar de "En proceso".</p>
+     */
     private List<DashboardResponse.MetricaGenerica> mapearGenerico(List<Object[]> datos) {
         return datos.stream()
             .map(obj -> DashboardResponse.MetricaGenerica.builder()
-                .nombre(obj[0] != null ? obj[0].toString() : "Sin asignar")
+                .nombre(nombreLegible(obj[0]))
                 .cantidad((Long) obj[1])
                 .build())
             .collect(Collectors.toList());
+    }
+
+    private String nombreLegible(Object valor) {
+        if (valor == null) {
+            return "Sin asignar";
+        }
+        if (valor instanceof EstadoTicket estado) {
+            return estado.getEtiqueta();
+        }
+        return valor.toString();
     }
 
     private List<DashboardResponse.MetricaFecha> mapearFecha(List<Object[]> datos) {

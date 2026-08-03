@@ -1,6 +1,7 @@
 package com.sedif.sistema_tickets.core.ticket;
 
 import com.sedif.sistema_tickets.core.usuarios.Usuario;
+import com.sedif.sistema_tickets.util.enums.EstadoTicket;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -31,7 +32,7 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
     // miraba 10 de los miles de tickets existentes.
 
     /** Vision GLOBAL: todos los tickets. Exclusivo de ADMINISTRADOR. */
-    @EntityGraph(attributePaths = {"usuarioArea", "usuarioArea.area", "usuarioSoporte", "estatus"})
+    @EntityGraph(attributePaths = {"usuarioArea", "usuarioArea.area", "usuarioSoporte"})
     @Query("""
             SELECT t FROM Ticket t
             WHERE (:busqueda IS NULL
@@ -39,14 +40,14 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
                    OR LOWER(t.usuarioArea.nombre) LIKE LOWER(CONCAT('%', :busqueda, '%'))
                    OR LOWER(t.usuarioArea.area.nombre) LIKE LOWER(CONCAT('%', :busqueda, '%'))
                    OR CAST(t.id AS string) LIKE CONCAT('%', :busqueda, '%'))
-              AND (:estatus IS NULL OR LOWER(t.estatus.nombre) = LOWER(:estatus))
+              AND (:estado IS NULL OR t.estado = :estado)
             """)
     Page<Ticket> buscarTodosPaginado(@Param("busqueda") String busqueda,
-                                     @Param("estatus") String estatus,
+                                     @Param("estado") EstadoTicket estado,
                                      Pageable pageable);
 
     /** Vision AREA: tickets levantados por personal del area indicada. */
-    @EntityGraph(attributePaths = {"usuarioArea", "usuarioArea.area", "usuarioSoporte", "estatus"})
+    @EntityGraph(attributePaths = {"usuarioArea", "usuarioArea.area", "usuarioSoporte"})
     @Query("""
             SELECT t FROM Ticket t
             WHERE t.usuarioArea.area.id = :areaId
@@ -54,11 +55,11 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
                    OR LOWER(t.titulo) LIKE LOWER(CONCAT('%', :busqueda, '%'))
                    OR LOWER(t.usuarioArea.nombre) LIKE LOWER(CONCAT('%', :busqueda, '%'))
                    OR CAST(t.id AS string) LIKE CONCAT('%', :busqueda, '%'))
-              AND (:estatus IS NULL OR LOWER(t.estatus.nombre) = LOWER(:estatus))
+              AND (:estado IS NULL OR t.estado = :estado)
             """)
     Page<Ticket> buscarPorAreaPaginado(@Param("areaId") Long areaId,
                                        @Param("busqueda") String busqueda,
-                                       @Param("estatus") String estatus,
+                                       @Param("estado") EstadoTicket estado,
                                        Pageable pageable);
 
     /**
@@ -66,7 +67,7 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
      * levanto. La version anterior solo miraba la asignacion, asi que un
      * tecnico no veia sus propios reportes.
      */
-    @EntityGraph(attributePaths = {"usuarioArea", "usuarioArea.area", "usuarioSoporte", "estatus"})
+    @EntityGraph(attributePaths = {"usuarioArea", "usuarioArea.area", "usuarioSoporte"})
     @Query("""
             SELECT t FROM Ticket t
             WHERE (t.usuarioSoporte.id = :usuarioId OR t.usuarioArea.id = :usuarioId)
@@ -75,11 +76,11 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
                    OR LOWER(t.usuarioArea.nombre) LIKE LOWER(CONCAT('%', :busqueda, '%'))
                    OR LOWER(t.usuarioArea.area.nombre) LIKE LOWER(CONCAT('%', :busqueda, '%'))
                    OR CAST(t.id AS string) LIKE CONCAT('%', :busqueda, '%'))
-              AND (:estatus IS NULL OR LOWER(t.estatus.nombre) = LOWER(:estatus))
+              AND (:estado IS NULL OR t.estado = :estado)
             """)
     Page<Ticket> buscarPorSoporteOCreadorPaginado(@Param("usuarioId") Long usuarioId,
                                                   @Param("busqueda") String busqueda,
-                                                  @Param("estatus") String estatus,
+                                                  @Param("estado") EstadoTicket estado,
                                                   Pageable pageable);
 
     // =====================================================================
@@ -99,20 +100,20 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
     @Query("SELECT t FROM Ticket t WHERE t.usuarioSoporte.id = :usuarioId OR t.usuarioArea.id = :usuarioId")
     List<Ticket> buscarPorSoporteOCreador(@Param("usuarioId") Long usuarioId);
 
-    long countByUsuarioSoporteAndEstatusNombre(Usuario usuarioSoporte, String nombreEstatus);
+    long countByUsuarioSoporteAndEstado(Usuario usuarioSoporte, EstadoTicket estado);
 
     // =====================================================================
     // METRICAS DEL DASHBOARD
     // =====================================================================
 
-    long countByEstatusNombreIgnoreCase(String nombreEstatus);
+    long countByEstado(EstadoTicket estado);
 
-    long countByEstatusNombreNotIgnoreCase(String nombreEstatus);
+    long countByEstadoNot(EstadoTicket estado);
 
     @Query("SELECT t.usuarioArea.area.nombre, COUNT(t) FROM Ticket t GROUP BY t.usuarioArea.area.nombre")
     List<Object[]> contarTicketsPorArea();
 
-    @Query("SELECT t.estatus.nombre, COUNT(t) FROM Ticket t GROUP BY t.estatus.nombre")
+    @Query("SELECT t.estado, COUNT(t) FROM Ticket t GROUP BY t.estado")
     List<Object[]> contarPorEstatus();
 
     @Query("SELECT t.usuarioSoporte.nombre, COUNT(t) FROM Ticket t WHERE t.usuarioSoporte IS NOT NULL GROUP BY t.usuarioSoporte.nombre")

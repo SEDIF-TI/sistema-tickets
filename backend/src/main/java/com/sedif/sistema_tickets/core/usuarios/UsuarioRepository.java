@@ -1,6 +1,6 @@
 package com.sedif.sistema_tickets.core.usuarios;
 
-import com.sedif.sistema_tickets.core.estatusticket.Estatus;
+import com.sedif.sistema_tickets.util.enums.EstadoTicket;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -37,14 +37,14 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
     // ==========================================
     
     @Query("SELECT u FROM Usuario u " +
-           "LEFT JOIN Ticket t ON t.usuarioSoporte = u AND t.estatus = :estatus " +
+           "LEFT JOIN Ticket t ON t.usuarioSoporte = u AND t.estado = :estado " +
            "WHERE u.rol.id = :rolId " +
            "AND u.activo = true " +
            "AND u.disponibleSoporte = true " +
            "AND u.id NOT IN (SELECT a.soporteFijo.id FROM Area a WHERE a.soporteFijo IS NOT NULL) " +
            "GROUP BY u " +
            "ORDER BY COUNT(t.id) ASC")
-    List<Usuario> buscarTecnicosGlobalesOrdenadosPorCarga(@Param("rolId") Long rolId, @Param("estatus") Estatus estatus);
+    List<Usuario> buscarTecnicosGlobalesOrdenadosPorCarga(@Param("rolId") Long rolId, @Param("estado") EstadoTicket estado);
 
     /**
      * Tecnicos activos y disponibles, ordenados de menor a mayor carga de
@@ -62,11 +62,11 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
      * ellos mismos sean fijos de otra area.</p>
      *
      * @param nombreRol     nombre del rol tecnico (normalmente "SOPORTE").
-     * @param nombreEstatus estatus que cuenta como carga viva (ej. "ABIERTO").
+     * @param estado estado que cuenta como carga viva (normalmente ABIERTO).
      */
     @Query("""
             SELECT u FROM Usuario u
-            LEFT JOIN Ticket t ON t.usuarioSoporte = u AND t.estatus.nombre = :nombreEstatus
+            LEFT JOIN Ticket t ON t.usuarioSoporte = u AND t.estado = :estado
             WHERE u.rol.nombre = :nombreRol
               AND u.activo = true
               AND u.disponibleSoporte = true
@@ -75,5 +75,5 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
             """)
     List<Usuario> buscarTecnicosDisponiblesOrdenadosPorCarga(
             @Param("nombreRol") String nombreRol,
-            @Param("nombreEstatus") String nombreEstatus);
+            @Param("estado") EstadoTicket estado);
 }

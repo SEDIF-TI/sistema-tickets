@@ -2,14 +2,13 @@ package com.sedif.sistema_tickets.core.ticket;
 
 import com.sedif.sistema_tickets.core.usuarios.Usuario;
 import com.sedif.sistema_tickets.core.usuarios.UsuarioRepository;
-import com.sedif.sistema_tickets.core.estatusticket.Estatus;
-import com.sedif.sistema_tickets.core.estatusticket.EstatusRepository;
 import com.sedif.sistema_tickets.core.telegram.SedifTelegramBot;
 import com.sedif.sistema_tickets.core.ticket.bitacora.Bitacora;
 import com.sedif.sistema_tickets.core.ticket.bitacora.BitacoraRepository;
 import com.sedif.sistema_tickets.core.ticket.filtros.TicketFiltroStrategy;
 import com.sedif.sistema_tickets.exception.MessageConstants;
 import com.sedif.sistema_tickets.exception.PageResponse;
+import com.sedif.sistema_tickets.util.enums.EstadoTicket;
 import com.sedif.sistema_tickets.util.enums.PlanTrabajo;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,7 +33,6 @@ public class TicketService {
     private final SedifTelegramBot telegramBot;
     private final TicketRepository ticketRepository;
     private final UsuarioRepository usuarioRepository;
-    private final EstatusRepository estatusRepository;
     private final Map<String, TicketFiltroStrategy> estrategiasFiltro;
     private final BitacoraRepository bitacoraRepository;
     
@@ -46,9 +44,6 @@ public class TicketService {
         Usuario usuario = usuarioRepository.findByCorreo(correoUsuario)
                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
 
-        Estatus estatusAbierto = estatusRepository.findByNombre("ABIERTO")
-                .orElseThrow(() -> new IllegalStateException("Estatus ABIERTO no configurado en la base de datos"));
-
         Ticket nuevoTicket = new Ticket();
         nuevoTicket.setTitulo(request.titulo());
         nuevoTicket.setDescripcion(request.descripcion());
@@ -59,8 +54,10 @@ public class TicketService {
             nuevoTicket.setSolicitanteNombre(request.solicitante());
         }
 
-        nuevoTicket.setUsuarioArea(usuario); 
-        nuevoTicket.setEstatus(estatusAbierto); 
+        nuevoTicket.setUsuarioArea(usuario);
+        // El alta ya no depende de que exista una fila en un catalogo: el
+        // estado inicial es una constante del enum.
+        nuevoTicket.setEstado(EstadoTicket.ABIERTO);
         nuevoTicket.setFechaCreacion(LocalDateTime.now());
         nuevoTicket.setCreadoPor(usuario.getCorreo());
         
@@ -143,8 +140,8 @@ public class TicketService {
         // comparacion: un problema N+1 en el camino critico de creacion de
         // tickets. La consulta del repositorio ya devuelve a los tecnicos
         // disponibles ordenados por carga ascendente.
-        List<Usuario> disponibles =
-                usuarioRepository.buscarTecnicosDisponiblesOrdenadosPorCarga("SOPORTE", "ABIERTO");
+        List<Usuario> disponibles = usuarioRepository
+                .buscarTecnicosDisponiblesOrdenadosPorCarga("SOPORTE", EstadoTicket.ABIERTO);
 
         return disponibles.isEmpty() ? null : disponibles.get(0);
     }
@@ -197,7 +194,10 @@ public class TicketService {
                 t.getFechaFin(),
                 nombreSolicitante,
                 nombreDepartamento,
-                t.getEstatus().getNombre(),
+                // Codigo estable para la logica de la interfaz...
+                t.getEstado() != null ? t.getEstado().name() : null,
+                // ...y etiqueta legible para mostrarla en pantalla.
+                t.getEstado() != null ? t.getEstado().getEtiqueta() : null,
                 t.getUsuarioArea()!= null ? t.getUsuarioArea().getId() : null,
                 t.getUsuarioSoporte() != null ? t.getUsuarioSoporte().getId() : null,
                 justificacion
@@ -215,7 +215,7 @@ public class TicketService {
             throw new SecurityException("No tienes permiso: El ticket pertenece a otra área.");
         }
     
-        ticket.setEstatus(estatusRepository.findByNombre("CERRADO").orElseThrow());
+        ticket.setEstado(EstadoTicket.CERRADO);
         ticket.setFechaFin(LocalDateTime.now());
         Ticket ticketGuardado = ticketRepository.save(ticket);
 
@@ -255,21 +255,17 @@ public class TicketService {
         Usuario tecnico = obtenerUsuarioAutenticado(correoUsuario);
         verificarPuedeOperarElTicket(ticket, tecnico);
 
-        if (ticket.getEstatus() != null
-                && "CERRADO".equalsIgnoreCase(ticket.getEstatus().getNombre())) {
+        if (ticket.getEstado() != null && ticket.getEstado().esFinal()) {
             throw new IllegalStateException(
                     "El ticket ya esta cerrado: no se puede volver a marcar en atencion.");
         }
 
-        Estatus estatusEnCamino = estatusRepository.findByNombre("EN PROCESO")
-                .orElseThrow(() -> new IllegalStateException("El estatus EN PROCESO no existe en la BD."));
-
-        ticket.setEstatus(estatusEnCamino);
+        ticket.setEstado(EstadoTicket.EN_PROCESO);
         Ticket ticketGuardado = ticketRepository.save(ticket);
 
         Bitacora bitacora = new Bitacora();
         bitacora.setTicket(ticketGuardado);
-        bitacora.setEstatusRegistrado("EN PROCESO");
+        bitacora.setEstatusRegistrado(EstadoTicket.EN_PROCESO.name());
         // Se deja constancia de quien avisa: la entrada generica anterior no
         // permitia saber que tecnico se habia puesto en camino.
         bitacora.setJustificacion(
@@ -340,10 +336,7 @@ public class TicketService {
                     "La meta del plan de trabajo indicada no existe en el catalogo.");
         }
 
-        Estatus estatusResuelto = estatusRepository.findByNombre("CERRADO")
-                .orElseThrow(() -> new IllegalStateException("El estatus CERRADO no existe en la BD."));
-
-        ticket.setEstatus(estatusResuelto);
+        ticket.setEstado(EstadoTicket.CERRADO);
         ticket.setFechaFin(LocalDateTime.now());
 
         if (justificacion != null) ticket.setJustificacion(justificacion);
@@ -353,7 +346,7 @@ public class TicketService {
 
         Bitacora bitacora = new Bitacora();
         bitacora.setTicket(ticketGuardado);
-        bitacora.setEstatusRegistrado("CERRADO");
+        bitacora.setEstatusRegistrado(EstadoTicket.CERRADO.name());
         bitacora.setJustificacion(justificacion);
         bitacoraRepository.save(bitacora);
 
@@ -390,14 +383,14 @@ public class TicketService {
         }
 
         String textoBusqueda = normalizarFiltro(busqueda);
-        String filtroEstatus = normalizarFiltro(estatus);
+        EstadoTicket filtroEstado = normalizarEstado(estatus);
 
         String nivelVision = usuario.getRol().getNivelVision();
         Page<Ticket> pagina = switch (nivelVision == null ? "" : nivelVision.toUpperCase()) {
-            case "GLOBAL" -> ticketRepository.buscarTodosPaginado(textoBusqueda, filtroEstatus, pageable);
+            case "GLOBAL" -> ticketRepository.buscarTodosPaginado(textoBusqueda, filtroEstado, pageable);
 
             case "PERSONAL" -> ticketRepository.buscarPorSoporteOCreadorPaginado(
-                    usuario.getId(), textoBusqueda, filtroEstatus, pageable);
+                    usuario.getId(), textoBusqueda, filtroEstado, pageable);
 
             case "AREA" -> {
                 if (usuario.getArea() == null) {
@@ -407,7 +400,7 @@ public class TicketService {
                     yield Page.empty(pageable);
                 }
                 yield ticketRepository.buscarPorAreaPaginado(
-                        usuario.getArea().getId(), textoBusqueda, filtroEstatus, pageable);
+                        usuario.getArea().getId(), textoBusqueda, filtroEstado, pageable);
             }
 
             // Nivel desconocido: se niega el acceso en lugar de conceder todo.
@@ -435,14 +428,14 @@ public class TicketService {
                 .orElseThrow(() -> new IllegalArgumentException(MessageConstants.USUARIO_NO_ENCONTRADO));
 
         String textoBusqueda = normalizarFiltro(busqueda);
-        String filtroEstatus = normalizarFiltro(estatus);
+        EstadoTicket filtroEstado = normalizarEstado(estatus);
 
         boolean esAdministrador = usuario.getRol() != null
                 && "GLOBAL".equalsIgnoreCase(usuario.getRol().getNivelVision());
 
         if (esAdministrador) {
             return PageResponse.de(
-                    ticketRepository.buscarTodosPaginado(textoBusqueda, filtroEstatus, pageable),
+                    ticketRepository.buscarTodosPaginado(textoBusqueda, filtroEstado, pageable),
                     this::mapearATicketResponse);
         }
 
@@ -452,7 +445,7 @@ public class TicketService {
 
         return PageResponse.de(
                 ticketRepository.buscarPorAreaPaginado(
-                        usuario.getArea().getId(), textoBusqueda, filtroEstatus, pageable),
+                        usuario.getArea().getId(), textoBusqueda, filtroEstado, pageable),
                 this::mapearATicketResponse);
     }
 
@@ -480,6 +473,26 @@ public class TicketService {
      */
     private String normalizarFiltro(String valor) {
         return (valor == null || valor.isBlank()) ? null : valor.trim();
+    }
+
+    /**
+     * Traduce el filtro de estado recibido del cliente al enum.
+     *
+     * <p>Un valor desconocido se trata como "sin filtro" en lugar de provocar
+     * un error: el filtro es una comodidad de la interfaz, y un parametro mal
+     * escrito en la URL no debe impedir ver la bandeja. Se deja constancia en
+     * el log para poder detectar un desajuste entre pantalla y backend.</p>
+     */
+    private EstadoTicket normalizarEstado(String valor) {
+        String texto = normalizarFiltro(valor);
+        if (texto == null) {
+            return null;
+        }
+
+        return EstadoTicket.desde(texto).orElseGet(() -> {
+            log.warn("Filtro de estado no reconocido: '{}'. Se ignora.", texto);
+            return null;
+        });
     }
 
     /**
