@@ -17,7 +17,10 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 /**
  * Endpoints de gestion de tickets.
@@ -63,22 +66,39 @@ public class TicketResource {
     @GetMapping
     public ResponseEntity<ApiResponse<PageResponse<TicketResponse>>> obtenerTodos(
             Authentication authentication,
+            @RequestParam(required = false) String busqueda,
+            @RequestParam(required = false) String estatus,
             @PageableDefault(size = 10, sort = "fechaCreacion", direction = Sort.Direction.DESC)
             Pageable pageable) {
 
-        return ResponseEntity.ok(ApiResponse.ok(
-                ticketService.obtenerTicketsParaBandeja(authentication.getName(), pageable)));
+        return ResponseEntity.ok(ApiResponse.ok(ticketService.obtenerTicketsParaBandeja(
+                authentication.getName(), busqueda, estatus, pageable)));
     }
 
     /** Historial del area del usuario autenticado, paginado. */
     @GetMapping("/mis-tickets")
     public ResponseEntity<ApiResponse<PageResponse<TicketResponse>>> obtenerHistorialArea(
             Authentication authentication,
+            @RequestParam(required = false) String busqueda,
+            @RequestParam(required = false) String estatus,
             @PageableDefault(size = 10, sort = "fechaCreacion", direction = Sort.Direction.DESC)
             Pageable pageable) {
 
-        return ResponseEntity.ok(ApiResponse.ok(
-                ticketService.obtenerTicketsDeMiAreaPaginado(authentication.getName(), pageable)));
+        return ResponseEntity.ok(ApiResponse.ok(ticketService.obtenerTicketsDeMiAreaPaginado(
+                authentication.getName(), busqueda, estatus, pageable)));
+    }
+
+    /**
+     * Catalogo de metas del plan anual de trabajo.
+     *
+     * <p>Lo necesita el desplegable de resolucion. Solo tiene sentido para
+     * quien puede resolver tickets, asi que se restringe igual que
+     * {@code resolver}.</p>
+     */
+    @GetMapping("/plan-trabajo")
+    @PreAuthorize("hasAnyRole('SOPORTE', 'ADMINISTRADOR')")
+    public ResponseEntity<ApiResponse<List<PlanTrabajoResponse>>> obtenerPlanTrabajo() {
+        return ResponseEntity.ok(ApiResponse.ok(ticketService.obtenerCatalogoPlanTrabajo()));
     }
 
     /**

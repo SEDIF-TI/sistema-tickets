@@ -9,30 +9,30 @@ import java.util.Optional;
  * <p>Cada actividad extra y cada resolucion de ticket puede imputarse a una
  * meta, para poder medir el avance al cierre del ano.</p>
  *
- * <p><b>PLANTILLA — pendiente de ajustar.</b> Las claves numericas se tomaron
- * de los datos ya registrados en las tablas {@code actividad_extra} y
- * {@code ticket} (aparecen las claves 1, 2, 5, 6, 7, 8 y 11), pero las
- * descripciones son genericas porque el listado real de metas no consta en el
- * codigo ni en la base de datos.</p>
+ * <p>Las claves numericas coinciden con las ya registradas en las tablas
+ * {@code actividad_extra} y {@code ticket}. Las descripciones se recuperaron
+ * del catalogo que el panel de soporte tenia escrito a mano en el desplegable
+ * de resolucion de tickets: el listado vivia duplicado en el frontend y no
+ * existia en el backend, asi que cualquier cambio de meta obligaba a tocar el
+ * JSX. Ahora el catalogo se sirve desde aqui.</p>
  *
- * <p>Para adaptarlo: sustituir el texto de cada {@code descripcion} por el
- * nombre real de la meta. <b>No cambiar las claves numericas</b>, porque son
- * las que ya estan guardadas en los registros historicos.</p>
+ * <p><b>No cambiar las claves numericas</b>: son las que ya estan guardadas en
+ * los registros historicos.</p>
  */
 public enum PlanTrabajo {
 
-    META_1(1, "Meta 1 — pendiente de definir"),
-    META_2(2, "Meta 2 — pendiente de definir"),
-    META_3(3, "Meta 3 — pendiente de definir"),
-    META_4(4, "Meta 4 — pendiente de definir"),
-    META_5(5, "Meta 5 — pendiente de definir"),
-    META_6(6, "Meta 6 — pendiente de definir"),
-    META_7(7, "Meta 7 — pendiente de definir"),
-    META_8(8, "Meta 8 — pendiente de definir"),
-    META_9(9, "Meta 9 — pendiente de definir"),
-    META_10(10, "Meta 10 — pendiente de definir"),
-    META_11(11, "Meta 11 — pendiente de definir"),
-    META_12(12, "Meta 12 — pendiente de definir");
+    META_1(1, "Mantenimiento preventivo equipo oficinas centrales"),
+    META_2(2, "Mantenimiento preventivo equipo oficinas metropolitanas"),
+    META_3(3, "Mantenimiento preventivo equipo Casa Jóvenes en Progreso"),
+    META_4(4, "Mantenimiento preventivo equipo Delegaciones Regionales y Casas Carmen Serdán"),
+    META_5(5, "Mantenimiento de Sistemas Institucionales"),
+    META_6(6, "Mantenimiento preventivo servidores"),
+    META_7(7, "Soporte técnico a equipo de cómputo y software"),
+    META_8(8, "Mantenimiento servicio de correo electrónico"),
+    META_9(9, "Supervisión servicios de Internet, telefonía IP y correos"),
+    META_10(10, "Soporte a videoconferencias"),
+    META_11(11, "Realización de respaldos de base de datos (bitácora)"),
+    META_12(12, "Mantenimiento e instalación de equipo de CCTV");
 
     private final int clave;
     private final String descripcion;

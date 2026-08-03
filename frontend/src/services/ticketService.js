@@ -11,11 +11,20 @@ import api from './api';
  * si los invoca un empleado, el backend responde 403.
  */
 export const ticketService = {
-    /** Bandeja del usuario; el backend filtra según su rol y su área. */
+    /**
+     * Bandeja del usuario; el backend filtra según su rol y su área.
+     * Admite `busqueda` y `estatus`, que se resuelven en la base de datos.
+     */
     getAll: (params = {}) => api.get('/v1/tickets', { params }),
 
     /** Historial del área del usuario autenticado. */
     getMisTickets: (params = {}) => api.get('/v1/tickets/mis-tickets', { params }),
+
+    /**
+     * Catálogo de metas del plan anual de trabajo, para el desplegable de
+     * resolución. Antes estaba escrito a mano dentro del panel de soporte.
+     */
+    getPlanTrabajo: () => api.get('/v1/tickets/plan-trabajo'),
 
     create: (data) => api.post('/v1/tickets', data),
 

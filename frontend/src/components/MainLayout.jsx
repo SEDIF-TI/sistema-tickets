@@ -8,7 +8,7 @@ import { useTheme } from '@mui/material/styles';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 import { AuthContext } from '../context/AuthContext.jsx';
-import { WebSocketContext } from '../context/WebSocketContext.jsx';
+import { useWebSocket } from '../context/useWebSocket.js';
 import { avisoService } from '../services/avisoService';
 import { useNetworkStatus } from '../hooks/useNetworkStatus.jsx';
 
@@ -81,7 +81,10 @@ const ICONOS = {
  */
 export default function MainLayout({ children }) {
     const { user, logout } = useContext(AuthContext);
-    const { stompClient, connected } = useContext(WebSocketContext) || {};
+    // El contexto expone `isConnected`. Antes se desestructuraba `connected`,
+    // que no existe: valía siempre `undefined` y la suscripción de avisos de
+    // más abajo nunca llegaba a activarse.
+    const { stompClient, isConnected } = useWebSocket();
     const navigate = useNavigate();
     const location = useLocation();
     const theme = useTheme();
@@ -149,7 +152,7 @@ export default function MainLayout({ children }) {
 
     // --- Alertas de resguardos vencidos en tiempo real ---------------------
     useEffect(() => {
-        if (!stompClient || !connected || !user || bloqueadoPorPassword) return;
+        if (!stompClient || !isConnected || !user || bloqueadoPorPassword) return;
 
         const suscripcion = stompClient.subscribe('/topic/alertas-resguardos', (mensaje) => {
             try {
@@ -169,7 +172,7 @@ export default function MainLayout({ children }) {
         });
 
         return () => suscripcion?.unsubscribe();
-    }, [stompClient, connected, user, bloqueadoPorPassword]);
+    }, [stompClient, isConnected, user, bloqueadoPorPassword]);
 
     const avisosVisibles = avisos.filter((a) => !avisosOcultos.includes(a.id));
 

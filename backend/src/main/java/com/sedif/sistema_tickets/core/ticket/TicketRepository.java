@@ -25,15 +25,41 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
     // sin romper el LIMIT.
     // =====================================================================
 
+    // Los tres metodos aceptan ademas un texto libre y un estatus, ambos
+    // opcionales (null = sin filtrar). Antes la busqueda se hacia en el
+    // navegador sobre la pagina ya descargada, de modo que "buscar" solo
+    // miraba 10 de los miles de tickets existentes.
+
     /** Vision GLOBAL: todos los tickets. Exclusivo de ADMINISTRADOR. */
     @EntityGraph(attributePaths = {"usuarioArea", "usuarioArea.area", "usuarioSoporte", "estatus"})
-    @Query("SELECT t FROM Ticket t")
-    Page<Ticket> buscarTodosPaginado(Pageable pageable);
+    @Query("""
+            SELECT t FROM Ticket t
+            WHERE (:busqueda IS NULL
+                   OR LOWER(t.titulo) LIKE LOWER(CONCAT('%', :busqueda, '%'))
+                   OR LOWER(t.usuarioArea.nombre) LIKE LOWER(CONCAT('%', :busqueda, '%'))
+                   OR LOWER(t.usuarioArea.area.nombre) LIKE LOWER(CONCAT('%', :busqueda, '%'))
+                   OR CAST(t.id AS string) LIKE CONCAT('%', :busqueda, '%'))
+              AND (:estatus IS NULL OR LOWER(t.estatus.nombre) = LOWER(:estatus))
+            """)
+    Page<Ticket> buscarTodosPaginado(@Param("busqueda") String busqueda,
+                                     @Param("estatus") String estatus,
+                                     Pageable pageable);
 
     /** Vision AREA: tickets levantados por personal del area indicada. */
     @EntityGraph(attributePaths = {"usuarioArea", "usuarioArea.area", "usuarioSoporte", "estatus"})
-    @Query("SELECT t FROM Ticket t WHERE t.usuarioArea.area.id = :areaId")
-    Page<Ticket> buscarPorAreaPaginado(@Param("areaId") Long areaId, Pageable pageable);
+    @Query("""
+            SELECT t FROM Ticket t
+            WHERE t.usuarioArea.area.id = :areaId
+              AND (:busqueda IS NULL
+                   OR LOWER(t.titulo) LIKE LOWER(CONCAT('%', :busqueda, '%'))
+                   OR LOWER(t.usuarioArea.nombre) LIKE LOWER(CONCAT('%', :busqueda, '%'))
+                   OR CAST(t.id AS string) LIKE CONCAT('%', :busqueda, '%'))
+              AND (:estatus IS NULL OR LOWER(t.estatus.nombre) = LOWER(:estatus))
+            """)
+    Page<Ticket> buscarPorAreaPaginado(@Param("areaId") Long areaId,
+                                       @Param("busqueda") String busqueda,
+                                       @Param("estatus") String estatus,
+                                       Pageable pageable);
 
     /**
      * Vision PERSONAL: tickets asignados al tecnico MAS los que el mismo
@@ -41,8 +67,20 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
      * tecnico no veia sus propios reportes.
      */
     @EntityGraph(attributePaths = {"usuarioArea", "usuarioArea.area", "usuarioSoporte", "estatus"})
-    @Query("SELECT t FROM Ticket t WHERE t.usuarioSoporte.id = :usuarioId OR t.usuarioArea.id = :usuarioId")
-    Page<Ticket> buscarPorSoporteOCreadorPaginado(@Param("usuarioId") Long usuarioId, Pageable pageable);
+    @Query("""
+            SELECT t FROM Ticket t
+            WHERE (t.usuarioSoporte.id = :usuarioId OR t.usuarioArea.id = :usuarioId)
+              AND (:busqueda IS NULL
+                   OR LOWER(t.titulo) LIKE LOWER(CONCAT('%', :busqueda, '%'))
+                   OR LOWER(t.usuarioArea.nombre) LIKE LOWER(CONCAT('%', :busqueda, '%'))
+                   OR LOWER(t.usuarioArea.area.nombre) LIKE LOWER(CONCAT('%', :busqueda, '%'))
+                   OR CAST(t.id AS string) LIKE CONCAT('%', :busqueda, '%'))
+              AND (:estatus IS NULL OR LOWER(t.estatus.nombre) = LOWER(:estatus))
+            """)
+    Page<Ticket> buscarPorSoporteOCreadorPaginado(@Param("usuarioId") Long usuarioId,
+                                                  @Param("busqueda") String busqueda,
+                                                  @Param("estatus") String estatus,
+                                                  Pageable pageable);
 
     // =====================================================================
     // CONSULTAS SIN PAGINAR

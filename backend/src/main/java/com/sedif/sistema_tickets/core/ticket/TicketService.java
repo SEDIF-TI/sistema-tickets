@@ -10,6 +10,7 @@ import com.sedif.sistema_tickets.core.ticket.bitacora.BitacoraRepository;
 import com.sedif.sistema_tickets.core.ticket.filtros.TicketFiltroStrategy;
 import com.sedif.sistema_tickets.exception.MessageConstants;
 import com.sedif.sistema_tickets.exception.PageResponse;
+import com.sedif.sistema_tickets.util.enums.PlanTrabajo;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -20,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -304,7 +306,9 @@ public class TicketService {
      * </ul>
      */
     @Transactional(readOnly = true)
-    public PageResponse<TicketResponse> obtenerTicketsParaBandeja(String correoUsuario, Pageable pageable) {
+    public PageResponse<TicketResponse> obtenerTicketsParaBandeja(
+            String correoUsuario, String busqueda, String estatus, Pageable pageable) {
+
         Usuario usuario = usuarioRepository.findByCorreoOrUsername(correoUsuario, correoUsuario)
                 .orElseThrow(() -> new IllegalArgumentException(MessageConstants.USUARIO_NO_ENCONTRADO));
 
@@ -312,11 +316,15 @@ public class TicketService {
             throw new IllegalStateException("El usuario no tiene un rol asignado.");
         }
 
+        String textoBusqueda = normalizarFiltro(busqueda);
+        String filtroEstatus = normalizarFiltro(estatus);
+
         String nivelVision = usuario.getRol().getNivelVision();
         Page<Ticket> pagina = switch (nivelVision == null ? "" : nivelVision.toUpperCase()) {
-            case "GLOBAL" -> ticketRepository.buscarTodosPaginado(pageable);
+            case "GLOBAL" -> ticketRepository.buscarTodosPaginado(textoBusqueda, filtroEstatus, pageable);
 
-            case "PERSONAL" -> ticketRepository.buscarPorSoporteOCreadorPaginado(usuario.getId(), pageable);
+            case "PERSONAL" -> ticketRepository.buscarPorSoporteOCreadorPaginado(
+                    usuario.getId(), textoBusqueda, filtroEstatus, pageable);
 
             case "AREA" -> {
                 if (usuario.getArea() == null) {
@@ -325,7 +333,8 @@ public class TicketService {
                     log.warn("Usuario id={} con vision AREA pero sin area asignada.", usuario.getId());
                     yield Page.empty(pageable);
                 }
-                yield ticketRepository.buscarPorAreaPaginado(usuario.getArea().getId(), pageable);
+                yield ticketRepository.buscarPorAreaPaginado(
+                        usuario.getArea().getId(), textoBusqueda, filtroEstatus, pageable);
             }
 
             // Nivel desconocido: se niega el acceso en lugar de conceder todo.
@@ -346,15 +355,22 @@ public class TicketService {
      * global que le corresponde en lugar de una lista vacia.</p>
      */
     @Transactional(readOnly = true)
-    public PageResponse<TicketResponse> obtenerTicketsDeMiAreaPaginado(String correoUsuario, Pageable pageable) {
+    public PageResponse<TicketResponse> obtenerTicketsDeMiAreaPaginado(
+            String correoUsuario, String busqueda, String estatus, Pageable pageable) {
+
         Usuario usuario = usuarioRepository.findByCorreoOrUsername(correoUsuario, correoUsuario)
                 .orElseThrow(() -> new IllegalArgumentException(MessageConstants.USUARIO_NO_ENCONTRADO));
+
+        String textoBusqueda = normalizarFiltro(busqueda);
+        String filtroEstatus = normalizarFiltro(estatus);
 
         boolean esAdministrador = usuario.getRol() != null
                 && "GLOBAL".equalsIgnoreCase(usuario.getRol().getNivelVision());
 
         if (esAdministrador) {
-            return PageResponse.de(ticketRepository.buscarTodosPaginado(pageable), this::mapearATicketResponse);
+            return PageResponse.de(
+                    ticketRepository.buscarTodosPaginado(textoBusqueda, filtroEstatus, pageable),
+                    this::mapearATicketResponse);
         }
 
         if (usuario.getArea() == null) {
@@ -362,8 +378,35 @@ public class TicketService {
         }
 
         return PageResponse.de(
-                ticketRepository.buscarPorAreaPaginado(usuario.getArea().getId(), pageable),
+                ticketRepository.buscarPorAreaPaginado(
+                        usuario.getArea().getId(), textoBusqueda, filtroEstatus, pageable),
                 this::mapearATicketResponse);
+    }
+
+    /**
+     * Catalogo de metas del plan anual de trabajo.
+     *
+     * <p>Lo consume el desplegable de resolucion del panel de soporte, que
+     * antes llevaba las doce metas escritas a mano en el JSX. Al servirlo desde
+     * el enum, el catalogo deja de estar duplicado y una meta nueva no obliga a
+     * recompilar el frontend.</p>
+     */
+    public List<PlanTrabajoResponse> obtenerCatalogoPlanTrabajo() {
+        return Arrays.stream(PlanTrabajo.values())
+                .map(meta -> new PlanTrabajoResponse(meta.getClave(), meta.getDescripcion()))
+                .toList();
+    }
+
+    /**
+     * Deja en {@code null} los filtros vacios.
+     *
+     * <p>Las consultas tratan {@code null} como "sin filtrar". Una cadena vacia
+     * llegada del formulario no es lo mismo: comparada con LIKE '%%' colaria,
+     * pero comparada con el estatus no encontraria ningun registro y la tabla
+     * apareceria vacia sin motivo.</p>
+     */
+    private String normalizarFiltro(String valor) {
+        return (valor == null || valor.isBlank()) ? null : valor.trim();
     }
 
     /**
