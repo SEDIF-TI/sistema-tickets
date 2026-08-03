@@ -18,6 +18,7 @@ import com.sedif.sistema_tickets.core.resguardo.ResguardoRequest;
 
 // Importaciones de Spring y utilidades de Java
 import org.springframework.beans.factory.annotation.Autowired;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import java.awt.Color;
 import java.io.ByteArrayOutputStream;
@@ -39,6 +40,7 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import com.sedif.sistema_tickets.core.usuarios.UsuarioRepository;
 
 @Service
+@Slf4j
 public class DocumentoService {
 
     // Fuentes globales
@@ -90,7 +92,7 @@ public class DocumentoService {
                 logo.setAlignment(Element.ALIGN_CENTER);
                 cellLogo.addElement(logo);
             } catch (Exception e) {
-                System.err.println("Error cargando logo: " + e.getMessage());
+                log.warn("No se pudo cargar el logotipo institucional en el documento.", e);
             }
             tableLogo.addCell(cellLogo);
             document.add(tableLogo);
@@ -433,7 +435,7 @@ public class DocumentoService {
                 logo.setAlignment(Element.ALIGN_CENTER);
                 cellLogo.addElement(logo);
             } catch (Exception e) {
-                System.err.println("Error cargando logo: " + e.getMessage());
+                log.warn("No se pudo cargar el logotipo institucional en el documento.", e);
             }
             tableLogo.addCell(cellLogo);
             document.add(tableLogo);
@@ -586,7 +588,7 @@ public class DocumentoService {
                     }
                 }
             } catch (Exception e) {
-                System.err.println("Error al mapear el nombre del perfil: " + e.getMessage());
+                log.warn("No se pudo determinar el perfil del usuario para el documento.", e);
             }
 
             pEntrega.add(new Chunk(formatearNombre(operador), fontBoldItalic));

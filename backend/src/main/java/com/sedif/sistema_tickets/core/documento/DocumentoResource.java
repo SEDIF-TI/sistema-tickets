@@ -4,6 +4,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import jakarta.validation.Valid;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import com.sedif.sistema_tickets.core.ticket.Ticket;
@@ -21,6 +23,8 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/v1/documentos")
+// Documentos con membrete institucional: solo el area de TI los emite.
+@PreAuthorize("hasAnyRole('ADMINISTRADOR', 'SOPORTE')")
 @RequiredArgsConstructor
 public class DocumentoResource {
 
@@ -32,7 +36,7 @@ public class DocumentoResource {
     // 1. GENERACIÓN DE DICTAMEN
     // ==========================================================
     @PostMapping(value = "/dictamen", produces = MediaType.APPLICATION_PDF_VALUE)
-    public ResponseEntity<byte[]> generarDictamen(@RequestBody DictamenRequest request) {
+    public ResponseEntity<byte[]> generarDictamen(@Valid @RequestBody DictamenRequest request) {
         byte[] pdfGenerado = documentoService.generarDictamenTecnicoPdf(request);
         return construirRespuestaPdf(pdfGenerado, "Dictamen_Tecnico_" + request.folioTicket() + ".pdf");
     }
@@ -41,7 +45,7 @@ public class DocumentoResource {
     // 2. GENERACIÓN DE MANTENIMIENTO PREVENTIVO
     // ==========================================================
     @PostMapping(value = "/mantenimiento", produces = MediaType.APPLICATION_PDF_VALUE)
-    public ResponseEntity<byte[]> generarMantenimientoPreventivoPdf(@RequestBody MantenimientoPreventivoRequest request) {
+    public ResponseEntity<byte[]> generarMantenimientoPreventivoPdf(@Valid @RequestBody MantenimientoPreventivoRequest request) {
         byte[] pdfGenerado = documentoService.generarMantenimientoPreventivoPdf(request);
         return construirRespuestaPdf(pdfGenerado, "Mantenimiento_Preventivo_" + request.departamento() + ".pdf");
     }
@@ -50,7 +54,7 @@ public class DocumentoResource {
     // 3. GENERACIÓN DE ENTRADA DE EQUIPO
     // ==========================================================
     @PostMapping(value = "/entrada-equipo", produces = MediaType.APPLICATION_PDF_VALUE)
-    public ResponseEntity<byte[]> generarEntradaEquipo(@RequestBody EntradaEquipoRequest request) {
+    public ResponseEntity<byte[]> generarEntradaEquipo(@Valid @RequestBody EntradaEquipoRequest request) {
         byte[] pdfGenerado = documentoService.generarEntradaEquipoPdf(request);
         String folio = request.getFolioTicket() != null ? String.valueOf(request.getFolioTicket()) : "0000";
         return construirRespuestaPdf(pdfGenerado, "Entrada_Equipo_" + folio + ".pdf");
@@ -60,7 +64,7 @@ public class DocumentoResource {
     // 4. GENERACIÓN DE RESGUARDO (SOLO PDF)
     // ==========================================================
     @PostMapping(value = "/resguardos", produces = MediaType.APPLICATION_PDF_VALUE)
-    public ResponseEntity<byte[]> generarResguardo(@RequestBody ResguardoRequest request) {
+    public ResponseEntity<byte[]> generarResguardo(@Valid @RequestBody ResguardoRequest request) {
         // Este método usa tu lógica existente en DocumentoService para crear el PDF
         byte[] pdfGenerado = documentoService.generarResguardo(request);
         return construirRespuestaPdf(pdfGenerado, "Resguardo_" + request.solicitanteNombre() + ".pdf");

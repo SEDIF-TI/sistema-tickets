@@ -1,11 +1,35 @@
 package com.sedif.sistema_tickets.core.aviso;
 
+import com.sedif.sistema_tickets.exception.ApiResponse;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
+/**
+ * Gestion y consulta de avisos.
+ *
+ * <p>Antes ninguna operacion comprobaba el rol: al colgar de
+ * {@code /api/v1/avisos} quedaba fuera del patron {@code /api/v1/admin/**} y
+ * bastaba con estar autenticado, de modo que <b>cualquier empleado podia
+ * crear, editar o borrar los avisos globales</b> que ve toda la organizacion.</p>
+ *
+ * <p>La ruta se mantiene por compatibilidad con el frontend, pero la
+ * autorizacion se aplica ahora por metodo: solo la lectura de avisos activos
+ * queda abierta a cualquier usuario autenticado, porque la necesitan todos los
+ * paneles ({@code MainLayout} y {@code SoporteLayout}).</p>
+ */
 @RestController
 @RequestMapping("/api/v1/avisos")
 @RequiredArgsConstructor
@@ -13,34 +37,41 @@ public class AvisoResource {
 
     private final AvisoService avisoService;
 
-    // Crear un nuevo aviso
-    @PostMapping
-    public ResponseEntity<AvisoResponseRecord> crearAviso(@RequestBody AvisoRequestRecord request) {
-        return ResponseEntity.ok(avisoService.crearAvisoGlobal(request));
-    }
-
-    // Listar solo activos para el panel de usuarios (MainLayout)
+    /** Avisos vigentes para el panel del usuario. Accesible a cualquier sesion. */
     @GetMapping("/activos")
-    public ResponseEntity<List<AvisoResponseRecord>> listarAvisosParaAreas() {
-        return ResponseEntity.ok(avisoService.obtenerAvisosActivos());
+    public ResponseEntity<ApiResponse<List<AvisoResponseRecord>>> listarAvisosActivos() {
+        return ResponseEntity.ok(ApiResponse.ok(avisoService.obtenerAvisosActivos()));
     }
 
-    // Listar todos los avisos para el Panel del Administrador
+    /** Listado completo, incluidos inactivos: solo para el panel de administracion. */
     @GetMapping
-    public ResponseEntity<List<AvisoResponseRecord>> listarTodos() {
-        return ResponseEntity.ok(avisoService.obtenerTodos());
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    public ResponseEntity<ApiResponse<List<AvisoResponseRecord>>> listarTodos() {
+        return ResponseEntity.ok(ApiResponse.ok(avisoService.obtenerTodos()));
     }
 
-    // Actualizar aviso (Sirve para el interruptor de estado y editar contenido)
+    @PostMapping
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    public ResponseEntity<ApiResponse<AvisoResponseRecord>> crearAviso(
+            @Valid @RequestBody AvisoRequestRecord request) {
+        AvisoResponseRecord creado = avisoService.crearAvisoGlobal(request);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.ok(creado, "Aviso creado correctamente."));
+    }
+
     @PutMapping("/{id}")
-    public ResponseEntity<AvisoResponseRecord> actualizarAviso(@PathVariable Long id, @RequestBody AvisoRequestRecord request) {
-        return ResponseEntity.ok(avisoService.actualizarAviso(id, request));
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    public ResponseEntity<ApiResponse<AvisoResponseRecord>> actualizarAviso(
+            @PathVariable Long id,
+            @Valid @RequestBody AvisoRequestRecord request) {
+        return ResponseEntity.ok(ApiResponse.ok(
+                avisoService.actualizarAviso(id, request), "Aviso actualizado correctamente."));
     }
 
-    // Borrar físicamente el aviso
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> eliminarAviso(@PathVariable Long id) {
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    public ResponseEntity<ApiResponse<Void>> eliminarAviso(@PathVariable Long id) {
         avisoService.eliminarAvisoFisico(id);
-        return ResponseEntity.ok().build();
+        return ResponseEntity.ok(ApiResponse.ok("Aviso eliminado correctamente."));
     }
 }

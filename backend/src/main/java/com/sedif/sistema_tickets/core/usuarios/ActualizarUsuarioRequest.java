@@ -1,11 +1,28 @@
 package com.sedif.sistema_tickets.core.usuarios;
+
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+
 /**
- * DTO específico para transportar los datos de actualización general
- * de un usuario por parte del administrador.
+ * Datos de actualizacion de un usuario desde el panel de administracion.
+ *
+ * <p>No incluye la contrasena a proposito: el restablecimiento tiene su propio
+ * endpoint, que genera una clave temporal en el servidor.</p>
  */
 public record ActualizarUsuarioRequest(
+
+        @NotBlank(message = "El nombre es obligatorio.")
+        @Size(max = 150, message = "El nombre no puede exceder 150 caracteres.")
         String nombre,
+
+        @NotBlank(message = "El correo es obligatorio.")
+        @Email(message = "El correo no tiene un formato valido.")
+        @Size(max = 100, message = "El correo no puede exceder 100 caracteres.")
         String correo,
-        Long rolId, // <--- Este debe ser el nombre
+
+        Long rolId,
+
         Long areaId
+
 ) {}

@@ -65,10 +65,10 @@ public class EquipoReparacionResource {
     /** Registra la entrada de un equipo al taller. */
     @PostMapping
     public ResponseEntity<ApiResponse<EquipoReparacionDTO>> registrarIngreso(
-            @Valid @RequestBody EquipoReparacion equipo,
+            @Valid @RequestBody EquipoReparacionRequest request,
             @RequestParam(required = false) Long tecnicoId) {
 
-        EquipoReparacionDTO creado = equipoService.registrarIngreso(equipo, tecnicoId);
+        EquipoReparacionDTO creado = equipoService.registrarIngreso(request, tecnicoId);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.ok(creado, "Equipo registrado en el taller."));
     }
@@ -77,11 +77,11 @@ public class EquipoReparacionResource {
     @PutMapping("/{id}")
     public ResponseEntity<ApiResponse<EquipoReparacionDTO>> actualizar(
             @PathVariable Long id,
-            @Valid @RequestBody EquipoReparacion equipo,
+            @Valid @RequestBody EquipoReparacionRequest request,
             @RequestParam(required = false) Long tecnicoId) {
 
         return ResponseEntity.ok(ApiResponse.ok(
-                equipoService.actualizar(id, equipo, tecnicoId), "Registro actualizado."));
+                equipoService.actualizar(id, request, tecnicoId), "Registro actualizado."));
     }
 
     /** Avanza el equipo en su ciclo de vida dentro del taller. */

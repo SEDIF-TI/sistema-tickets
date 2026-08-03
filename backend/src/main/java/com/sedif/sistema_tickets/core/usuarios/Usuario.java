@@ -1,5 +1,6 @@
 package com.sedif.sistema_tickets.core.usuarios;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.sedif.sistema_tickets.core.area.Area;
 import com.sedif.sistema_tickets.util.audit.Auditable;
 import jakarta.persistence.*;
@@ -9,6 +10,18 @@ import lombok.NoArgsConstructor;
 
 /**
  * Entidad que representa a los usuarios del sistema.
+ *
+ * <p><b>Ultima linea de defensa contra la fuga de credenciales.</b> Lo
+ * correcto es que ningun controlador devuelva esta entidad y use siempre un
+ * DTO. Pero basta con que una entidad relacionada la arrastre al serializarse
+ * (por ejemplo {@code ActividadExtra.usuario} o
+ * {@code EquipoReparacion.tecnicoAsignado}) para que el hash de la contrasena
+ * y el chat de Telegram acaben viajando al navegador y siendo visibles en la
+ * pestana Network.</p>
+ *
+ * <p>Los campos sensibles llevan {@link JsonIgnore}: aunque alguien devuelva
+ * la entidad por descuido, esos datos no salen. La anotacion no afecta a la
+ * persistencia ni a la lectura desde Java, solo a la serializacion JSON.</p>
  */
 @Entity
 @Table(name = "usuario")
@@ -39,6 +52,14 @@ public class Usuario extends Auditable {
     private String username; // Campo para login tradicional con username
     // --------------------------------------------
 
+    /**
+     * Hash BCrypt de la contrasena.
+     *
+     * <p>{@code @JsonIgnore} impide que salga en ninguna respuesta JSON. Un
+     * hash filtrado permite atacarlo sin limite de intentos y sin dejar rastro
+     * en los logs del servidor.</p>
+     */
+    @JsonIgnore
     @Column(name = "s_password", nullable = false)
     private String password;
 
@@ -58,7 +79,14 @@ public class Usuario extends Auditable {
     @JoinColumn(name = "fn_area_id")
     private Area area;
 
-    // Nueva columna para vincular notificaciones de Telegram
+    /**
+     * Chat de Telegram vinculado, para las notificaciones.
+     *
+     * <p>{@code @JsonIgnore}: es un identificador personal de mensajeria. Con
+     * el y el token del bot se pueden enviar mensajes directos a esa persona,
+     * asi que no tiene por que viajar al navegador.</p>
+     */
+    @JsonIgnore
     @Column(name = "telegram_chat_id")
     private Long telegramChatId;
 

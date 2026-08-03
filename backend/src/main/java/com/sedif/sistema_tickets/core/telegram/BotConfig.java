@@ -1,12 +1,14 @@
 package com.sedif.sistema_tickets.core.telegram;
 
 import org.springframework.context.annotation.Bean;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Configuration;
 import org.telegram.telegrambots.meta.TelegramBotsApi;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.updatesreceivers.DefaultBotSession;
 
 @Configuration
+@Slf4j
 public class BotConfig {
 
     @Bean
@@ -18,11 +20,11 @@ public class BotConfig {
             // Registramos tu bot para que empiece a "escuchar" (Long Polling)
             api.registerBot(sedifTelegramBot);
             
-            System.out.println("[SISTEMA] Bot de Telegram registrado y escuchando correctamente.");
+            log.info("Bot de Telegram registrado correctamente.");
             return api;
             
         } catch (TelegramApiException e) {
-            System.err.println("[SISTEMA] Error crítico al iniciar el bot de Telegram: " + e.getMessage());
+            log.error("No se pudo iniciar el bot de Telegram. Las notificaciones quedaran desactivadas.", e);
             return null;
         }
     }

@@ -2,6 +2,8 @@ package com.sedif.sistema_tickets.core.taller;
 
 import com.sedif.sistema_tickets.core.usuarios.Usuario;
 import com.sedif.sistema_tickets.core.usuarios.UsuarioRepository;
+import com.sedif.sistema_tickets.util.enums.EstadoTaller;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -11,6 +13,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
+@Slf4j
 public class EquipoReparacionServiceImpl implements EquipoReparacionService {
 
     private final EquipoReparacionRepository equipoRepository;
@@ -45,63 +48,89 @@ public class EquipoReparacionServiceImpl implements EquipoReparacionService {
     @Transactional(readOnly = true)
     public EquipoReparacionDTO obtenerPorId(Long id) {
         EquipoReparacion equipo = equipoRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Registro de taller no encontrado con ID: " + id));
+                .orElseThrow(() -> new IllegalArgumentException("No existe un registro de taller con ese identificador."));
         return convertirADto(equipo);
     }
 
     @Override
     @Transactional
-    public EquipoReparacionDTO registrarIngreso(EquipoReparacion equipo, Long tecnicoId) {
-        // Generación de Folio automático (Ej: REP-2026-1)
-        long totalRegistros = equipoRepository.count();
-        String nuevoFolio = "REP-" + Year.now().getValue() + "-" + (totalRegistros + 1);
-        equipo.setFolio(nuevoFolio);
-        
-        // Estado inicial por defecto
-        equipo.setEstadoTaller("RECIBIDO");
+    public EquipoReparacionDTO registrarIngreso(EquipoReparacionRequest request, Long tecnicoId) {
+        EquipoReparacion equipo = new EquipoReparacion();
+        aplicarDatos(equipo, request);
 
-        // Asignación de técnico si se proporciona el ID
+        equipo.setFolio(generarFolio());
+        // Toda alta entra como RECIBIDO; los avances pasan por cambiarEstado.
+        equipo.setEstadoTaller(EstadoTaller.RECIBIDO.name());
+
         if (tecnicoId != null) {
-            Usuario tecnico = usuarioRepository.findById(tecnicoId)
-                    .orElseThrow(() -> new RuntimeException("Técnico no encontrado."));
-            equipo.setTecnicoAsignado(tecnico);
+            equipo.setTecnicoAsignado(buscarTecnico(tecnicoId));
         }
 
         EquipoReparacion guardado = equipoRepository.save(equipo);
+        log.info("Equipo ingresado al taller con folio {}", guardado.getFolio());
         return convertirADto(guardado);
+    }
+
+    /**
+     * Genera el folio del ano en curso.
+     *
+     * <p>La version anterior usaba {@code count() + 1} sobre toda la tabla, lo
+     * que producia folios repetidos si dos tecnicos registraban a la vez, y
+     * ademas nunca reiniciaba la numeracion al cambiar de ano. Aqui se toma el
+     * maximo consecutivo del ano actual, y la restriccion UNIQUE de la columna
+     * es la garantia final frente a una colision.</p>
+     */
+    private String generarFolio() {
+        int anio = Year.now().getValue();
+        String prefijo = "REP-" + anio + "-";
+
+        int siguiente = equipoRepository.findMaxConsecutivoDelAnio(prefijo + "%")
+                .map(ultimo -> ultimo + 1)
+                .orElse(1);
+
+        return prefijo + siguiente;
+    }
+
+    private Usuario buscarTecnico(Long tecnicoId) {
+        return usuarioRepository.findById(tecnicoId)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "El tecnico indicado no existe."));
+    }
+
+    /** Copia los campos editables del DTO a la entidad. */
+    private void aplicarDatos(EquipoReparacion equipo, EquipoReparacionRequest r) {
+        equipo.setSolicitanteNombre(r.solicitanteNombre());
+        equipo.setSolicitanteNumero(r.solicitanteNumero());
+        equipo.setDepartamento(r.departamento());
+
+        equipo.setEquipoTipo(r.equipoTipo());
+        equipo.setMarca(r.marca());
+        equipo.setModelo(r.modelo());
+        equipo.setNumeroSerie(r.numeroSerie());
+        equipo.setNumeroInventario(r.numeroInventario());
+
+        equipo.setCondicionRecepcion(r.condicionRecepcion());
+        equipo.setAccesorios(r.accesorios());
+        equipo.setFallaReportada(r.fallaReportada());
+        equipo.setDiagnostico(r.diagnostico());
+        equipo.setSolucion(r.solucion());
+
+        equipo.setTicketId(r.ticketId());
     }
 
     @Override
     @Transactional
-    public EquipoReparacionDTO actualizar(Long id, EquipoReparacion detalles, Long tecnicoId) {
+    public EquipoReparacionDTO actualizar(Long id, EquipoReparacionRequest request, Long tecnicoId) {
         EquipoReparacion existente = equipoRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Registro no encontrado."));
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "No existe un registro de taller con ese identificador."));
 
-        // Actualizamos los datos (excepto el folio que es inmutable)
-        existente.setSolicitanteNombre(detalles.getSolicitanteNombre());
-        existente.setSolicitanteNumero(detalles.getSolicitanteNumero());
-        existente.setDepartamento(detalles.getDepartamento());
-        
-        existente.setEquipoTipo(detalles.getEquipoTipo());
-        existente.setMarca(detalles.getMarca());
-        existente.setModelo(detalles.getModelo());
-        existente.setNumeroSerie(detalles.getNumeroSerie());
-        existente.setNumeroInventario(detalles.getNumeroInventario());
-        
-        existente.setCondicionRecepcion(detalles.getCondicionRecepcion());
-        existente.setAccesorios(detalles.getAccesorios());
-        existente.setFallaReportada(detalles.getFallaReportada());
-        existente.setDiagnostico(detalles.getDiagnostico());
-        existente.setSolucion(detalles.getSolucion());
-        
-        if (detalles.getEstadoTaller() != null) {
-            existente.setEstadoTaller(detalles.getEstadoTaller());
-        }
+        // El folio y el estado no se tocan aqui: el folio es inmutable y el
+        // estado avanza por su propio endpoint, que valida las transiciones.
+        aplicarDatos(existente, request);
 
         if (tecnicoId != null) {
-            Usuario tecnico = usuarioRepository.findById(tecnicoId)
-                    .orElseThrow(() -> new RuntimeException("Técnico no encontrado."));
-            existente.setTecnicoAsignado(tecnico);
+            existente.setTecnicoAsignado(buscarTecnico(tecnicoId));
         }
 
         return convertirADto(equipoRepository.save(existente));
@@ -111,8 +140,17 @@ public class EquipoReparacionServiceImpl implements EquipoReparacionService {
     @Transactional
     public EquipoReparacionDTO cambiarEstado(Long id, String nuevoEstado) {
         EquipoReparacion existente = equipoRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Registro no encontrado."));
-        existente.setEstadoTaller(nuevoEstado.toUpperCase());
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "No existe un registro de taller con ese identificador."));
+
+        // Se valida contra el enum: antes se guardaba cualquier texto en
+        // mayusculas, de modo que un error de escritura dejaba el equipo en un
+        // estado inexistente e invisible para los filtros del listado.
+        EstadoTaller estado = EstadoTaller.desde(nuevoEstado)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "El estado '" + nuevoEstado + "' no es valido para un equipo en taller."));
+
+        existente.setEstadoTaller(estado.name());
         return convertirADto(equipoRepository.save(existente));
     }
 
