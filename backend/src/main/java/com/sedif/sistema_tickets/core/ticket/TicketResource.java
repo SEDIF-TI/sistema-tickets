@@ -114,12 +114,21 @@ public class TicketResource {
                 "Ticket finalizado correctamente."));
     }
 
-    /** Toma del ticket por un tecnico. Exclusivo de SOPORTE y ADMINISTRADOR. */
+    /**
+     * Aviso de que el tecnico va en camino. Exclusivo de SOPORTE y
+     * ADMINISTRADOR.
+     *
+     * <p>El servicio recibe ademas la identidad autenticada: el rol por si solo
+     * no basta, porque no impedia que un tecnico moviera el ticket de otro.</p>
+     */
     @PutMapping("/{id}/atender")
     @PreAuthorize("hasAnyRole('SOPORTE', 'ADMINISTRADOR')")
-    public ResponseEntity<ApiResponse<TicketResponse>> atenderTicket(@PathVariable Long id) {
+    public ResponseEntity<ApiResponse<TicketResponse>> atenderTicket(
+            @PathVariable Long id, Authentication authentication) {
+
         return ResponseEntity.ok(ApiResponse.ok(
-                ticketService.atenderTicket(id), "Ticket marcado como en atencion."));
+                ticketService.atenderTicket(id, authentication.getName()),
+                "Se registro que vas en camino a atender el reporte."));
     }
 
     /** Resolucion del ticket. Exclusivo de SOPORTE y ADMINISTRADOR. */
@@ -127,10 +136,12 @@ public class TicketResource {
     @PreAuthorize("hasAnyRole('SOPORTE', 'ADMINISTRADOR')")
     public ResponseEntity<ApiResponse<TicketResponse>> resolverTicket(
             @PathVariable Long id,
-            @Valid @RequestBody ResolucionRequest request) {
+            @Valid @RequestBody ResolucionRequest request,
+            Authentication authentication) {
 
         return ResponseEntity.ok(ApiResponse.ok(
-                ticketService.resolverTicket(id, request.justificacion(), request.planTrabajoClave()),
+                ticketService.resolverTicket(id, request.justificacion(),
+                        request.planTrabajoClave(), authentication.getName()),
                 "Ticket resuelto correctamente."));
     }
 }

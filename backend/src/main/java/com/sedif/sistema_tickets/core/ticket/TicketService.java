@@ -237,10 +237,29 @@ public class TicketService {
                 .toList();
     }
 
+    /**
+     * Marca que el tecnico va en camino a atender el reporte.
+     *
+     * <p><b>Correccion de control de acceso.</b> La version anterior recibia
+     * solo el id del ticket y no comprobaba nada mas: cualquier usuario con rol
+     * SOPORTE podia mover el estado de un ticket asignado a otro tecnico
+     * cambiando el numero de la URL, y la bitacora registraba el cambio sin
+     * dejar constancia de quien lo habia hecho. Ahora se exige que el ticket
+     * sea suyo, salvo que quien actue sea ADMINISTRADOR.</p>
+     */
     @Transactional
-    public TicketResponse atenderTicket(Long ticketId) {
+    public TicketResponse atenderTicket(Long ticketId, String correoUsuario) {
         Ticket ticket = ticketRepository.findById(ticketId)
                 .orElseThrow(() -> new IllegalArgumentException("Ticket no encontrado"));
+
+        Usuario tecnico = obtenerUsuarioAutenticado(correoUsuario);
+        verificarPuedeOperarElTicket(ticket, tecnico);
+
+        if (ticket.getEstatus() != null
+                && "CERRADO".equalsIgnoreCase(ticket.getEstatus().getNombre())) {
+            throw new IllegalStateException(
+                    "El ticket ya esta cerrado: no se puede volver a marcar en atencion.");
+        }
 
         Estatus estatusEnCamino = estatusRepository.findByNombre("EN PROCESO")
                 .orElseThrow(() -> new IllegalStateException("El estatus EN PROCESO no existe en la BD."));
@@ -251,32 +270,87 @@ public class TicketService {
         Bitacora bitacora = new Bitacora();
         bitacora.setTicket(ticketGuardado);
         bitacora.setEstatusRegistrado("EN PROCESO");
-        bitacora.setJustificacion("El técnico va en camino para atender el reporte.");
+        // Se deja constancia de quien avisa: la entrada generica anterior no
+        // permitia saber que tecnico se habia puesto en camino.
+        bitacora.setJustificacion(
+                "El tecnico " + tecnico.getNombre() + " va en camino para atender el reporte.");
         bitacoraRepository.save(bitacora);
 
         emitirEventoTicket(ticketGuardado);
 
         return mapearATicketResponse(ticketGuardado);
-    }   
+    }
 
+    /** Carga al usuario autenticado, que puede identificarse por correo o usuario. */
+    private Usuario obtenerUsuarioAutenticado(String correoUsuario) {
+        return usuarioRepository.findByCorreoOrUsername(correoUsuario, correoUsuario)
+                .orElseThrow(() -> new IllegalArgumentException(MessageConstants.USUARIO_NO_ENCONTRADO));
+    }
+
+    /**
+     * Comprueba que el tecnico puede operar sobre el ticket.
+     *
+     * <p>El ADMINISTRADOR (vision GLOBAL) puede intervenir en cualquiera, para
+     * poder desatascar un reporte cuando el tecnico asignado esta ausente. El
+     * resto solo opera sobre los suyos.</p>
+     */
+    private void verificarPuedeOperarElTicket(Ticket ticket, Usuario usuario) {
+        boolean esAdministrador = usuario.getRol() != null
+                && "GLOBAL".equalsIgnoreCase(usuario.getRol().getNivelVision());
+
+        if (esAdministrador) {
+            return;
+        }
+
+        Long idAsignado = ticket.getUsuarioSoporte() != null
+                ? ticket.getUsuarioSoporte().getId()
+                : null;
+
+        if (idAsignado == null || !idAsignado.equals(usuario.getId())) {
+            log.warn("El usuario id={} intento operar el ticket id={}, asignado a id={}.",
+                    usuario.getId(), ticket.getId(), idAsignado);
+            throw new SecurityException(
+                    "No puedes modificar este ticket: esta asignado a otro tecnico.");
+        }
+    }
+
+    /**
+     * Cierra el ticket con la constancia del trabajo realizado.
+     *
+     * <p>Comparte con {@link #atenderTicket} la comprobacion de pertenencia:
+     * antes cualquier tecnico podia cerrar el ticket de otro, firmando ademas
+     * la bitacora en su nombre.</p>
+     *
+     * <p>La clave del plan de trabajo se valida contra el catalogo: hasta ahora
+     * se guardaba cualquier entero que llegase, de modo que un valor fuera de
+     * catalogo corrompia silenciosamente el conteo de metas del ano.</p>
+     */
     @Transactional
-    public TicketResponse resolverTicket(Long ticketId, String justificacion, Integer planTrabajoClave) {
+    public TicketResponse resolverTicket(Long ticketId, String justificacion,
+                                         Integer planTrabajoClave, String correoUsuario) {
+
         Ticket ticket = ticketRepository.findById(ticketId)
                 .orElseThrow(() -> new IllegalArgumentException("Ticket no encontrado"));
+
+        Usuario tecnico = obtenerUsuarioAutenticado(correoUsuario);
+        verificarPuedeOperarElTicket(ticket, tecnico);
+
+        if (planTrabajoClave != null && !PlanTrabajo.esClaveValida(planTrabajoClave)) {
+            throw new IllegalArgumentException(
+                    "La meta del plan de trabajo indicada no existe en el catalogo.");
+        }
 
         Estatus estatusResuelto = estatusRepository.findByNombre("CERRADO")
                 .orElseThrow(() -> new IllegalStateException("El estatus CERRADO no existe en la BD."));
 
         ticket.setEstatus(estatusResuelto);
-        ticket.setFechaFin(LocalDateTime.now()); 
-        
-        // RECUPERAMOS LA LÓGICA DEL CONTROLADOR ANTERIOR
+        ticket.setFechaFin(LocalDateTime.now());
+
         if (justificacion != null) ticket.setJustificacion(justificacion);
         if (planTrabajoClave != null) ticket.setPlanTrabajoClave(planTrabajoClave);
-        
+
         Ticket ticketGuardado = ticketRepository.save(ticket);
 
-        // GUARDAMOS EN EL HISTORIAL
         Bitacora bitacora = new Bitacora();
         bitacora.setTicket(ticketGuardado);
         bitacora.setEstatusRegistrado("CERRADO");
@@ -285,9 +359,8 @@ public class TicketService {
 
         emitirEventoTicket(ticketGuardado);
 
-        // DEVOLVEMOS EL DTO SEGURO
         return mapearATicketResponse(ticketGuardado);
-    }  
+    }
 
     /**
      * Bandeja de tickets del usuario, paginada y filtrada segun su rol.

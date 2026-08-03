@@ -1,8 +1,10 @@
 import { useState, useEffect, useContext, useCallback } from 'react';
 import {
     Box, Typography, Chip, Tooltip, Dialog, DialogTitle, DialogContent,
-    DialogActions, Button, TextField, MenuItem, Paper, Stack, Divider, Alert
+    DialogActions, Button, TextField, MenuItem, Paper, Stack, Divider, Alert,
+    useMediaQuery
 } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import DirectionsRunIcon from '@mui/icons-material/DirectionsRun';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutlined';
@@ -63,6 +65,12 @@ export default function PanelSoporte() {
     const { user } = useContext(AuthContext);
     const { notificar, notificarError, notificarAdvertencia } = useNotification();
 
+    const theme = useTheme();
+    // Los diálogos pasan a pantalla completa en el teléfono: el técnico
+    // resuelve el ticket de pie y en la calle, y un cuadro flotante con el
+    // teclado abierto deja el campo de texto fuera de la vista.
+    const esMovil = useMediaQuery(theme.breakpoints.down('sm'));
+
     const estadoRed = useNetworkStatus();
     const sinConexion = Boolean(estadoRed.sinConexion ?? estadoRed);
 
@@ -74,6 +82,11 @@ export default function PanelSoporte() {
     const [planClave, setPlanClave] = useState('');
     const [intentoEnvio, setIntentoEnvio] = useState(false);
     const [resolviendo, setResolviendo] = useState(false);
+
+    // Ticket cuyo aviso de "voy en camino" está viajando al servidor. Sin esto,
+    // un segundo toque sobre el mismo botón —fácil desde un teléfono con la red
+    // lenta— envía la petición dos veces.
+    const [avisando, setAvisando] = useState(null);
 
     const [metas, setMetas] = useState([]);
 
@@ -130,12 +143,20 @@ export default function PanelSoporte() {
 
     // --- Acciones ----------------------------------------------------------
     const marcarEnCamino = async (ticket) => {
+        if (avisando) return;   // ya hay un aviso en curso
+
+        setAvisando(ticket.id);
         try {
             const respuesta = await ticketService.atender(ticket.id);
-            notificar(respuesta?.message || `Vas en camino al ticket #${ticket.id}.`);
+            notificar(
+                respuesta?.mensaje
+                || `Avisaste que vas en camino al ticket #${ticket.id}.`
+            );
             recargar();
         } catch (error) {
             notificarError(error);
+        } finally {
+            setAvisando(null);
         }
     };
 
@@ -169,7 +190,7 @@ export default function PanelSoporte() {
                 justificacion.trim(),
                 Number(planClave)
             );
-            notificar(respuesta?.message || `Ticket #${ticketAResolver.id} resuelto correctamente.`);
+            notificar(respuesta?.mensaje || `Ticket #${ticketAResolver.id} resuelto correctamente.`);
             setTicketAResolver(null);
             recargar();
         } catch (error) {
@@ -253,31 +274,41 @@ export default function PanelSoporte() {
             render: (t) => {
                 const cerrado = estaCerrado(t.estatus);
                 const enProceso = (t.estatus || '').toUpperCase() === 'EN PROCESO';
+                const enviandoEste = avisando === t.id;
 
                 return (
                     <AccionesTabla
                         acciones={[
                             {
+                                id: 'ver',
                                 icono: <VisibilityIcon />,
                                 titulo: 'Ver detalle',
                                 etiqueta: `Ver el detalle del ticket número ${t.id}`,
                                 onClick: () => setTicketDetalle(t),
                             },
                             {
+                                // Acción principal del técnico en campo: en el
+                                // teléfono se muestra como botón con texto.
+                                id: 'en-camino',
                                 icono: <DirectionsRunIcon />,
-                                titulo: 'Voy en camino',
-                                etiqueta: `Marcar que vas en camino al ticket número ${t.id}`,
+                                titulo: enviandoEste ? 'Avisando…' : 'Voy en camino',
+                                etiqueta: `Avisar que vas en camino al ticket número ${t.id}`,
                                 color: 'warning',
+                                prioritaria: true,
                                 oculta: cerrado || enProceso,
                                 onClick: () => marcarEnCamino(t),
-                                deshabilitada: sinConexion,
-                                motivoDeshabilitada: 'Sin conexión con el servidor',
+                                deshabilitada: sinConexion || Boolean(avisando),
+                                motivoDeshabilitada: sinConexion
+                                    ? 'Sin conexión con el servidor'
+                                    : 'Enviando el aviso…',
                             },
                             {
+                                id: 'resolver',
                                 icono: <CheckCircleOutlineIcon />,
                                 titulo: 'Resolver ticket',
                                 etiqueta: `Resolver el ticket número ${t.id}`,
                                 color: 'success',
+                                prioritaria: true,
                                 oculta: cerrado || !enProceso,
                                 onClick: () => abrirResolucion(t),
                                 deshabilitada: sinConexion,
@@ -349,6 +380,7 @@ export default function PanelSoporte() {
                 onClose={() => setTicketDetalle(null)}
                 fullWidth
                 maxWidth="sm"
+                fullScreen={esMovil}
                 aria-labelledby="titulo-detalle-ticket"
             >
                 <DialogTitle id="titulo-detalle-ticket">
@@ -449,8 +481,14 @@ export default function PanelSoporte() {
                     </Stack>
                 </DialogContent>
 
-                <DialogActions>
-                    <Button onClick={() => setTicketDetalle(null)}>Cerrar</Button>
+                <DialogActions sx={{ p: 2 }}>
+                    <Button
+                        onClick={() => setTicketDetalle(null)}
+                        fullWidth={esMovil}
+                        size={esMovil ? 'large' : 'medium'}
+                    >
+                        Cerrar
+                    </Button>
                 </DialogActions>
             </Dialog>
 
@@ -460,6 +498,7 @@ export default function PanelSoporte() {
                 onClose={cerrarResolucion}
                 fullWidth
                 maxWidth="sm"
+                fullScreen={esMovil}
                 aria-labelledby="titulo-resolver-ticket"
             >
                 <DialogTitle id="titulo-resolver-ticket">
@@ -522,14 +561,24 @@ export default function PanelSoporte() {
                     </Stack>
                 </DialogContent>
 
-                <DialogActions>
-                    <Button onClick={cerrarResolucion} color="inherit" disabled={resolviendo}>
+                {/* En móvil los botones se apilan a lo ancho y en tamaño
+                    grande: son el objetivo táctil final de todo el flujo. */}
+                <DialogActions sx={{ flexDirection: { xs: 'column-reverse', sm: 'row' }, gap: 1, p: 2 }}>
+                    <Button
+                        onClick={cerrarResolucion}
+                        color="inherit"
+                        disabled={resolviendo}
+                        fullWidth={esMovil}
+                        size={esMovil ? 'large' : 'medium'}
+                    >
                         Cancelar
                     </Button>
                     <Button
                         onClick={confirmarResolucion}
                         variant="contained"
                         disabled={resolviendo || sinConexion || metas.length === 0}
+                        fullWidth={esMovil}
+                        size={esMovil ? 'large' : 'medium'}
                     >
                         {resolviendo ? 'Guardando…' : 'Confirmar resolución'}
                     </Button>

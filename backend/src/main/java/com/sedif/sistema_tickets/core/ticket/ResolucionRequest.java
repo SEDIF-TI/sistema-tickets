@@ -16,8 +16,13 @@ import jakarta.validation.constraints.Size;
  */
 public record ResolucionRequest(
 
+        // El minimo de 10 caracteres evita cierres con "ok" o "listo", que no
+        // sirven como constancia del trabajo realizado. Coincide con lo que
+        // valida el formulario del panel de soporte: la regla vive aqui, y el
+        // frontend solo la adelanta para no gastar un viaje al servidor.
         @NotBlank(message = "La justificacion de la resolucion es obligatoria.")
-        @Size(max = 2000, message = "La justificacion no puede exceder 2000 caracteres.")
+        @Size(min = 10, max = 2000,
+              message = "Describe el trabajo realizado con al menos 10 caracteres.")
         String justificacion,
 
         Integer planTrabajoClave
