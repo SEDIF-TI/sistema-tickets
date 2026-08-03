@@ -11,6 +11,7 @@ import HomeRepairServiceIcon from '@mui/icons-material/HomeRepairService';
 
 // Contextos
 import { AuthContext, AuthProvider } from './context/AuthContext.jsx';
+import { NotificationProvider } from './context/NotificationContext.jsx';
 import { WebSocketProvider } from './context/WebSocketContext.jsx';
 
 // Layouts y Páginas Base
@@ -107,13 +108,18 @@ export default function App() {
     return (
         <ThemeProvider theme={theme}>
             <CssBaseline />
-            <AuthProvider>
-                <WebSocketProvider>
-                    <Router>
-                        <AppContent />
-                    </Router>
-                </WebSocketProvider>
-            </AuthProvider>
+            {/* NotificationProvider envuelve al resto para que cualquier
+                pantalla pueda lanzar avisos con useNotification(), en lugar
+                de montar su propio Snackbar o usar alert() nativo. */}
+            <NotificationProvider>
+                <AuthProvider>
+                    <WebSocketProvider>
+                        <Router>
+                            <AppContent />
+                        </Router>
+                    </WebSocketProvider>
+                </AuthProvider>
+            </NotificationProvider>
         </ThemeProvider>
     );
 }

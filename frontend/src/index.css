@@ -1,0 +1,148 @@
+/* ==========================================================================
+   Estilos globales — Sistema de Tickets SEDIF
+   ==========================================================================
+   Deliberadamente mínimo: el sistema de diseño vive en src/theme/theme.js.
+   Aquí solo van reglas que MUI no puede cubrir desde el tema.
+   ========================================================================== */
+
+/* --- Base ---------------------------------------------------------------- */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  /* El desplazamiento suave se anula más abajo si el usuario pide
+     movimiento reducido. */
+  scroll-behavior: smooth;
+  /* Base 16px: no se reduce en móvil porque por debajo de 16px Safari en iOS
+     hace zoom automático al enfocar un campo de formulario. */
+  font-size: 16px;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Ninguna pantalla debe provocar barra de scroll horizontal. */
+  overflow-x: hidden;
+}
+
+/* Las imágenes nunca desbordan su contenedor. */
+img,
+picture,
+video,
+canvas,
+svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+/* --- Accesibilidad ------------------------------------------------------- */
+
+/* Enlace de salto para quien navega con teclado: permite ir directo al
+   contenido sin recorrer todo el menú lateral. Solo se ve al enfocarlo. */
+.skip-link {
+  position: absolute;
+  top: -100px;
+  left: 8px;
+  z-index: 2000;
+  padding: 12px 20px;
+  border-radius: 0 0 8px 8px;
+  background-color: #801a36;
+  color: #ffffff;
+  font-weight: 600;
+  text-decoration: none;
+  transition: top 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.skip-link:focus {
+  top: 0;
+}
+
+/* Oculta visualmente sin ocultar a los lectores de pantalla. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* --- Animaciones --------------------------------------------------------- */
+
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-5px);
+  }
+  75% {
+    transform: translateX(5px);
+  }
+}
+
+/* Refuerzo visual al fallar la validación de un formulario. */
+.error-shake {
+  animation: shake 400ms ease-in-out;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in-up {
+  animation: fadeInUp 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* --- Movimiento reducido -------------------------------------------------
+   Respeta la preferencia del sistema operativo. El tema aplica lo mismo a los
+   componentes de MUI; esto cubre las animaciones propias y el scroll suave. */
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* --- Impresión -----------------------------------------------------------
+   La pantalla de credenciales se imprime para entregar la contraseña
+   temporal: al imprimir sobran menús y botones. */
+
+@media print {
+  .no-print,
+  header,
+  nav,
+  aside {
+    display: none !important;
+  }
+
+  body {
+    background: #ffffff !important;
+  }
+}
