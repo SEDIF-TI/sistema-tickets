@@ -1,167 +1,294 @@
-import { useState, useEffect, useContext } from 'react';
-import { Box, Button, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography, Chip, Snackbar, Alert } from '@mui/material';
+import { useState, useEffect, useContext, useCallback } from 'react';
+import { Box, Button, Typography, Chip, Tooltip } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
-import CheckIcon from '@mui/icons-material/Check';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutlined';
+import ConfirmationNumberIcon from '@mui/icons-material/ConfirmationNumber';
 import { useNavigate, useLocation } from 'react-router-dom';
-import api from '../../services/api';
-import { AuthContext } from '../../context/AuthContext.jsx'; 
 
-// --- NUEVO: Importamos tu hook de red ---
+import { ticketService } from '../../services/ticketService';
+import { AuthContext } from '../../context/AuthContext.jsx';
+import { useNotification } from '../../context/NotificationContext.jsx';
 import { useNetworkStatus } from '../../hooks/useNetworkStatus.jsx';
-// ----------------------------------------
+import { useTablaPaginada } from '../../hooks/useTablaPaginada.jsx';
+import { formatearFechaHora, tiempoRelativo, truncar } from '../../util/formater';
 
-const COLOR_GUINDA = '#801A36';
+import DynamicTable from '../../components/DynamicTable';
+import AccionesTabla from '../../components/AccionesTabla';
+import ConfirmationDialog from '../../components/ConfirmationDialog';
 
+/** Estados posibles de un ticket, para el filtro. */
+const OPCIONES_ESTATUS = [
+    { valor: '', etiqueta: 'Todos los estados' },
+    { valor: 'ABIERTO', etiqueta: 'Abierto' },
+    { valor: 'EN PROCESO', etiqueta: 'En proceso' },
+    { valor: 'PENDIENTE', etiqueta: 'Pendiente' },
+    { valor: 'CERRADO', etiqueta: 'Cerrado' },
+];
+
+/** Color del distintivo según el estado. */
+const colorEstatus = (estatus) => {
+    switch ((estatus || '').toUpperCase()) {
+        case 'CERRADO': return 'default';
+        case 'EN PROCESO': return 'info';
+        case 'PENDIENTE': return 'warning';
+        case 'ABIERTO': return 'primary';
+        default: return 'default';
+    }
+};
+
+/**
+ * Historial de tickets del usuario, o bitácora global si es administrador.
+ *
+ * Cambios respecto a la versión anterior:
+ *  - La tabla se construía a mano, sin paginación: traía el historial entero
+ *    en cada carga y lo pintaba de golpe.
+ *  - Usaba `window.confirm()` y `alert()` nativos, bloqueantes y sin estilo.
+ *  - La acción "Finalizar" era un botón de texto que ensanchaba la tabla.
+ *  - El color guinda estaba escrito a mano.
+ */
 export default function TicketsPage() {
-    const { user } = useContext(AuthContext); 
+    const { user } = useContext(AuthContext);
+    const { notificar, notificarError, notificarInfo } = useNotification();
     const navigate = useNavigate();
     const location = useLocation();
 
-    // --- NUEVO: Instanciamos el estado de la red ---
-    const isOffline = useNetworkStatus();
-    // -----------------------------------------------
+    const estadoRed = useNetworkStatus();
+    const sinConexion = Boolean(estadoRed.sinConexion ?? estadoRed);
 
-    const [historialTickets, setHistorialTickets] = useState([]);
-    const [openSnackbar, setOpenSnackbar] = useState(false);
-    const [snackbarMessage, setSnackbarMessage] = useState('');
+    const [filtroEstatus, setFiltroEstatus] = useState('');
+    const [ticketAFinalizar, setTicketAFinalizar] = useState(null);
+    const [finalizando, setFinalizando] = useState(false);
 
-    const userRole = user?.rol || user?.role || user?.rolNombre || '';
-    const cleanRole = userRole.replace('ROLE_', '').toUpperCase();
+    const rolCrudo = user?.rol || user?.role || user?.rolNombre || '';
+    const rol = rolCrudo.replace('ROLE_', '').toUpperCase();
+    const esAdministrador = rol === 'ADMINISTRADOR';
 
-    const formatearFecha = (fecha) => {
-        if (!fecha) return '--/--/----';
-        const d = new Date(fecha);
-        return `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear().toString().slice(-2)} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
-    };
+    const cargar = useCallback((params) => ticketService.getMisTickets(params), []);
 
-    const cargarHistorial = async () => {
-        // Si no hay red, mejor ni intentamos hacer la petición para evitar errores en consola
-        if (isOffline) return; 
-        try {
-            const response = await api.get('/v1/tickets/mis-tickets');
-            setHistorialTickets(response.data);
-        } catch (error) {
-            console.error("Error al cargar el historial:", error);
-        }
-    };
+    const tabla = useTablaPaginada({
+        cargar,
+        ordenInicial: { campo: 'fechaCreacion', direccion: 'desc' },
+        filtros: { estatus: filtroEstatus || undefined },
+    });
 
-    const handleFinalizarTicket = async (ticketId) => {
-        // --- NUEVO: Bloqueo lógico por si logran burlar el botón ---
-        if (isOffline) {
-            alert("No hay conexión a internet. No puedes finalizar tickets en este momento.");
-            return;
-        }
-
-        const confirmar = window.confirm('¿Estás seguro de que tu problema fue resuelto y deseas cerrar este ticket?');
-        if (confirmar) {
-            try {
-                await api.put(`/v1/tickets/${ticketId}/finalizar`);
-                cargarHistorial(); 
-            } catch (error) {
-                console.error("Error al finalizar el ticket:", error);
-                alert("Hubo un error al intentar cerrar el ticket.");
-            }
-        }
-    };
-
-    useEffect(() => { 
-        cargarHistorial(); 
+    // Mensaje traído desde la pantalla de creación de ticket.
+    useEffect(() => {
         if (location.state?.mensajeExito) {
-            setSnackbarMessage(location.state.mensajeExito);
-            setOpenSnackbar(true);
+            notificarInfo(location.state.mensajeExito);
             window.history.replaceState({}, document.title);
         }
-    }, [location, isOffline]); // Añadimos isOffline para que recargue el historial automáticamente al volver el internet
+    }, [location, notificarInfo]);
+
+    const confirmarFinalizacion = async () => {
+        setFinalizando(true);
+        try {
+            await ticketService.finalizar(ticketAFinalizar.id);
+            notificar(`Ticket #${ticketAFinalizar.id} finalizado correctamente.`);
+            setTicketAFinalizar(null);
+            tabla.recargar();
+        } catch (error) {
+            notificarError(error);
+        } finally {
+            setFinalizando(false);
+        }
+    };
+
+    const columnas = [
+        {
+            id: 'id',
+            etiqueta: 'Folio',
+            ancho: 90,
+            ordenable: true,
+            render: (t) => (
+                <Typography variant="body2" fontWeight={600}>#{t.id}</Typography>
+            ),
+        },
+        {
+            id: 'titulo',
+            etiqueta: 'Asunto',
+            principal: true,   // hace de título en la vista de tarjetas
+            ordenable: true,
+            render: (t) => (
+                <Tooltip title={t.descripcion || ''} arrow placement="top-start">
+                    <Typography variant="body2" fontWeight={500}>
+                        {truncar(t.titulo, 48)}
+                    </Typography>
+                </Tooltip>
+            ),
+        },
+        { id: 'solicitante', etiqueta: 'Solicitante', ancho: '15%' },
+        { id: 'departamento', etiqueta: 'Área', ancho: '14%' },
+        {
+            id: 'fechaCreacion',
+            etiqueta: 'Creado',
+            ancho: 150,
+            ordenable: true,
+            sx: { whiteSpace: 'nowrap' },
+            render: (t) => (
+                <Tooltip title={tiempoRelativo(t.fechaCreacion)} arrow>
+                    <Typography variant="body2" color="text.secondary">
+                        {formatearFechaHora(t.fechaCreacion)}
+                    </Typography>
+                </Tooltip>
+            ),
+        },
+        {
+            id: 'fechaFin',
+            etiqueta: 'Cerrado',
+            ancho: 150,
+            ordenable: true,
+            sx: { whiteSpace: 'nowrap' },
+            render: (t) => (
+                <Typography variant="body2" color="text.secondary">
+                    {formatearFechaHora(t.fechaFin)}
+                </Typography>
+            ),
+        },
+        {
+            id: 'estatus',
+            etiqueta: 'Estado',
+            alineacion: 'center',
+            ancho: 130,
+            render: (t) => (
+                <Chip
+                    label={t.estatus}
+                    size="small"
+                    color={colorEstatus(t.estatus)}
+                    variant={t.estatus === 'CERRADO' ? 'outlined' : 'filled'}
+                    sx={{ minWidth: 96 }}
+                />
+            ),
+        },
+        {
+            id: 'acciones',
+            etiqueta: 'Acciones',
+            alineacion: 'center',
+            ancho: 110,
+            sinOrden: true,
+            render: (t) => {
+                const cerrado = t.estatus === 'CERRADO';
+
+                // El administrador observa la bitácora; no cierra tickets ajenos.
+                if (esAdministrador) {
+                    return (
+                        <Typography variant="caption" color="text.secondary">
+                            {cerrado ? 'Finalizado' : 'En proceso'}
+                        </Typography>
+                    );
+                }
+
+                return (
+                    <AccionesTabla
+                        acciones={[
+                            {
+                                icono: <CheckCircleOutlineIcon />,
+                                titulo: 'Finalizar ticket',
+                                etiqueta: `Finalizar el ticket número ${t.id}`,
+                                color: 'success',
+                                onClick: () => setTicketAFinalizar(t),
+                                deshabilitada: cerrado || sinConexion,
+                                motivoDeshabilitada: cerrado
+                                    ? 'El ticket ya está cerrado'
+                                    : 'Sin conexión con el servidor',
+                            },
+                        ]}
+                    />
+                );
+            },
+        },
+    ];
 
     return (
-        <Box sx={{ px: { xs: 2, md: 4 }, py: 3, width: '100%', boxSizing: 'border-box' }}>
-            
-            <Snackbar open={openSnackbar} autoHideDuration={5000} onClose={() => setOpenSnackbar(false)} anchorOrigin={{ vertical: 'top', horizontal: 'center' }}>
-                <Alert onClose={() => setOpenSnackbar(false)} severity="info">
-                    {snackbarMessage}
-                </Alert>
-            </Snackbar>
+        <Box>
+            {/* Cabecera: en móvil el título y el botón se apilan. */}
+            <Box
+                sx={{
+                    display: 'flex',
+                    flexDirection: { xs: 'column', sm: 'row' },
+                    justifyContent: 'space-between',
+                    alignItems: { xs: 'stretch', sm: 'center' },
+                    gap: 2,
+                    mb: 3,
+                }}
+            >
+                <Box>
+                    <Typography variant="h4" component="h2" color="primary.main">
+                        {esAdministrador ? 'Bitácora global de tickets' : 'Historial de tickets'}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                        {esAdministrador
+                            ? 'Todos los reportes registrados en la institución.'
+                            : 'Reportes levantados por tu área.'}
+                    </Typography>
+                </Box>
 
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-                <Typography variant="h4" sx={{ fontWeight: 'bold', color: COLOR_GUINDA }}>
-                    {cleanRole === 'ADMINISTRADOR' ? 'Bitácora Global de Tickets' : 'Historial de Tickets'}
-                </Typography>
-                
-                {cleanRole !== 'ADMINISTRADOR' && (
-                    <Button 
-                        variant="contained" 
-                        startIcon={<AddIcon />} 
-                        onClick={() => navigate('/tickets/nuevo')} 
-                        disabled={isOffline} // <-- BLOQUEO DEL BOTÓN NUEVO TICKET
-                        sx={{ 
-                            bgcolor: isOffline ? 'grey.400' : COLOR_GUINDA, 
-                            '&:hover': { bgcolor: isOffline ? 'grey.400' : '#5c0a28' }
-                        }}
+                {!esAdministrador && (
+                    <Button
+                        variant="contained"
+                        startIcon={<AddIcon />}
+                        onClick={() => navigate('/tickets/nuevo')}
+                        disabled={sinConexion}
                     >
-                        {isOffline ? 'Sin Conexión' : 'Levantar Ticket'}
+                        Levantar ticket
                     </Button>
                 )}
             </Box>
 
-            <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #e2e8f0', borderRadius: 2, overflow: 'hidden' }}>
-                <Table sx={{ minWidth: 1000 }}>
-                    <TableHead>
-                        <TableRow sx={{ bgcolor: COLOR_GUINDA }}>
-                            <TableCell sx={{ color: 'white', fontWeight: 'bold', width: '5%' }}>ID</TableCell>
-                            <TableCell sx={{ color: 'white', fontWeight: 'bold', width: '15%' }}>Solicitante</TableCell>
-                            <TableCell sx={{ color: 'white', fontWeight: 'bold', width: '15%' }}>Departamento</TableCell>
-                            <TableCell sx={{ color: 'white', fontWeight: 'bold', width: '25%' }}>Título</TableCell>
-                            <TableCell sx={{ color: 'white', fontWeight: 'bold', width: '10%' }}>Inicio</TableCell>
-                            <TableCell sx={{ color: 'white', fontWeight: 'bold', width: '10%' }}>Fin</TableCell>
-                            <TableCell sx={{ color: 'white', fontWeight: 'bold', width: '10%', textAlign: 'center' }}>Estatus</TableCell>
-                            <TableCell sx={{ color: 'white', fontWeight: 'bold', width: '10%', textAlign: 'center' }}>Acción</TableCell>
-                        </TableRow>
-                    </TableHead>
-                    <TableBody>
-                        {historialTickets.length === 0 ? (
-                            <TableRow>
-                                <TableCell colSpan={8} align="center" sx={{ py: 6 }}>
-                                    <Typography color="textSecondary">No hay tickets registrados.</Typography>
-                                </TableCell>
-                            </TableRow>
-                        ) : (
-                            historialTickets.map((t) => (
-                                <TableRow key={t.id} hover sx={{ transition: '0.2s', '&:hover': { bgcolor: '#f9f9f9' } }}>
-                                    <TableCell sx={{ fontWeight: 'bold' }}>#{t.id}</TableCell>
-                                    <TableCell sx={{ fontWeight: '500' }}>{t.solicitante || 'Usuario'}</TableCell>
-                                    <TableCell>{t.departamento || 'Área'}</TableCell>
-                                    <TableCell>{t.titulo}</TableCell>
-                                    <TableCell sx={{ whiteSpace: 'nowrap', fontSize: '0.85rem' }}>{formatearFecha(t.fechaCreacion)}</TableCell>
-                                    <TableCell sx={{ whiteSpace: 'nowrap', fontSize: '0.85rem' }}>{formatearFecha(t.fechaFin)}</TableCell>
-                                    <TableCell align="center">
-                                        <Chip label={t.estatus} color={t.estatus === 'CERRADO' ? 'default' : 'warning'} size="small" sx={{ fontWeight: 'bold', minWidth: '80px' }} />
-                                    </TableCell>
-                                    <TableCell align="center">
-                                        {t.estatus !== 'CERRADO' ? (
-                                            cleanRole !== 'ADMINISTRADOR' ? (
-                                                <Button 
-                                                    size="small" 
-                                                    variant="outlined" 
-                                                    color="inherit" 
-                                                    startIcon={<CheckIcon />} 
-                                                    onClick={() => handleFinalizarTicket(t.id)}
-                                                    disabled={isOffline} // <-- BLOQUEO DEL BOTÓN DE FINALIZAR
-                                                >
-                                                    Finalizar
-                                                </Button>
-                                            ) : (
-                                                <Typography variant="body2" color="textSecondary" sx={{ fontStyle: 'italic' }}>En proceso</Typography>
-                                            )
-                                        ) : (
-                                            <Typography variant="body2" color="textSecondary" sx={{ fontWeight: 'bold' }}>Finalizado</Typography>
-                                        )}
-                                    </TableCell>
-                                </TableRow>
-                            ))
-                        )}
-                    </TableBody>
-                </Table>
-            </TableContainer>
+            <DynamicTable
+                columnas={columnas}
+                filas={tabla.filas}
+                cargando={tabla.cargando}
+                anchoMinimo={1080}
+                busqueda={tabla.busqueda}
+                onBuscar={tabla.setBusqueda}
+                placeholderBusqueda="Buscar por asunto, solicitante o área…"
+                filtros={[
+                    {
+                        id: 'estatus',
+                        etiqueta: 'Estado',
+                        valor: filtroEstatus,
+                        valorPorDefecto: '',
+                        opciones: OPCIONES_ESTATUS,
+                        onChange: setFiltroEstatus,
+                        ancho: 190,
+                    },
+                ]}
+                paginacion={tabla.paginacion}
+                onCambiarPagina={tabla.cambiarPagina}
+                onCambiarTamano={tabla.cambiarTamano}
+                orden={tabla.orden}
+                onCambiarOrden={tabla.cambiarOrden}
+                onRecargar={tabla.recargar}
+                vacio={{
+                    icono: ConfirmationNumberIcon,
+                    titulo: tabla.busqueda || filtroEstatus
+                        ? 'Sin resultados'
+                        : 'No hay tickets registrados',
+                    descripcion: tabla.busqueda || filtroEstatus
+                        ? 'Prueba con otros términos de búsqueda o cambia el filtro de estado.'
+                        : esAdministrador
+                            ? 'Cuando los usuarios levanten tickets, aparecerán aquí.'
+                            : 'Aún no has levantado ningún ticket de soporte.',
+                    textoAccion: !esAdministrador && !tabla.busqueda ? 'Levantar mi primer ticket' : undefined,
+                    onAccion: !esAdministrador && !tabla.busqueda
+                        ? () => navigate('/tickets/nuevo')
+                        : undefined,
+                }}
+            />
+
+            <ConfirmationDialog
+                abierto={Boolean(ticketAFinalizar)}
+                titulo="¿Finalizar este ticket?"
+                mensaje={
+                    ticketAFinalizar
+                        ? `El ticket #${ticketAFinalizar.id} "${ticketAFinalizar.titulo}" se marcará como cerrado. Confírmalo solo si tu problema quedó resuelto.`
+                        : ''
+                }
+                textoConfirmar="Sí, finalizar"
+                cargando={finalizando}
+                onConfirmar={confirmarFinalizacion}
+                onCancelar={() => setTicketAFinalizar(null)}
+            />
         </Box>
     );
 }

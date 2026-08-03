@@ -1,17 +1,21 @@
-import React, { useContext, useEffect, useState } from 'react';
-import { Box, Drawer, AppBar, Toolbar, List, Typography, ListItem, ListItemButton, ListItemIcon, Button, Tooltip, IconButton, CssBaseline, Alert } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
-import { AuthContext } from '../context/AuthContext.jsx';
-import { WebSocketContext } from '../context/WebSocketContext.jsx'; // 👈 IMPORTADO
-import api from '../services/api';
+import { useContext, useEffect, useState, useMemo } from 'react';
+import {
+    Box, Drawer, AppBar, Toolbar, List, Typography, ListItem, ListItemButton,
+    ListItemIcon, ListItemText, Button, Tooltip, IconButton, Alert,
+    useMediaQuery, Collapse
+} from '@mui/material';
+import { useTheme } from '@mui/material/styles';
+import { useNavigate, useLocation } from 'react-router-dom';
 
-// --- custom hook ---
+import { AuthContext } from '../context/AuthContext.jsx';
+import { WebSocketContext } from '../context/WebSocketContext.jsx';
+import { avisoService } from '../services/avisoService';
 import { useNetworkStatus } from '../hooks/useNetworkStatus.jsx';
 
-// 1. Importar el logo
-import logoPuebla from '../assets/logo-puebla.png'; 
+import logoPuebla from '../assets/logo-puebla.png';
 
-// Importación de iconos
+// Iconos
+import MenuIcon from '@mui/icons-material/Menu';
 import ExitToAppIcon from '@mui/icons-material/ExitToApp';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import GroupIcon from '@mui/icons-material/Group';
@@ -19,244 +23,307 @@ import HistoryIcon from '@mui/icons-material/History';
 import DomainIcon from '@mui/icons-material/Domain';
 import AddCircleIcon from '@mui/icons-material/AddCircle';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
-import CampaignIcon from '@mui/icons-material/Campaign'; 
-import AssignmentIcon from '@mui/icons-material/Assignment'; 
-import DescriptionIcon from '@mui/icons-material/Description'; 
+import CampaignIcon from '@mui/icons-material/Campaign';
+import AssignmentIcon from '@mui/icons-material/Assignment';
+import DescriptionIcon from '@mui/icons-material/Description';
 import ComputerIcon from '@mui/icons-material/Computer';
 import WifiOffIcon from '@mui/icons-material/WifiOff';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import CloseIcon from '@mui/icons-material/Close';
-// Agrega estas dos líneas en tu bloque de importaciones de iconos
 import InventoryIcon from '@mui/icons-material/Inventory';
 import HomeRepairServiceIcon from '@mui/icons-material/HomeRepairService';
+import MailIcon from '@mui/icons-material/Mail';
 
-const drawerWidth = 65; 
-const COLOR_GUINDA = '#801A36';
+/** Ancho del menú lateral en escritorio (solo iconos). */
+const ANCHO_MENU = 72;
 
-const iconMap = {
-    'DashboardIcon': DashboardIcon,
-    'GroupIcon': GroupIcon,
-    'HistoryIcon': HistoryIcon,
-    'DomainIcon': DomainIcon,
-    'AddCircleIcon': AddCircleIcon,
-    'CampaignIcon': CampaignIcon,
-    'AssignmentIcon': AssignmentIcon,
-    'DescriptionIcon': DescriptionIcon,
-    'ComputerIcon': ComputerIcon,
-    'InventoryIcon': InventoryIcon,
-    'HomeRepairServiceIcon': HomeRepairServiceIcon
+/** Ancho del cajón en móvil, donde sí caben las etiquetas. */
+const ANCHO_MENU_MOVIL = 268;
+
+/** Alto de la barra superior, que aloja el logotipo institucional. */
+const ALTO_BARRA = { xs: 72, sm: 88 };
+
+/**
+ * Traduce el nombre de icono guardado en la tabla `vista` a su componente.
+ * El menú se construye desde la base de datos, así que este mapa es el punto
+ * de unión entre esa configuración y la interfaz.
+ */
+const ICONOS = {
+    DashboardIcon,
+    GroupIcon,
+    HistoryIcon,
+    DomainIcon,
+    AddCircleIcon,
+    CampaignIcon,
+    AssignmentIcon,
+    DescriptionIcon,
+    ComputerIcon,
+    InventoryIcon,
+    HomeRepairServiceIcon,
+    MailIcon,
 };
 
+/**
+ * Estructura principal de la aplicación: barra superior, menú lateral y área
+ * de contenido.
+ *
+ * Correcciones respecto a la versión anterior:
+ *  - El contenido combinaba `width: 100%` con `marginLeft: 72px`, lo que
+ *    garantizaba desbordamiento horizontal en cualquier resolución.
+ *  - El menú era `variant="permanent"` sin alternativa móvil: robaba 72px de
+ *    ancho en pantallas de 375px, donde no sobra ni uno.
+ *  - Los avisos flotaban sobre el contenido en posición fija, tapándolo, y con
+ *    `variant="filled"` de severidad warning quedaban en 3.19:1 de contraste,
+ *    por debajo del mínimo legible.
+ *  - Los botones del menú solo tenían icono, sin nombre accesible: un lector
+ *    de pantalla anunciaba "botón" en cada opción.
+ *  - El aviso de desconexión solo se mostraba al rol EMPLEADO, cuando afecta
+ *    igual a todos.
+ */
 export default function MainLayout({ children }) {
     const { user, logout } = useContext(AuthContext);
-    const { stompClient, connected } = useContext(WebSocketContext) || {}; // 👈 CONTEXTO WEBSOCKET
+    const { stompClient, connected } = useContext(WebSocketContext) || {};
     const navigate = useNavigate();
-    
-    const [avisosActivos, setAvisosActivos] = useState([]);
-    const [avisosOcultos, setAvisosOcultos] = useState([]); 
+    const location = useLocation();
+    const theme = useTheme();
+    const esEscritorio = useMediaQuery(theme.breakpoints.up('md'));
 
-    // --- 1. Usar el custom hook que ya importaste ---
-    const isOffline = useNetworkStatus();
-
-    // --- 2. Estados para la recuperación de red (mensaje verde) ---
-    const [wasOffline, setWasOffline] = useState(false);
+    const [menuAbierto, setMenuAbierto] = useState(false);
+    const [avisos, setAvisos] = useState([]);
+    const [avisosOcultos, setAvisosOcultos] = useState([]);
     const [mostrarRecuperacion, setMostrarRecuperacion] = useState(false);
+    const [estuvoSinConexion, setEstuvoSinConexion] = useState(false);
 
-    const handleLogout = () => { logout(); navigate('/login'); };
+    const estadoRed = useNetworkStatus();
+    const sinConexion = Boolean(estadoRed.sinConexion ?? estadoRed);
 
-    const userRole = user?.rol || user?.role || user?.rolNombre || '';
-    const cleanRole = userRole.replace('ROLE_', '').toUpperCase();
-    const estaBloqueado = user?.passwordTemporal;
+    const rolCrudo = user?.rol || user?.role || user?.rolNombre || '';
+    const rol = rolCrudo.replace('ROLE_', '').toUpperCase();
+    const bloqueadoPorPassword = Boolean(user?.passwordTemporal);
 
-    // --- 3. Efecto para mostrar alerta cuando regresa el internet ---
+    const vistas = useMemo(() => user?.vistasPermitidas ?? [], [user]);
+    const mostrarMenu = Boolean(user) && !bloqueadoPorPassword && vistas.length > 0;
+
+    // --- Recuperación de conexión -----------------------------------------
     useEffect(() => {
-        if (isOffline) {
-            setWasOffline(true);           
-            setMostrarRecuperacion(false); 
-        } else if (!isOffline && wasOffline) {
+        if (sinConexion) {
+            setEstuvoSinConexion(true);
+            setMostrarRecuperacion(false);
+        } else if (estuvoSinConexion) {
             setMostrarRecuperacion(true);
-            setWasOffline(false);
-            const timer = setTimeout(() => setMostrarRecuperacion(false), 5000);
-            return () => clearTimeout(timer);
+            setEstuvoSinConexion(false);
+            const temporizador = setTimeout(() => setMostrarRecuperacion(false), 5000);
+            return () => clearTimeout(temporizador);
         }
-    }, [isOffline, wasOffline]);
-    // --------------------------------------------------------------
+    }, [sinConexion, estuvoSinConexion]);
 
-    // 1. CONSULTA DE AVISOS GENERALES (Polling cada 30 segundos)
+    // --- Avisos institucionales -------------------------------------------
     useEffect(() => {
-        if (!user || estaBloqueado) return;
+        if (!user || bloqueadoPorPassword) return;
 
         const buscarAvisos = async () => {
-            // Si el sistema está offline, detenemos la petición para no saturar la red ni la consola
-            if (isOffline) return;
+            // Sin conexión no se insiste: solo llenaría la consola de errores.
+            if (sinConexion) return;
+
             try {
-                const response = await api.get('/v1/avisos/activos');
-                const datosAvisos = Array.isArray(response.data) ? response.data : [];
-                
-                const paraMi = datosAvisos.filter(a => {
-                    const esActivo = a.activo === true;
-                    const esParaMi = !a.areaId || a.areaId === user?.areaId || cleanRole === 'ADMINISTRADOR';
-                    return esActivo && esParaMi;
-                });
-                
-                setAvisosActivos(paraMi);
-            } catch (error) {
-                console.error("Error al buscar avisos:", error);
+                const respuesta = await avisoService.getActivos();
+                const datos = Array.isArray(respuesta.data) ? respuesta.data : [];
+
+                setAvisos(
+                    datos.filter((a) => {
+                        const activo = a.activo === true;
+                        const esParaMi =
+                            !a.areaId || a.areaId === user?.areaId || rol === 'ADMINISTRADOR';
+                        return activo && esParaMi;
+                    })
+                );
+            } catch {
+                // El fallo ya se refleja en el indicador de conexión.
+                setAvisos([]);
             }
         };
 
         buscarAvisos();
-        const intervalo = setInterval(buscarAvisos, 30000); 
+        const intervalo = setInterval(buscarAvisos, 30000);
         return () => clearInterval(intervalo);
-    }, [user, estaBloqueado, cleanRole, isOffline]);
+    }, [user, bloqueadoPorPassword, rol, sinConexion]);
 
-    // 2. ESCUCHA EN TIEMPO REAL VÍA WEBSOCKET (ALERTAS DE RESGUARDOS VENCIDOS)
+    // --- Alertas de resguardos vencidos en tiempo real ---------------------
     useEffect(() => {
-        if (!stompClient || !connected || !user || estaBloqueado) return;
+        if (!stompClient || !connected || !user || bloqueadoPorPassword) return;
 
-        // Suscripción al tópico broadcast de resguardos
-        const subscription = stompClient.subscribe('/topic/alertas-resguardos', (message) => {
+        const suscripcion = stompClient.subscribe('/topic/alertas-resguardos', (mensaje) => {
             try {
-                const resguardo = JSON.parse(message.body);
-                
-                // Construimos el objeto del aviso para la alerta superior
-                const nuevoAvisoAlerta = {
-                    id: `resguardo-${resguardo.id}-${Date.now()}`,
-                    titulo: '⚠️ RESGUARDO VENCIDO',
-                    mensaje: `El resguardo de ${resguardo.solicitanteNombre} (${resguardo.equipoNombre}) ha vencido.`
-                };
-
-                // Agregamos la alerta en tiempo real a los avisos activos
-                setAvisosActivos((prev) => [nuevoAvisoAlerta, ...prev]);
-            } catch (error) {
-                console.error("Error procesando alerta WebSocket de resguardo:", error);
+                const resguardo = JSON.parse(mensaje.body);
+                setAvisos((prev) => [
+                    {
+                        id: `resguardo-${resguardo.id}-${Date.now()}`,
+                        titulo: 'Resguardo vencido',
+                        mensaje: `El resguardo de ${resguardo.solicitanteNombre} (${resguardo.equipoNombre}) ha vencido.`,
+                        severidad: 'error',
+                    },
+                    ...prev,
+                ]);
+            } catch {
+                // Un mensaje mal formado no debe tumbar la suscripción.
             }
         });
 
-        return () => {
-            if (subscription) subscription.unsubscribe();
-        };
-    }, [stompClient, connected, user, estaBloqueado]);
+        return () => suscripcion?.unsubscribe();
+    }, [stompClient, connected, user, bloqueadoPorPassword]);
 
-    const handleCerrarAviso = (idAviso) => {
-        if (!avisosOcultos.includes(idAviso)) {
-            setAvisosOcultos([...avisosOcultos, idAviso]);
-        }
+    const avisosVisibles = avisos.filter((a) => !avisosOcultos.includes(a.id));
+
+    // --- Acciones ----------------------------------------------------------
+    const cerrarSesion = () => {
+        logout();
+        navigate('/login');
     };
 
-    const avisosVisibles = avisosActivos.filter(aviso => !avisosOcultos.includes(aviso.id));
+    const irA = (ruta) => {
+        navigate(ruta);
+        if (!esEscritorio) setMenuAbierto(false);
+    };
+
+    // --- Menú lateral ------------------------------------------------------
+    const contenidoMenu = (
+        <>
+            <Toolbar sx={{ minHeight: ALTO_BARRA }} />
+            <List component="nav" aria-label="Navegación principal" sx={{ px: 1, pt: 2 }}>
+                {vistas.map((vista) => {
+                    const Icono = ICONOS[vista.icono] || DescriptionIcon;
+                    const activa = location.pathname === vista.ruta;
+
+                    return (
+                        <ListItem key={vista.ruta} disablePadding sx={{ mb: 0.5 }}>
+                            <Tooltip title={esEscritorio ? vista.nombre : ''} placement="right" arrow>
+                                <ListItemButton
+                                    onClick={() => irA(vista.ruta)}
+                                    selected={activa}
+                                    // El tooltip no aporta nombre accesible: sin
+                                    // esto el lector de pantalla solo diría "botón".
+                                    aria-label={vista.nombre}
+                                    aria-current={activa ? 'page' : undefined}
+                                    sx={{
+                                        minHeight: 48,
+                                        justifyContent: esEscritorio ? 'center' : 'flex-start',
+                                        px: esEscritorio ? 1 : 2,
+                                    }}
+                                >
+                                    <ListItemIcon
+                                        sx={{
+                                            minWidth: esEscritorio ? 0 : 40,
+                                            justifyContent: 'center',
+                                            color: activa ? 'primary.main' : 'text.secondary',
+                                        }}
+                                    >
+                                        <Icono />
+                                    </ListItemIcon>
+                                    {/* La etiqueta solo se muestra en el cajón
+                                        móvil, donde hay espacio de sobra. */}
+                                    {!esEscritorio && (
+                                        <ListItemText
+                                            primary={vista.nombre}
+                                            primaryTypographyProps={{
+                                                fontWeight: activa ? 600 : 500,
+                                                color: activa ? 'primary.main' : 'text.primary',
+                                            }}
+                                        />
+                                    )}
+                                </ListItemButton>
+                            </Tooltip>
+                        </ListItem>
+                    );
+                })}
+            </List>
+        </>
+    );
 
     return (
-        <Box sx={{ display: 'flex', minHeight: '100vh', width: '100vw', bgcolor: '#f4f7f6', overflowX: 'hidden' }}>
-            <CssBaseline />
+        <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
+            <a href="#contenido-principal" className="skip-link">
+                Saltar al contenido principal
+            </a>
 
-            {/* --- Renderizado del Banner Offline PWA (ROJO) --- */}
-            {isOffline && cleanRole === 'EMPLEADO' && (
-                <Box sx={{ position: 'fixed', top: '75px', left: '50%', transform: 'translateX(-50%)', zIndex: 9999, display: 'flex', flexDirection: 'column', width: '90%', maxWidth: '600px', mt: 2 }}>
-                    <Alert severity="error" variant="filled" icon={<WifiOffIcon />} sx={{ width: '100%', fontWeight: 'bold', boxShadow: 3 }}>
-                        Te encuentras sin conexión. Estamos trabajando en ello.
-                    </Alert>
-                </Box>
-            )}
-            {/* ------------------------------------------------- */}
-
-           {/* --- Renderizado del Banner de Recuperación (VERDE SUAVE) --- */}
-            {mostrarRecuperacion && cleanRole === 'EMPLEADO' && (
-                <Box sx={{ position: 'fixed', top: '75px', left: '50%', transform: 'translateX(-50%)', zIndex: 9999, width: '90%', maxWidth: '600px', mt: 2 }}>
-                    <Box sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        bgcolor: '#edf7ed', // <-- Fondo verde pastel suave
-                        color: '#1e4620',   // <-- Letras en verde oscuro
-                        px: 2,
-                        py: 1.5,
-                        borderRadius: '4px',
-                        boxShadow: 3
-                    }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                            <CheckCircleIcon sx={{ color: '#1e4620' }} /> {/* <-- Icono verde oscuro */}
-                            <Typography sx={{ fontWeight: 'bold', fontSize: '0.875rem' }}>
-                                Conexión restablecida. Compruebe su navegador.
-                            </Typography>
-                        </Box>
-                        <IconButton size="small" onClick={() => setMostrarRecuperacion(false)} sx={{ color: '#1e4620', p: 0.5 }}>
-                            <CloseIcon fontSize="small" />
+            {/* --- Barra superior --- */}
+            <AppBar
+                position="fixed"
+                sx={{ bgcolor: 'primary.main', zIndex: (t) => t.zIndex.drawer + 1 }}
+            >
+                <Toolbar sx={{ minHeight: ALTO_BARRA, gap: 1, px: { xs: 1, sm: 3 } }}>
+                    {mostrarMenu && !esEscritorio && (
+                        <IconButton
+                            color="inherit"
+                            edge="start"
+                            onClick={() => setMenuAbierto(true)}
+                            aria-label="Abrir menú de navegación"
+                        >
+                            <MenuIcon />
                         </IconButton>
-                    </Box>
-                </Box>
-            )}
-            {/* ----------------------------------------------------------------------- */}
+                    )}
 
-            {/* BANNERS DE ALERTA / AVISOS SUPERIORES */}
-            {avisosVisibles.length > 0 && (
-                <Box sx={{ position: 'fixed', top: '75px', left: '50%', transform: 'translateX(-50%)', zIndex: 9998, display: 'flex', flexDirection: 'column', gap: 1.5, width: '90%', maxWidth: '600px', mt: (isOffline || mostrarRecuperacion) && cleanRole === 'EMPLEADO' ? 8 : 0 }}>
-                    {avisosVisibles.map(aviso => (
-                        <Alert key={aviso.id} severity="warning" variant="filled" onClose={() => handleCerrarAviso(aviso.id)} sx={{ width: '100%', fontWeight: 'bold', boxShadow: 3 }}>
-                            {aviso.titulo}: {aviso.mensaje}
-                        </Alert>
-                    ))}
-                </Box>
-            )}
-
-            <AppBar position="fixed" sx={{ width: '100%', left: 0, top: 0, bgcolor: COLOR_GUINDA, borderRadius: '0 !important', boxShadow: 2, zIndex: 1300 }}>
-                <Toolbar sx={{ 
-                    display: 'flex', 
-                    justifyContent: 'space-between', 
-                    alignItems: 'center', 
-                    minHeight: { xs: '80px', sm: '95px' }, 
-                    px: { xs: 1, sm: 3 } 
-                }}>
-                    
-                    {/* 1. SECCIÓN IZQUIERDA */}
-                    <Box sx={{ flex: 1, display: 'flex', justifyContent: 'flex-start' }}></Box>
-
-                    {/* 2. SECCIÓN CENTRAL */}
-                    <Box sx={{ flex: 2, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                        <img 
-                            src={logoPuebla} 
-                            alt="Logo Puebla" 
-                            style={{ 
-                                height: '108px', 
-                                width: 'auto', 
-                                maxWidth: '100%', 
+                    {/* Logotipo institucional, centrado en escritorio. */}
+                    <Box
+                        sx={{
+                            flex: 1,
+                            display: 'flex',
+                            justifyContent: { xs: 'flex-start', md: 'center' },
+                            alignItems: 'center',
+                        }}
+                    >
+                        <Box
+                            component="img"
+                            src={logoPuebla}
+                            alt="Gobierno del Estado de Puebla"
+                            sx={{
+                                height: { xs: 44, sm: 68 },
+                                width: 'auto',
                                 objectFit: 'contain',
-                                filter: 'brightness(0) invert(1)' 
-                            }} 
+                                // El logotipo es oscuro; sobre el guinda se
+                                // invierte a blanco para que se lea.
+                                filter: 'brightness(0) invert(1)',
+                            }}
                         />
                     </Box>
 
-                    {/* 3. SECCIÓN DERECHA */}
-                    <Box sx={{ flex: 1, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: { xs: 0.5, sm: 1.5 } }}>
-                        <Typography 
-                            variant="body2" 
-                            sx={{ textTransform: 'uppercase', display: { xs: 'none', md: 'block' }, textAlign: 'right', lineHeight: 1.2 }}
-                        >
-                            {user?.nombre || 'Usuario'} <br/> 
-                            <span style={{ fontSize: '0.75rem', fontWeight: 'bold', opacity: 0.8 }}>
-                                {cleanRole}
-                            </span>
-                        </Typography>
+                    {/* Identidad del usuario y acciones. */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 0.5, sm: 1 } }}>
+                        <Box sx={{ display: { xs: 'none', md: 'block' }, textAlign: 'right', mr: 1 }}>
+                            <Typography variant="body2" sx={{ lineHeight: 1.3, fontWeight: 500 }}>
+                                {user?.nombre || 'Usuario'}
+                            </Typography>
+                            <Typography variant="caption" sx={{ opacity: 0.85 }}>
+                                {rol}
+                            </Typography>
+                        </Box>
 
-                        {!estaBloqueado && (
-                            <Tooltip title="Mi Perfil">
-                                <IconButton color="inherit" onClick={() => navigate('/perfil')}>
+                        {!bloqueadoPorPassword && (
+                            <Tooltip title="Mi perfil">
+                                <IconButton
+                                    color="inherit"
+                                    onClick={() => navigate('/perfil')}
+                                    aria-label="Ir a mi perfil"
+                                >
                                     <AccountCircleIcon />
                                 </IconButton>
                             </Tooltip>
                         )}
 
-                        <Button 
-                            color="inherit" 
-                            onClick={handleLogout} 
+                        <Button
+                            color="inherit"
+                            onClick={cerrarSesion}
                             startIcon={<ExitToAppIcon />}
-                            sx={{ display: { xs: 'none', sm: 'flex' } }}
+                            sx={{ display: { xs: 'none', sm: 'inline-flex' } }}
                         >
                             Salir
                         </Button>
 
-                        <Tooltip title="Cerrar Sesión">
-                            <IconButton color="inherit" onClick={handleLogout} sx={{ display: { xs: 'flex', sm: 'none' } }}>
+                        <Tooltip title="Cerrar sesión">
+                            <IconButton
+                                color="inherit"
+                                onClick={cerrarSesion}
+                                aria-label="Cerrar sesión"
+                                sx={{ display: { xs: 'inline-flex', sm: 'none' } }}
+                            >
                                 <ExitToAppIcon />
                             </IconButton>
                         </Tooltip>
@@ -264,29 +331,91 @@ export default function MainLayout({ children }) {
                 </Toolbar>
             </AppBar>
 
-            {user && !estaBloqueado && (
-                <Drawer variant="permanent" sx={{ width: drawerWidth, flexShrink: 0, '& .MuiDrawer-paper': { width: drawerWidth, backgroundColor: '#ffffff', borderRight: '1px solid #e0e0e0', borderRadius: '0 !important' } }}>
-                    <Toolbar sx={{ minHeight: { xs: '80px', sm: '95px' } }} /> 
-                    <List sx={{ pt: 2 }}>
-                        {(user?.vistasPermitidas || []).map((vista, index) => {
-                            const IconoDinamico = iconMap[vista.icono] || DescriptionIcon;
-                            return (
-                                <ListItem key={index} disablePadding>
-                                    <Tooltip title={vista.nombre} placement="right">
-                                        <ListItemButton onClick={() => navigate(vista.ruta)} sx={{ justifyContent: 'center' }}>
-                                            <ListItemIcon sx={{ color: COLOR_GUINDA }}>
-                                                <IconoDinamico />
-                                            </ListItemIcon>
-                                        </ListItemButton>
-                                    </Tooltip>
-                                </ListItem>
-                            );
-                        })}
-                    </List>
-                </Drawer>
+            {/* --- Menú lateral ---
+                Escritorio: fijo y estrecho. Móvil: cajón temporal sobre el
+                contenido, para no robarle ancho a la pantalla. */}
+            {mostrarMenu && (
+                <Box component="nav" sx={{ width: { md: ANCHO_MENU }, flexShrink: { md: 0 } }}>
+                    <Drawer
+                        variant={esEscritorio ? 'permanent' : 'temporary'}
+                        open={esEscritorio ? true : menuAbierto}
+                        onClose={() => setMenuAbierto(false)}
+                        ModalProps={{ keepMounted: true }}
+                        sx={{
+                            '& .MuiDrawer-paper': {
+                                width: esEscritorio ? ANCHO_MENU : ANCHO_MENU_MOVIL,
+                                boxSizing: 'border-box',
+                                bgcolor: 'background.paper',
+                                borderRight: '1px solid',
+                                borderColor: 'divider',
+                            },
+                        }}
+                    >
+                        {contenidoMenu}
+                    </Drawer>
+                </Box>
             )}
 
-            <Box component="main" sx={{ flexGrow: 1, p: 3, mt: { xs: '80px', sm: '95px' }, width: '100%', ml: `${drawerWidth}px` }}>
+            {/* --- Contenido ---
+                `minWidth: 0` permite que una tabla ancha genere su propio
+                scroll interno en lugar de estirar toda la página. */}
+            <Box
+                component="main"
+                id="contenido-principal"
+                sx={{
+                    flexGrow: 1,
+                    minWidth: 0,
+                    p: { xs: 2, sm: 3 },
+                    mt: ALTO_BARRA,
+                }}
+            >
+                {/* Estado de la conexión. `aria-live` hace que un lector de
+                    pantalla lo anuncie sin que el usuario tenga que buscarlo. */}
+                <Box aria-live="polite">
+                    <Collapse in={sinConexion}>
+                        <Alert severity="error" icon={<WifiOffIcon />} sx={{ mb: 2 }}>
+                            {estadoRed.servidorCaido
+                                ? 'No hay comunicación con el servidor. Los datos que ves pueden estar desactualizados.'
+                                : 'Sin conexión a internet. Revisa tu red para continuar trabajando.'}
+                        </Alert>
+                    </Collapse>
+
+                    <Collapse in={mostrarRecuperacion}>
+                        <Alert
+                            severity="success"
+                            icon={<CheckCircleIcon />}
+                            onClose={() => setMostrarRecuperacion(false)}
+                            sx={{ mb: 2 }}
+                        >
+                            Conexión restablecida.
+                        </Alert>
+                    </Collapse>
+                </Box>
+
+                {/* Avisos institucionales, en línea y no flotando sobre el
+                    contenido. Severidad estándar, no `filled`, para respetar el
+                    contraste mínimo. */}
+                {avisosVisibles.length > 0 && (
+                    <Box
+                        aria-live="polite"
+                        sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mb: 3 }}
+                    >
+                        {avisosVisibles.map((aviso) => (
+                            <Alert
+                                key={aviso.id}
+                                severity={aviso.severidad || 'warning'}
+                                onClose={() => setAvisosOcultos((prev) => [...prev, aviso.id])}
+                                className="fade-in-up"
+                            >
+                                <Box component="strong" sx={{ fontWeight: 600 }}>
+                                    {aviso.titulo}
+                                </Box>
+                                {aviso.mensaje ? `: ${aviso.mensaje}` : ''}
+                            </Alert>
+                        ))}
+                    </Box>
+                )}
+
                 {children}
             </Box>
         </Box>
