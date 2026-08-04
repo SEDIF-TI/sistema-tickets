@@ -1,7 +1,11 @@
 package com.sedif.sistema_tickets.core.area;
 
 import com.sedif.sistema_tickets.exception.ApiResponse;
+import com.sedif.sistema_tickets.exception.PageResponse;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -14,6 +18,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -34,8 +39,27 @@ public class AreaResource {
 
     private final AreaService areaService;
 
+    /**
+     * Listado paginado del panel, con busqueda y filtro de estado resueltos en
+     * la base de datos.
+     */
     @GetMapping
-    public ResponseEntity<ApiResponse<List<AreaResponse>>> obtenerAreas() {
+    public ResponseEntity<ApiResponse<PageResponse<AreaResponse>>> obtenerAreas(
+            @RequestParam(required = false) String busqueda,
+            @RequestParam(required = false) Boolean activo,
+            @PageableDefault(size = 10, sort = "nombre", direction = Sort.Direction.ASC)
+            Pageable pageable) {
+
+        return ResponseEntity.ok(ApiResponse.ok(
+                areaService.listarAreasPaginado(busqueda, activo, pageable)));
+    }
+
+    /**
+     * Catalogo completo sin paginar, para los selectores de area de otros
+     * formularios (alta de usuario, por ejemplo).
+     */
+    @GetMapping("/todas")
+    public ResponseEntity<ApiResponse<List<AreaResponse>>> obtenerTodas() {
         return ResponseEntity.ok(ApiResponse.ok(areaService.listarAreas()));
     }
 

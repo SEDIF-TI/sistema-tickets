@@ -132,7 +132,7 @@ export default function AdminUsuariosPage() {
             try {
                 const [resRoles, resAreas] = await Promise.all([
                     rolService.getAll(),
-                    areaService.getAll(),
+                    areaService.getTodas(),
                 ]);
 
                 if (cancelado) return;

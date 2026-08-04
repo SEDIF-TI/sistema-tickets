@@ -2,13 +2,20 @@ package com.sedif.sistema_tickets.core.area;
 
 import com.sedif.sistema_tickets.core.usuarios.Usuario;
 import com.sedif.sistema_tickets.core.usuarios.UsuarioRepository;
+import com.sedif.sistema_tickets.exception.PageResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Set;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class AreaService {
 
@@ -18,17 +25,23 @@ public class AreaService {
 
     @Transactional
     public AreaResponse crearArea(AreaRecord record) {
-        Area nuevaArea = new Area();
-        nuevaArea.setNombre(record.nombre());
-        
-        if (record.activo() != null) {
-            nuevaArea.setActivo(record.activo());
-        } else {
-            nuevaArea.setActivo(true);
+        String nombre = record.nombre().trim();
+
+        // Dos areas con el mismo nombre son indistinguibles en los selectores
+        // y reparten al personal entre ambas sin que nadie lo note.
+        if (areaRepository.existsByNombreIgnoreCase(nombre)) {
+            throw new IllegalArgumentException("Ya existe un area con el nombre " + nombre + ".");
         }
 
-        Area areaGuardada = areaRepository.save(nuevaArea);
-        return AreaResponse.desdeEntidad(areaGuardada);
+        Area nuevaArea = new Area();
+        nuevaArea.setNombre(nombre);
+        nuevaArea.setActivo(record.activo() != null ? record.activo() : true);
+        // La version anterior ignoraba este campo al crear: marcar un area como
+        // prioritaria en el alta no tenia ningun efecto y habia que volver a
+        // editarla para conseguirlo.
+        nuevaArea.setPrioritaria(record.prioritaria() != null ? record.prioritaria() : false);
+
+        return AreaResponse.desdeEntidad(areaRepository.save(nuevaArea));
     }
 
     @Transactional(readOnly = true)
@@ -39,12 +52,73 @@ public class AreaService {
             .toList();
     }
 
+    /** Campos por los que se admite ordenar el listado de areas. */
+    private static final Set<String> CAMPOS_ORDENABLES = Set.of("id", "nombre", "activo", "prioritaria");
+
+    /**
+     * Listado paginado del panel, con busqueda y filtro de estado resueltos en
+     * la base de datos.
+     *
+     * <p>La pantalla traia el catalogo completo y filtraba en el navegador.</p>
+     */
+    @Transactional(readOnly = true)
+    public PageResponse<AreaResponse> listarAreasPaginado(
+            String busqueda, Boolean activo, Pageable pageable) {
+
+        return PageResponse.de(
+                areaRepository.buscarPaginado(normalizarBusqueda(busqueda), activo, sanearOrden(pageable)),
+                AreaResponse::desdeEntidad);
+    }
+
+    /**
+     * Prepara el texto para el LIKE: minusculas, comodines y escape, para que
+     * buscar "100%" busque ese literal y no cualquier cosa que empiece por 100.
+     */
+    private String normalizarBusqueda(String valor) {
+        if (valor == null || valor.isBlank()) {
+            return null;
+        }
+        String escapado = valor.trim().toLowerCase()
+                .replace("!", "!!")
+                .replace("%", "!%")
+                .replace("_", "!_");
+        return "%" + escapado + "%";
+    }
+
+    /**
+     * Descarta los campos de ordenacion no permitidos: el {@code Pageable} se
+     * arma con lo que llegue en la URL.
+     */
+    private Pageable sanearOrden(Pageable pageable) {
+        if (pageable.getSort().isUnsorted()) {
+            return pageable;
+        }
+
+        List<Sort.Order> permitidos = pageable.getSort().stream()
+                .filter(orden -> {
+                    boolean valido = CAMPOS_ORDENABLES.contains(orden.getProperty());
+                    if (!valido) {
+                        log.warn("Orden por campo no permitido: '{}'. Se ignora.", orden.getProperty());
+                    }
+                    return valido;
+                })
+                .toList();
+
+        return PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(),
+                permitidos.isEmpty() ? Sort.by(Sort.Direction.ASC, "nombre") : Sort.by(permitidos));
+    }
+
     @Transactional
     public AreaResponse actualizarArea(Long id, AreaRecord record) {
         Area areaExistente = areaRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("El área con ID " + id + " no existe."));
+            .orElseThrow(() -> new IllegalArgumentException("El area indicada no existe."));
 
-        areaExistente.setNombre(record.nombre());
+        String nombre = record.nombre().trim();
+        if (areaRepository.existsByNombreIgnoreCaseAndIdNot(nombre, id)) {
+            throw new IllegalArgumentException("Ya existe otra area con el nombre " + nombre + ".");
+        }
+
+        areaExistente.setNombre(nombre);
         
         if (record.activo() != null) {
             areaExistente.setActivo(record.activo());
@@ -62,9 +136,21 @@ public class AreaService {
     @Transactional
     public void eliminarArea(Long id) {
         Area areaExistente = areaRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("El área con ID " + id + " no existe."));
+            .orElseThrow(() -> new IllegalArgumentException("El area indicada no existe."));
 
-        // Borrado lógico
+        // Dar de baja un area con personal dentro deja a esas personas sin area
+        // valida, y con ella se rompe el filtro de visibilidad de sus tickets:
+        // la bandeja les aparece vacia sin explicacion. Antes se permitia.
+        long personal = areaRepository.contarUsuariosActivos(id);
+        if (personal > 0) {
+            throw new IllegalArgumentException(
+                    "No se puede dar de baja el area: todavia tiene " + personal
+                    + (personal == 1 ? " usuario activo." : " usuarios activos.")
+                    + " Reasignalos primero a otra area.");
+        }
+
+        // Baja logica: el area desaparece de los selectores pero los tickets
+        // historicos conservan su referencia.
         areaExistente.setActivo(false);
         areaRepository.save(areaExistente);
     }
@@ -72,14 +158,17 @@ public class AreaService {
     // --- NUEVO MÉTODO INTEGRADO ---
     @Transactional
     public AreaResponse asignarSoporteFijo(Long id, SoporteFijoRequestRecord request) {
-        // 1. Validación manual estricta
-        if (request == null || request.soporteFijoId() == null) {
-            throw new IllegalArgumentException("El ID del soporte fijo es obligatorio.");
-        }
-
-        // 2. Validar existencia del área
         Area area = areaRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Área no encontrada."));
+
+        // Un id nulo retira la asignacion en lugar de ser un error. Antes solo
+        // se podia asignar: una vez puesto un tecnico fijo, no habia forma de
+        // devolver el area al balanceador automatico desde la interfaz.
+        if (request == null || request.soporteFijoId() == null) {
+            area.setSoporteFijo(null);
+            log.debug("Soporte fijo retirado del area id={}", id);
+            return AreaResponse.desdeEntidad(areaRepository.save(area));
+        }
 
         // 3. Validar existencia del usuario a asignar
         Usuario tecnico = usuarioRepository.findById(request.soporteFijoId())

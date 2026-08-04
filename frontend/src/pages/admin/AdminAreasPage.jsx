@@ -1,198 +1,557 @@
-import React, { useEffect, useState } from 'react';
-import { Switch, Box, Typography, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Button, TextField, Dialog, DialogActions, DialogContent, DialogTitle, Autocomplete } from '@mui/material';
+import { useState, useEffect, useCallback } from 'react';
+import {
+    Box, Typography, Button, Chip, Switch, Tooltip, Dialog, DialogTitle,
+    DialogContent, DialogActions, Stack, useMediaQuery, FormControlLabel,
+    Autocomplete, TextField
+} from '@mui/material';
+import { useTheme } from '@mui/material/styles';
+import AddIcon from '@mui/icons-material/Add';
+import EditIcon from '@mui/icons-material/Edit';
+import DomainIcon from '@mui/icons-material/Domain';
+import BlockIcon from '@mui/icons-material/Block';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutlined';
+import EngineeringIcon from '@mui/icons-material/Engineering';
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+
 import { areaService } from '../../services/areaService';
-import { userService } from '../../services/userService'; // <-- Importamos para traer a los técnicos
-import { toUpper } from '../../util/formater'; // <-- Importamos la función para convertir a mayúsculas
+import { userService } from '../../services/userService';
+import { useNotification } from '../../context/NotificationContext.jsx';
+import { useNetworkStatus } from '../../hooks/useNetworkStatus.jsx';
+import { useTablaPaginada } from '../../hooks/useTablaPaginada.jsx';
+import { esquemaArea } from '../../util/esquemas';
 
-const AdminAreasPage = () => {
-    const [areas, setAreas] = useState([]);
-    const [tecnicos, setTecnicos] = useState([]); // <-- Guardará solo a los usuarios de SOPORTE
-    const [busqueda, setBusqueda] = useState('');
-    
-    // Estados para el Modal de Crear/Editar Área
-    const [open, setOpen] = useState(false);
-    const [currentArea, setCurrentArea] = useState({ nombre: '' });
+import DynamicTable from '../../components/DynamicTable';
+import AccionesTabla from '../../components/AccionesTabla';
+import ConfirmationDialog from '../../components/ConfirmationDialog';
+import CampoFormulario from '../../components/CampoFormulario';
 
-    // Estados para el Modal de Asignar Soporte
-    const [openSoporte, setOpenSoporte] = useState(false);
+const OPCIONES_ESTADO = [
+    { valor: '', etiqueta: 'Todos los estados' },
+    { valor: 'true', etiqueta: 'Activas' },
+    { valor: 'false', etiqueta: 'Dadas de baja' },
+];
+
+const VALORES_INICIALES = { nombre: '', prioritaria: false };
+
+/**
+ * Administración de áreas.
+ *
+ * Cambios respecto a la versión anterior:
+ *  - Cargaba los técnicos con `userService.getAll()` y filtraba en memoria.
+ *    Ese endpoint ahora devuelve una página, así que el `.filter()` habría
+ *    fallado; se usa `getSoporte()`, que además filtra en el servidor.
+ *  - "Eliminar" borraba sin preguntar, con un solo clic y sin deshacer.
+ *  - No había forma de retirar el soporte fijo una vez asignado.
+ *  - El nombre no se validaba: se podía crear un área en blanco, que aparecía
+ *    como una fila vacía en todos los selectores del sistema.
+ *  - La tabla traía el catálogo completo y filtraba en el navegador.
+ */
+export default function AdminAreasPage() {
+    const { notificar, notificarError } = useNotification();
+
+    const theme = useTheme();
+    const esMovil = useMediaQuery(theme.breakpoints.down('sm'));
+
+    const estadoRed = useNetworkStatus();
+    const sinConexion = Boolean(estadoRed.sinConexion ?? estadoRed);
+
+    const [filtroEstado, setFiltroEstado] = useState('');
+    const [tecnicos, setTecnicos] = useState([]);
+
+    const [areaEditando, setAreaEditando] = useState(null);
+    const [modalAbierto, setModalAbierto] = useState(false);
+
     const [areaSoporte, setAreaSoporte] = useState(null);
-    const [tecnicoSeleccionado, setTecnicoSeleccionado] = useState(null);
+    const [tecnicoElegido, setTecnicoElegido] = useState(null);
+    const [areaABaja, setAreaABaja] = useState(null);
+    const [procesando, setProcesando] = useState(false);
 
-    const cargarDatos = async () => {
+    const cargar = useCallback((params) => areaService.getAll(params), []);
+
+    const tabla = useTablaPaginada({
+        cargar,
+        ordenInicial: { campo: 'nombre', direccion: 'asc' },
+        filtros: { activo: filtroEstado || undefined },
+    });
+
+    const { recargar } = tabla;
+
+    const {
+        control,
+        handleSubmit,
+        reset,
+        formState: { isSubmitting },
+    } = useForm({
+        resolver: zodResolver(esquemaArea),
+        mode: 'onBlur',
+        defaultValues: VALORES_INICIALES,
+    });
+
+    // --- Técnicos disponibles ---------------------------------------------
+    useEffect(() => {
+        let cancelado = false;
+
+        userService.getSoporte()
+            .then((respuesta) => {
+                if (cancelado) return;
+                const lista = Array.isArray(respuesta?.data) ? respuesta.data : [];
+                // Un técnico dado de baja no puede ser responsable de un área:
+                // el backend rechaza la asignación, así que no se ofrece.
+                setTecnicos(lista.filter((t) => t.activo));
+            })
+            .catch(() => {
+                if (!cancelado) setTecnicos([]);
+            });
+
+        return () => { cancelado = true; };
+    }, []);
+
+    // --- Alta y edición ---------------------------------------------------
+    const abrirAlta = () => {
+        setAreaEditando(null);
+        reset(VALORES_INICIALES);
+        setModalAbierto(true);
+    };
+
+    const abrirEdicion = (area) => {
+        setAreaEditando(area);
+        reset({ nombre: area.nombre || '', prioritaria: Boolean(area.prioritaria) });
+        setModalAbierto(true);
+    };
+
+    const guardar = async (datos) => {
+        const carga = {
+            nombre: datos.nombre.trim(),
+            prioritaria: Boolean(datos.prioritaria),
+            activo: areaEditando ? areaEditando.activo : true,
+        };
+
         try {
-            // Descargamos áreas y usuarios al mismo tiempo para mayor velocidad
-            const [resAreas, resUsuarios] = await Promise.all([
-                areaService.getAll(),
-                userService.getAll()
-            ]);
+            const respuesta = areaEditando
+                ? await areaService.update(areaEditando.id, carga)
+                : await areaService.create(carga);
 
-            // Ordenamos áreas
-            const areasOrdenadas = resAreas.data.sort((a, b) => a.nombre.localeCompare(b.nombre));
-            setAreas(areasOrdenadas);
-
-            // Filtramos a los usuarios para quedarnos SOLO con los técnicos de soporte activos
-            const soportesActivos = resUsuarios.data.filter(u => u.rolNombre === 'SOPORTE' && u.activo);
-            setTecnicos(soportesActivos);
+            notificar(respuesta?.mensaje
+                || (areaEditando ? 'Área actualizada correctamente.' : 'Área registrada correctamente.'));
+            setModalAbierto(false);
+            recargar();
         } catch (error) {
-            console.error("Error al cargar datos:", error);
+            notificarError(error);
         }
     };
 
-    useEffect(() => { cargarDatos(); }, []);
-
-    // --- Funciones del CRUD de Áreas ---
-    const handleSaveArea = async () => {
-        if (currentArea.id) await areaService.update(currentArea.id, currentArea);
-        else await areaService.create(currentArea);
-        setOpen(false);
-        cargarDatos();
-    };
-
-    const handleTogglePrioridad = async (area) => {
+    // --- Prioridad --------------------------------------------------------
+    const alternarPrioridad = async (area) => {
         try {
-            const payload = { ...area, prioritaria: !area.prioritaria };
-            await areaService.update(area.id, payload);
-            cargarDatos();
+            await areaService.update(area.id, {
+                nombre: area.nombre,
+                activo: area.activo,
+                prioritaria: !area.prioritaria,
+            });
+            notificar(area.prioritaria
+                ? `${area.nombre} deja de ser prioritaria.`
+                : `${area.nombre} pasa a ser prioritaria.`);
+            recargar();
         } catch (error) {
-            alert("Ocurrió un error al intentar cambiar la prioridad.");
+            notificarError(error);
         }
     };
 
-    // --- Nueva Función: Guardar el Soporte Fijo ---
-    const handleGuardarSoporte = async () => {
-        if (!tecnicoSeleccionado) {
-            alert("Por favor, selecciona un técnico.");
-            return;
-        }
+    // --- Soporte fijo -----------------------------------------------------
+    const abrirSoporte = (area) => {
+        setAreaSoporte(area);
+        setTecnicoElegido(
+            area.soporteFijoId
+                ? tecnicos.find((t) => t.id === area.soporteFijoId) ?? null
+                : null
+        );
+    };
 
+    const guardarSoporte = async () => {
+        setProcesando(true);
         try {
-            await areaService.asignarSoporteFijo(areaSoporte.id, tecnicoSeleccionado.id);
-            alert("Soporte fijo asignado correctamente.");
-            setOpenSoporte(false);
+            // Sin técnico elegido se retira la asignación y el área vuelve al
+            // balanceador automático.
+            const respuesta = await areaService.asignarSoporteFijo(
+                areaSoporte.id,
+                tecnicoElegido?.id ?? null
+            );
+            notificar(tecnicoElegido
+                ? `${tecnicoElegido.nombreCompleto || tecnicoElegido.nombre} queda a cargo de ${areaSoporte.nombre}.`
+                : `${areaSoporte.nombre} vuelve a la asignación automática.`);
             setAreaSoporte(null);
-            setTecnicoSeleccionado(null);
-            cargarDatos();
+            recargar();
+            return respuesta;
         } catch (error) {
-            const mensajeError = error.response?.data || "Ocurrió un error al asignar el soporte.";
-            alert(`Error: ${mensajeError}`);
+            notificarError(error);
+        } finally {
+            setProcesando(false);
         }
     };
 
-    const areasFiltradas = areas.filter(area => 
-        area.nombre.toLowerCase().includes(busqueda.toLowerCase())
-    );
+    // --- Baja y reactivación ----------------------------------------------
+    const confirmarBaja = async () => {
+        setProcesando(true);
+        try {
+            if (areaABaja.activo) {
+                const respuesta = await areaService.delete(areaABaja.id);
+                notificar(respuesta?.mensaje || 'Área dada de baja correctamente.');
+            } else {
+                // Reactivar es una edición normal: el endpoint de baja solo
+                // desactiva.
+                await areaService.update(areaABaja.id, {
+                    nombre: areaABaja.nombre,
+                    prioritaria: Boolean(areaABaja.prioritaria),
+                    activo: true,
+                });
+                notificar(`${areaABaja.nombre} vuelve a estar activa.`);
+            }
+            setAreaABaja(null);
+            recargar();
+        } catch (error) {
+            notificarError(error);
+        } finally {
+            setProcesando(false);
+        }
+    };
+
+    // --- Columnas ---------------------------------------------------------
+    const columnas = [
+        {
+            id: 'nombre',
+            etiqueta: 'Área',
+            principal: true,
+            ordenable: true,
+            render: (a) => (
+                <Typography variant="body2" fontWeight={500}>
+                    {a.nombre}
+                </Typography>
+            ),
+        },
+        {
+            id: 'soporteFijoNombre',
+            etiqueta: 'Técnico responsable',
+            ancho: '26%',
+            sinOrden: true,
+            render: (a) => (
+                a.soporteFijoId ? (
+                    <Typography variant="body2">{a.soporteFijoNombre}</Typography>
+                ) : (
+                    <Typography variant="body2" color="text.secondary">
+                        Asignación automática
+                    </Typography>
+                )
+            ),
+        },
+        {
+            id: 'prioritaria',
+            etiqueta: 'Prioritaria',
+            alineacion: 'center',
+            ancho: 120,
+            sinOrden: true,
+            render: (a) => (
+                <Tooltip
+                    title={a.prioritaria
+                        ? 'Sus tickets reciben atención preferente'
+                        : 'Atención en el orden habitual'}
+                    arrow
+                >
+                    <span>
+                        <Switch
+                            checked={Boolean(a.prioritaria)}
+                            onChange={() => alternarPrioridad(a)}
+                            disabled={!a.activo || sinConexion}
+                            color="warning"
+                            inputProps={{ 'aria-label': `Prioridad del área ${a.nombre}` }}
+                        />
+                    </span>
+                </Tooltip>
+            ),
+        },
+        {
+            id: 'activo',
+            etiqueta: 'Estado',
+            alineacion: 'center',
+            ancho: 120,
+            render: (a) => (
+                <Chip
+                    label={a.activo ? 'Activa' : 'Dada de baja'}
+                    size="small"
+                    color={a.activo ? 'success' : 'default'}
+                    variant={a.activo ? 'filled' : 'outlined'}
+                />
+            ),
+        },
+        {
+            id: 'acciones',
+            etiqueta: 'Acciones',
+            alineacion: 'center',
+            ancho: 140,
+            sinOrden: true,
+            render: (a) => (
+                <AccionesTabla
+                    acciones={[
+                        {
+                            id: 'editar',
+                            icono: <EditIcon />,
+                            titulo: 'Editar',
+                            etiqueta: `Editar el área ${a.nombre}`,
+                            onClick: () => abrirEdicion(a),
+                            deshabilitada: sinConexion,
+                            motivoDeshabilitada: 'Sin conexión con el servidor',
+                        },
+                        {
+                            id: 'soporte',
+                            icono: <EngineeringIcon />,
+                            titulo: 'Técnico responsable',
+                            etiqueta: `Asignar el técnico responsable de ${a.nombre}`,
+                            onClick: () => abrirSoporte(a),
+                            deshabilitada: sinConexion || !a.activo,
+                            motivoDeshabilitada: !a.activo
+                                ? 'El área está dada de baja'
+                                : 'Sin conexión con el servidor',
+                        },
+                        {
+                            id: 'estado',
+                            icono: a.activo ? <BlockIcon /> : <CheckCircleOutlineIcon />,
+                            titulo: a.activo ? 'Dar de baja' : 'Reactivar',
+                            etiqueta: `${a.activo ? 'Dar de baja el área' : 'Reactivar el área'} ${a.nombre}`,
+                            color: a.activo ? 'error' : 'success',
+                            onClick: () => setAreaABaja(a),
+                            deshabilitada: sinConexion,
+                            motivoDeshabilitada: 'Sin conexión con el servidor',
+                        },
+                    ]}
+                />
+            ),
+        },
+    ];
 
     return (
-        <Box sx={{ p: 3 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                <Typography variant="h5">Gestión de Áreas</Typography>
-                <Button variant="contained" color="primary" onClick={() => { setCurrentArea({ nombre: '' }); setOpen(true); }}>
-                    + Nueva Área
+        <Box>
+            <Box
+                sx={{
+                    display: 'flex',
+                    flexDirection: { xs: 'column', sm: 'row' },
+                    justifyContent: 'space-between',
+                    alignItems: { xs: 'stretch', sm: 'center' },
+                    gap: 2,
+                    mb: 3,
+                }}
+            >
+                <Box>
+                    <Typography
+                        variant="h4"
+                        component="h2"
+                        color="primary.main"
+                        sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
+                    >
+                        <DomainIcon fontSize="large" aria-hidden="true" />
+                        Áreas
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                        Unidades administrativas y su técnico responsable.
+                    </Typography>
+                </Box>
+
+                <Button
+                    variant="contained"
+                    startIcon={<AddIcon />}
+                    onClick={abrirAlta}
+                    disabled={sinConexion}
+                >
+                    Nueva área
                 </Button>
             </Box>
 
-            <TextField
-                label="Buscar área por nombre..."
-                variant="outlined"
-                size="small"
-                fullWidth
-                sx={{ mb: 2 }}
-                value={busqueda}
-                onChange={(e) => setBusqueda(e.target.value)}
+            <DynamicTable
+                columnas={columnas}
+                filas={tabla.filas}
+                cargando={tabla.cargando}
+                anchoMinimo={900}
+                busqueda={tabla.busqueda}
+                onBuscar={tabla.setBusqueda}
+                placeholderBusqueda="Buscar área por nombre…"
+                filtros={[
+                    {
+                        id: 'estado',
+                        etiqueta: 'Estado',
+                        valor: filtroEstado,
+                        valorPorDefecto: '',
+                        opciones: OPCIONES_ESTADO,
+                        onChange: setFiltroEstado,
+                        ancho: 190,
+                    },
+                ]}
+                paginacion={tabla.paginacion}
+                onCambiarPagina={tabla.cambiarPagina}
+                onCambiarTamano={tabla.cambiarTamano}
+                orden={tabla.orden}
+                onCambiarOrden={tabla.cambiarOrden}
+                onRecargar={recargar}
+                vacio={{
+                    icono: DomainIcon,
+                    titulo: tabla.busqueda || filtroEstado
+                        ? 'Sin resultados'
+                        : 'No hay áreas registradas',
+                    descripcion: tabla.busqueda || filtroEstado
+                        ? 'Prueba con otro nombre o cambia el filtro de estado.'
+                        : 'Da de alta las unidades administrativas de la institución.',
+                    textoAccion: !tabla.busqueda && !filtroEstado ? 'Crear la primera área' : undefined,
+                    onAccion: !tabla.busqueda && !filtroEstado ? abrirAlta : undefined,
+                }}
             />
-            
-            <TableContainer component={Paper}>
-                <Table>
-                    <TableHead>
-                        <TableRow>
-                            <TableCell>Nombre</TableCell>
-                            <TableCell align="center">Prioritaria</TableCell>
-                            <TableCell align="center">Soporte Asignado</TableCell>
-                            <TableCell>Acciones</TableCell>
-                        </TableRow>
-                    </TableHead>
-                    <TableBody>
-                        {areasFiltradas.map(a => (
-                            <TableRow key={a.id}>
-                                <TableCell>{a.nombre}</TableCell>
-                                <TableCell align="center">
-                                    <Switch
-                                        checked={a.prioritaria || false}
-                                        onChange={() => handleTogglePrioridad(a)}
-                                        color="warning"
-                                    />
-                                </TableCell>
-                                {/* NUEVA COLUMNA: Muestra si ya tiene alguien asignado (opcional si tu backend lo devuelve) */}
-                                <TableCell align="center">
-                                    {a.soporteFijoNombre ? a.soporteFijoNombre : <Typography variant="caption" color="textSecondary">Sin asignar</Typography>}
-                                </TableCell>
-                                
-                                <TableCell>
-                                    {/* NUEVO BOTÓN PARA ASIGNAR */}
-                                    <Button 
-                                        size="small" 
-                                        color="success" 
-                                        onClick={() => { setAreaSoporte(a); setOpenSoporte(true); }}
-                                    >
-                                        Asignar Soporte
-                                    </Button>
-                                    <Button size="small" onClick={() => { setCurrentArea(a); setOpen(true); }}>Editar</Button>
-                                    <Button size="small" color="error" onClick={async () => { await areaService.delete(a.id); cargarDatos(); }}>Eliminar</Button>
-                                </TableCell>
-                            </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
-            </TableContainer>
 
-            {/* Modal para Crear/Editar Área */}
-            <Dialog open={open} onClose={() => setOpen(false)}>
-                <DialogTitle>{currentArea.id ? "Editar" : "Crear"} Área</DialogTitle>
-                <DialogContent>
-                    <TextField 
-                        label="Nombre del Área" 
-                        fullWidth 
-                        margin="dense"
-                        value={currentArea.nombre} 
-                        onChange={e => setCurrentArea({...currentArea, nombre: toUpper(e.target.value)})} 
-                    />
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setOpen(false)}>Cancelar</Button>
-                    <Button onClick={handleSaveArea} variant="contained" color="primary">Guardar</Button>
-                </DialogActions>
+            {/* ------------------------------------------ alta y edición ---- */}
+            <Dialog
+                open={modalAbierto}
+                onClose={() => !isSubmitting && setModalAbierto(false)}
+                fullWidth
+                maxWidth="sm"
+                fullScreen={esMovil}
+                aria-labelledby="titulo-area"
+            >
+                <DialogTitle id="titulo-area">
+                    {areaEditando ? 'Editar área' : 'Nueva área'}
+                </DialogTitle>
+
+                <form onSubmit={handleSubmit(guardar)} noValidate>
+                    <DialogContent dividers>
+                        <Stack spacing={2.5}>
+                            <CampoFormulario
+                                control={control}
+                                nombre="nombre"
+                                etiqueta="Nombre del área"
+                                obligatorio
+                                maximo={100}
+                                mayusculas
+                                ayuda="Como aparecerá en los selectores y en los documentos."
+                            />
+
+                            <Controller
+                                name="prioritaria"
+                                control={control}
+                                render={({ field }) => (
+                                    <FormControlLabel
+                                        control={
+                                            <Switch
+                                                checked={Boolean(field.value)}
+                                                onChange={(e) => field.onChange(e.target.checked)}
+                                                color="warning"
+                                            />
+                                        }
+                                        label={
+                                            <Box>
+                                                <Typography variant="body2">Área prioritaria</Typography>
+                                                <Typography variant="caption" color="text.secondary">
+                                                    Sus tickets reciben atención preferente.
+                                                </Typography>
+                                            </Box>
+                                        }
+                                    />
+                                )}
+                            />
+                        </Stack>
+                    </DialogContent>
+
+                    <DialogActions
+                        sx={{ flexDirection: { xs: 'column-reverse', sm: 'row' }, gap: 1, p: 2 }}
+                    >
+                        <Button
+                            onClick={() => setModalAbierto(false)}
+                            color="inherit"
+                            disabled={isSubmitting}
+                            fullWidth={esMovil}
+                            size={esMovil ? 'large' : 'medium'}
+                        >
+                            Cancelar
+                        </Button>
+                        <Button
+                            type="submit"
+                            variant="contained"
+                            disabled={isSubmitting || sinConexion}
+                            fullWidth={esMovil}
+                            size={esMovil ? 'large' : 'medium'}
+                        >
+                            {isSubmitting ? 'Guardando…' : areaEditando ? 'Guardar cambios' : 'Crear área'}
+                        </Button>
+                    </DialogActions>
+                </form>
             </Dialog>
 
-            {/* <-- NUEVO MODAL: ASIGNAR SOPORTE FIJO --> */}
-            <Dialog open={openSoporte} onClose={() => setOpenSoporte(false)} maxWidth="xs" fullWidth>
-                <DialogTitle>Asignar Soporte</DialogTitle>
-                <DialogContent>
-                    <Typography variant="body2" sx={{ mb: 2, mt: 1 }}>
-                        Selecciona el técnico que será responsable de los tickets del área: <strong>{areaSoporte?.nombre}</strong>
+            {/* --------------------------------------------- soporte fijo -- */}
+            <Dialog
+                open={Boolean(areaSoporte)}
+                onClose={() => !procesando && setAreaSoporte(null)}
+                fullWidth
+                maxWidth="xs"
+                fullScreen={esMovil}
+                aria-labelledby="titulo-soporte"
+            >
+                <DialogTitle id="titulo-soporte">Técnico responsable</DialogTitle>
+
+                <DialogContent dividers>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
+                        Quien atienda de forma fija los tickets de{' '}
+                        <strong>{areaSoporte?.nombre}</strong>. Si no eliges a nadie, los
+                        tickets se reparten automáticamente entre el personal disponible.
                     </Typography>
-                    
+
                     <Autocomplete
                         options={tecnicos}
-                        getOptionLabel={(option) => `${option.nombre} (${option.correo})`}
-                        value={tecnicoSeleccionado}
-                        onChange={(event, newValue) => setTecnicoSeleccionado(newValue)}
+                        value={tecnicoElegido}
+                        onChange={(_e, valor) => setTecnicoElegido(valor)}
+                        getOptionLabel={(t) => t.nombreCompleto || t.nombre || ''}
+                        isOptionEqualToValue={(opcion, valor) => opcion.id === valor.id}
+                        noOptionsText="No hay personal de soporte activo"
                         renderInput={(params) => (
-                            <TextField {...params} label="Técnico de Soporte" margin="dense" fullWidth />
+                            <TextField
+                                {...params}
+                                label="Técnico de soporte"
+                                helperText="Déjalo vacío para volver a la asignación automática."
+                            />
                         )}
                     />
                 </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => { setOpenSoporte(false); setTecnicoSeleccionado(null); }} color="inherit">
+
+                <DialogActions
+                    sx={{ flexDirection: { xs: 'column-reverse', sm: 'row' }, gap: 1, p: 2 }}
+                >
+                    <Button
+                        onClick={() => setAreaSoporte(null)}
+                        color="inherit"
+                        disabled={procesando}
+                        fullWidth={esMovil}
+                        size={esMovil ? 'large' : 'medium'}
+                    >
                         Cancelar
                     </Button>
-                    <Button onClick={handleGuardarSoporte} variant="contained" color="success">
-                        Asignar Técnico
+                    <Button
+                        onClick={guardarSoporte}
+                        variant="contained"
+                        disabled={procesando || sinConexion}
+                        fullWidth={esMovil}
+                        size={esMovil ? 'large' : 'medium'}
+                    >
+                        {procesando ? 'Guardando…' : 'Guardar'}
                     </Button>
                 </DialogActions>
             </Dialog>
 
+            {/* ------------------------------------------ baja / reactivar -- */}
+            <ConfirmationDialog
+                abierto={Boolean(areaABaja)}
+                titulo={areaABaja?.activo ? '¿Dar de baja esta área?' : '¿Reactivar esta área?'}
+                mensaje={areaABaja?.activo
+                    ? `${areaABaja?.nombre} dejará de aparecer en los formularios. Los tickets ya registrados conservan su área. Si todavía tiene personal asignado, el sistema no permitirá la baja.`
+                    : `${areaABaja?.nombre} volverá a estar disponible en los formularios.`}
+                textoConfirmar={areaABaja?.activo ? 'Sí, dar de baja' : 'Sí, reactivar'}
+                destructivo={areaABaja?.activo}
+                cargando={procesando}
+                onConfirmar={confirmarBaja}
+                onCancelar={() => setAreaABaja(null)}
+            />
         </Box>
     );
-};
-
-export default AdminAreasPage;
+}

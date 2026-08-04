@@ -92,6 +92,12 @@ export const esquemaUsuario = (rolesPorId = {}) =>
         }
     });
 
+/** Alta y edición de un área. Espeja `AreaRecord`. */
+export const esquemaArea = z.object({
+    nombre: textoObligatorio('El nombre del área', 100, 3),
+    prioritaria: z.boolean().optional(),
+});
+
 /** Resolución de un ticket. Espeja `ResolucionRequest`. */
 export const esquemaResolucion = z.object({
     planTrabajoClave: z.string().min(1, 'Selecciona la meta del plan de trabajo.'),
