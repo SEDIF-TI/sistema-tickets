@@ -105,6 +105,10 @@ public class SecurityConfig {
                     .requestMatchers("/api/v1/auth/**").permitAll()
                     .requestMatchers("/ws-tickets/**").permitAll()
                     .requestMatchers("/error").permitAll()
+                    // Sondeo de conectividad del frontend. Publico porque la
+                    // pantalla de acceso lo consulta antes de que exista
+                    // sesion, y no revela nada: responde 204 sin cuerpo.
+                    .requestMatchers("/api/salud").permitAll()
 
                     // Barrera por URL para el area de administracion. La
                     // autorizacion fina vive en los @PreAuthorize de cada

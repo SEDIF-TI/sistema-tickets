@@ -130,6 +130,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         String ruta = request.getServletPath();
         return ruta.startsWith("/api/v1/auth/")
                 || ruta.startsWith("/ws-tickets")
+                || ruta.equals("/api/salud")
                 || "OPTIONS".equalsIgnoreCase(request.getMethod());
     }
 }

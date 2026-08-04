@@ -62,7 +62,16 @@ export const useNetworkStatus = () => {
         const corte = setTimeout(() => controlador.abort(), TIMEOUT_SONDEO_MS);
 
         try {
-            await fetch(import.meta.env.VITE_API_URL || '/api', {
+            // Se sondea /salud y no la raíz de la API.
+            //
+            // `/api` a secas no corresponde a ningún controlador: Spring
+            // Security lo rechazaba con 403 ANTES de que el filtro de CORS
+            // añadiera sus cabeceras, así que el navegador lo reportaba como
+            // un error de CORS. La consola se llenaba de "blocked by CORS
+            // policy" cada treinta segundos y la aplicación mostraba "No hay
+            // comunicación con el servidor" aunque el backend estuviera en pie.
+            const base = import.meta.env.VITE_API_URL || '/api';
+            await fetch(`${base.replace(/\/$/, '')}/salud`, {
                 method: 'HEAD',
                 cache: 'no-store',
                 signal: controlador.signal,

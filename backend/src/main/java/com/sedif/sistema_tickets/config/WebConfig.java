@@ -39,7 +39,12 @@ public class WebConfig {
         // llamara a la API desde el navegador de un usuario con sesion activa.
         config.setAllowedOrigins(origenesPermitidos);
 
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        // HEAD va en la lista porque el sondeo de conectividad del frontend lo
+        // usa: pide solo las cabeceras, sin descargar cuerpo, cada treinta
+        // segundos. Al faltar aqui, el preflight se rechazaba con 403 y el
+        // navegador lo reportaba como error de CORS, de modo que la aplicacion
+        // se declaraba sin conexion con el servidor perfectamente en pie.
+        config.setAllowedMethods(List.of("GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept", "X-Requested-With"));
 
         // Necesario para que el navegador pueda leer el encabezado en descargas
