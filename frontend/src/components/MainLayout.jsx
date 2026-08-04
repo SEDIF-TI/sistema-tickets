@@ -252,7 +252,7 @@ export default function MainLayout({ children }) {
                 position="fixed"
                 sx={{ bgcolor: 'primary.main', zIndex: (t) => t.zIndex.drawer + 1 }}
             >
-                <Toolbar sx={{ minHeight: ALTO_BARRA, gap: 1, px: { xs: 1, sm: 3 } }}>
+                <Toolbar sx={{ minHeight: ALTO_BARRA, gap: 1, px: { xs: 1, sm: 3 }, position: 'relative' }}>
                     {mostrarMenu && !esEscritorio && (
                         <IconButton
                             color="inherit"
@@ -264,13 +264,26 @@ export default function MainLayout({ children }) {
                         </IconButton>
                     )}
 
-                    {/* Logotipo institucional, centrado en escritorio. */}
+                    {/* Logotipo institucional.
+
+                        En escritorio se centra respecto a la BARRA, no respecto
+                        al espacio libre: colocado en el flujo, los bloques de
+                        los lados tienen anchos distintos —el de la izquierda
+                        aparece solo en movil— y el logo quedaba desplazado. Con
+                        posicion absoluta el centro es siempre el de la pantalla.
+
+                        `pointerEvents: none` evita que la caja invisible tape
+                        los botones que quedan debajo. */}
                     <Box
                         sx={{
-                            flex: 1,
+                            position: { xs: 'static', md: 'absolute' },
+                            left: { md: '50%' },
+                            transform: { md: 'translateX(-50%)' },
+                            flex: { xs: 1, md: 'unset' },
                             display: 'flex',
                             justifyContent: { xs: 'flex-start', md: 'center' },
                             alignItems: 'center',
+                            pointerEvents: 'none',
                         }}
                     >
                         <Box
@@ -278,7 +291,7 @@ export default function MainLayout({ children }) {
                             src={logoPuebla}
                             alt="Gobierno del Estado de Puebla"
                             sx={{
-                                height: { xs: 44, sm: 68 },
+                                height: { xs: 52, sm: 78 },
                                 width: 'auto',
                                 objectFit: 'contain',
                                 // El logotipo es oscuro; sobre el guinda se
@@ -287,6 +300,10 @@ export default function MainLayout({ children }) {
                             }}
                         />
                     </Box>
+
+                    {/* Empuja la identidad del usuario al extremo derecho, ya
+                        que el logotipo salio del flujo en escritorio. */}
+                    <Box sx={{ flex: 1, display: { xs: 'none', md: 'block' } }} />
 
                     {/* Identidad del usuario y acciones. */}
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 0.5, sm: 1 } }}>
@@ -369,7 +386,13 @@ export default function MainLayout({ children }) {
                     flexGrow: 1,
                     minWidth: 0,
                     p: { xs: 2, sm: 3 },
-                    mt: ALTO_BARRA,
+                    // En píxeles, no con el valor suelto de ALTO_BARRA: `mt`
+                    // interpreta los números como múltiplos del espaciado del
+                    // tema (8px), de modo que `mt: {xs: 72, sm: 88}` reservaba
+                    // 576px y 704px en lugar de 72 y 88. Ese era el bloque en
+                    // blanco que aparecía sobre el contenido en todas las
+                    // pantallas, empujándolo por debajo del pliegue.
+                    mt: { xs: `${ALTO_BARRA.xs}px`, sm: `${ALTO_BARRA.sm}px` },
                 }}
             >
                 {/* Estado de la conexión. `aria-live` hace que un lector de

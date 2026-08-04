@@ -58,7 +58,8 @@ public class CorreoInstitucionalServiceImpl implements CorreoInstitucionalServic
     @Transactional(readOnly = true)
     public CorreoInstitucional obtenerPorId(Long id) {
         return correoRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Correo institucional no encontrado con ID: " + id));
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "No existe un registro de correo con ese identificador."));
     }
 
     @Override

@@ -293,7 +293,15 @@ const theme = createTheme({
     },
     MuiTableRow: {
       styleOverrides: {
-        root: { transition: 'background-color 150ms', '&:hover': { backgroundColor: neutro[50] } },
+        root: {
+          transition: 'background-color 150ms',
+          // El resaltado al pasar el cursor es solo para las filas de datos.
+          // Aplicado a `root` alcanzaba tambien a la fila de encabezado, que
+          // va sobre fondo guinda: el gris claro encima la lavaba y el texto
+          // blanco quedaba casi ilegible.
+          '&:hover': { backgroundColor: neutro[50] },
+          '.MuiTableHead-root &:hover': { backgroundColor: 'transparent' },
+        },
       },
     },
 
@@ -303,10 +311,16 @@ const theme = createTheme({
       styleOverrides: {
         root: {
           color: 'inherit',
-          '&:hover': { color: 'inherit', opacity: 0.85 },
+          // Sin opacidad al pasar el cursor: sobre el fondo guinda del
+          // encabezado, atenuar el texto blanco lo dejaba casi invisible. El
+          // realce se hace mostrando la flecha de orden, que antes estaba
+          // oculta hasta el hover.
+          '&:hover': { color: 'inherit' },
+          '&:hover .MuiTableSortLabel-icon': { opacity: 0.6 },
+          '&.Mui-focusVisible': { color: 'inherit' },
           '&.Mui-active': {
             color: 'inherit',
-            '& .MuiTableSortLabel-icon': { color: 'inherit !important' },
+            '& .MuiTableSortLabel-icon': { color: 'inherit !important', opacity: 1 },
           },
         },
       },

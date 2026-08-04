@@ -204,7 +204,7 @@ public class DocumentoService {
             document.close();
             return baos.toByteArray();
         } catch (Exception e) {
-            throw new RuntimeException("Error al generar el formato oficial de Dictamen", e);
+            throw new IllegalStateException("No se pudo generar el dictamen tecnico. Revise que los datos esten completos.", e);
         }
     }
 
@@ -317,7 +317,7 @@ public class DocumentoService {
             document.close();
             return baos.toByteArray();
         } catch (Exception e) {
-            throw new RuntimeException("Error al generar el reporte de actividades", e);
+            throw new IllegalStateException("No se pudo generar el reporte de actividades.", e);
         }
     }
 
@@ -405,7 +405,7 @@ public class DocumentoService {
             workbook.write(out);
             return out.toByteArray();
         } catch (Exception e) {
-            throw new RuntimeException("Error al generar el archivo Excel", e);
+            throw new IllegalStateException("No se pudo generar el archivo de Excel.", e);
         }
     }
     
@@ -615,7 +615,7 @@ public class DocumentoService {
             document.close();
             return baos.toByteArray();
         } catch (Exception e) {
-            throw new RuntimeException("Error al generar el formato oficial de Resguardo", e);
+            throw new IllegalStateException("No se pudo generar la responsiva de resguardo.", e);
         }
     }
 
@@ -671,7 +671,7 @@ public class DocumentoService {
             document.close();
             return baos.toByteArray();
         } catch (Exception e) {
-            throw new RuntimeException("Error al generar Entrada de Equipo", e);
+            throw new IllegalStateException("No se pudo generar el formato de entrada de equipo.", e);
         }
     }
 
@@ -722,7 +722,7 @@ public class DocumentoService {
             document.close();
             return baos.toByteArray();
         } catch (Exception e) {
-            throw new RuntimeException("Error al generar Mantenimiento", e);
+            throw new IllegalStateException("No se pudo generar el reporte de mantenimiento preventivo.", e);
         }
     }
 
