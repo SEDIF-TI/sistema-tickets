@@ -4,6 +4,7 @@ import com.sedif.sistema_tickets.core.ticket.TicketRepository;
 import com.sedif.sistema_tickets.core.usuarios.UsuarioRepository;
 import com.sedif.sistema_tickets.core.aviso.AvisoRepository;
 import com.sedif.sistema_tickets.util.enums.EstadoTicket;
+import com.sedif.sistema_tickets.util.enums.Prioridad;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import java.util.List;
@@ -56,7 +57,18 @@ public class DashboardService {
         if (valor instanceof EstadoTicket estado) {
             return estado.getEtiqueta();
         }
-        return valor.toString();
+        if (valor instanceof Prioridad prioridad) {
+            return prioridad.getEtiqueta();
+        }
+
+        // La consulta de prioridades agrupa por la columna y devuelve texto,
+        // no la constante del enum, asi que se traduce aqui: sin esto la
+        // grafica mostraba "URGENTE" en mayusculas junto a estados ya
+        // capitalizados como "Abierto".
+        String texto = valor.toString();
+        return Prioridad.desde(texto)
+                .map(Prioridad::getEtiqueta)
+                .orElse(texto);
     }
 
     private List<DashboardResponse.MetricaFecha> mapearFecha(List<Object[]> datos) {

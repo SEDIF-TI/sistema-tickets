@@ -49,10 +49,17 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-validation</artifactId>
 		</dependency>
-		<!-- Flyway: versionado del esquema de base de datos -->
+		<!-- Flyway: versionado del esquema de base de datos.
+
+		     Se declara el STARTER, no solo flyway-core. En Spring Boot 4 las
+		     autoconfiguraciones viven en modulos propios: con flyway-core a
+		     secas las clases estan en el classpath pero Boot nunca ejecuta las
+		     migraciones, y `spring.flyway.enabled=true` no da ningun aviso de
+		     que se esta ignorando. El sintoma era una base recien creada que
+		     quedaba vacia y un arranque que fallaba por tablas inexistentes. -->
 		<dependency>
-			<groupId>org.flywaydb</groupId>
-			<artifactId>flyway-core</artifactId>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-flyway</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>org.flywaydb</groupId>

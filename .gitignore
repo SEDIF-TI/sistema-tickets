@@ -79,3 +79,6 @@ pgdata/
 *.sql.gz
 *.dump
 backup/
+
+# Configuracion local de Claude Code (herramienta de desarrollo, no del proyecto)
+.claude/

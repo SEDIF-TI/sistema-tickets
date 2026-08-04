@@ -26,20 +26,31 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
     // sin romper el LIMIT.
     // =====================================================================
 
-    // Los tres metodos aceptan ademas un texto libre y un estatus, ambos
+    // Los tres metodos aceptan ademas un texto libre y un estado, ambos
     // opcionales (null = sin filtrar). Antes la busqueda se hacia en el
     // navegador sobre la pagina ya descargada, de modo que "buscar" solo
     // miraba 10 de los miles de tickets existentes.
+    //
+    // El parametro :busqueda llega YA en minusculas y con los comodines '%'
+    // puestos por el servicio (ver TicketService.normalizarBusqueda). Se hace
+    // asi por dos motivos:
+    //
+    //   1. PostgreSQL no puede inferir el tipo de un parametro que llega nulo
+    //      dentro de LOWER(...): lo trata como bytea y la consulta falla con
+    //      "function lower(bytea) does not exist" en cuanto se filtra sin
+    //      texto de busqueda. El CAST explicito fija el tipo.
+    //   2. Aplicar LOWER solo al lado de la columna permite aprovechar un
+    //      indice funcional si en el futuro hiciera falta.
 
     /** Vision GLOBAL: todos los tickets. Exclusivo de ADMINISTRADOR. */
     @EntityGraph(attributePaths = {"usuarioArea", "usuarioArea.area", "usuarioSoporte"})
     @Query("""
             SELECT t FROM Ticket t
-            WHERE (:busqueda IS NULL
-                   OR LOWER(t.titulo) LIKE LOWER(CONCAT('%', :busqueda, '%'))
-                   OR LOWER(t.usuarioArea.nombre) LIKE LOWER(CONCAT('%', :busqueda, '%'))
-                   OR LOWER(t.usuarioArea.area.nombre) LIKE LOWER(CONCAT('%', :busqueda, '%'))
-                   OR CAST(t.id AS string) LIKE CONCAT('%', :busqueda, '%'))
+            WHERE (CAST(:busqueda AS string) IS NULL
+                   OR LOWER(t.titulo) LIKE :busqueda ESCAPE '!'
+                   OR LOWER(t.usuarioArea.nombre) LIKE :busqueda ESCAPE '!'
+                   OR LOWER(t.usuarioArea.area.nombre) LIKE :busqueda ESCAPE '!'
+                   OR CAST(t.id AS string) LIKE :busqueda ESCAPE '!')
               AND (:estado IS NULL OR t.estado = :estado)
             """)
     Page<Ticket> buscarTodosPaginado(@Param("busqueda") String busqueda,
@@ -51,10 +62,10 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
     @Query("""
             SELECT t FROM Ticket t
             WHERE t.usuarioArea.area.id = :areaId
-              AND (:busqueda IS NULL
-                   OR LOWER(t.titulo) LIKE LOWER(CONCAT('%', :busqueda, '%'))
-                   OR LOWER(t.usuarioArea.nombre) LIKE LOWER(CONCAT('%', :busqueda, '%'))
-                   OR CAST(t.id AS string) LIKE CONCAT('%', :busqueda, '%'))
+              AND (CAST(:busqueda AS string) IS NULL
+                   OR LOWER(t.titulo) LIKE :busqueda ESCAPE '!'
+                   OR LOWER(t.usuarioArea.nombre) LIKE :busqueda ESCAPE '!'
+                   OR CAST(t.id AS string) LIKE :busqueda ESCAPE '!')
               AND (:estado IS NULL OR t.estado = :estado)
             """)
     Page<Ticket> buscarPorAreaPaginado(@Param("areaId") Long areaId,
@@ -71,11 +82,11 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
     @Query("""
             SELECT t FROM Ticket t
             WHERE (t.usuarioSoporte.id = :usuarioId OR t.usuarioArea.id = :usuarioId)
-              AND (:busqueda IS NULL
-                   OR LOWER(t.titulo) LIKE LOWER(CONCAT('%', :busqueda, '%'))
-                   OR LOWER(t.usuarioArea.nombre) LIKE LOWER(CONCAT('%', :busqueda, '%'))
-                   OR LOWER(t.usuarioArea.area.nombre) LIKE LOWER(CONCAT('%', :busqueda, '%'))
-                   OR CAST(t.id AS string) LIKE CONCAT('%', :busqueda, '%'))
+              AND (CAST(:busqueda AS string) IS NULL
+                   OR LOWER(t.titulo) LIKE :busqueda ESCAPE '!'
+                   OR LOWER(t.usuarioArea.nombre) LIKE :busqueda ESCAPE '!'
+                   OR LOWER(t.usuarioArea.area.nombre) LIKE :busqueda ESCAPE '!'
+                   OR CAST(t.id AS string) LIKE :busqueda ESCAPE '!')
               AND (:estado IS NULL OR t.estado = :estado)
             """)
     Page<Ticket> buscarPorSoporteOCreadorPaginado(@Param("usuarioId") Long usuarioId,

@@ -388,7 +388,7 @@ public class TicketService {
             throw new IllegalStateException("El usuario no tiene un rol asignado.");
         }
 
-        String textoBusqueda = normalizarFiltro(busqueda);
+        String textoBusqueda = normalizarBusqueda(busqueda);
         EstadoTicket filtroEstado = normalizarEstado(estatus);
         Pageable paginaSegura = sanearOrden(pageable);
 
@@ -434,7 +434,7 @@ public class TicketService {
         Usuario usuario = usuarioRepository.findByCorreoOrUsername(correoUsuario, correoUsuario)
                 .orElseThrow(() -> new IllegalArgumentException(MessageConstants.USUARIO_NO_ENCONTRADO));
 
-        String textoBusqueda = normalizarFiltro(busqueda);
+        String textoBusqueda = normalizarBusqueda(busqueda);
         EstadoTicket filtroEstado = normalizarEstado(estatus);
         Pageable paginaSegura = sanearOrden(pageable);
 
@@ -543,6 +543,34 @@ public class TicketService {
      */
     private String normalizarFiltro(String valor) {
         return (valor == null || valor.isBlank()) ? null : valor.trim();
+    }
+
+    /**
+     * Prepara el texto de busqueda para el LIKE de las consultas.
+     *
+     * <p>Devuelve el texto en minusculas y rodeado de comodines, o
+     * {@code null} si no hay nada que buscar. La transformacion se hace aqui y
+     * no en la consulta porque PostgreSQL no puede inferir el tipo de un
+     * parametro nulo dentro de {@code LOWER(...)}: lo trata como {@code bytea}
+     * y la consulta falla en cuanto se filtra por estado sin texto de
+     * busqueda.</p>
+     *
+     * <p>Se escapan los comodines propios de LIKE para que un usuario que
+     * escriba "100%" busque ese texto literal y no cualquier cosa que empiece
+     * por "100".</p>
+     */
+    private String normalizarBusqueda(String valor) {
+        String texto = normalizarFiltro(valor);
+        if (texto == null) {
+            return null;
+        }
+
+        String escapado = texto.toLowerCase()
+                .replace("!", "!!")
+                .replace("%", "!%")
+                .replace("_", "!_");
+
+        return "%" + escapado + "%";
     }
 
     /**
