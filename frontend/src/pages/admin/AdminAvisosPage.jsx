@@ -1,183 +1,421 @@
-import React, { useState, useEffect } from 'react';
-import { 
-    Box, Typography, Paper, TextField, Button, Table, TableBody, 
-    TableCell, TableContainer, TableHead, TableRow, 
-    Chip, Switch, Tooltip, IconButton, Autocomplete, 
-    Snackbar, Alert // <--- Agregamos los componentes para la notificación
+import { useState, useEffect, useCallback } from 'react';
+import {
+    Box, Typography, Button, Chip, Switch, Tooltip, Dialog, DialogTitle,
+    DialogContent, DialogActions, Stack, useMediaQuery
 } from '@mui/material';
-
+import { useTheme } from '@mui/material/styles';
+import AddIcon from '@mui/icons-material/Add';
+import EditIcon from '@mui/icons-material/Edit';
 import CampaignIcon from '@mui/icons-material/Campaign';
-import PostAddIcon from '@mui/icons-material/PostAdd';
-import DeleteIcon from '@mui/icons-material/Delete';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlineOutlined';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 
-import api from '../../services/api';
-import { areaService } from '../../services/areaService'; 
+import { avisoService } from '../../services/avisoService';
+import { areaService } from '../../services/areaService';
+import { useNotification } from '../../context/NotificationContext.jsx';
+import { useNetworkStatus } from '../../hooks/useNetworkStatus.jsx';
+import { esquemaAviso } from '../../util/esquemas';
+import { truncar } from '../../util/formater';
 
-import { toUpper } from '../../util/formater'; // <-- Importamos la función para convertir a mayúsculas
+import DynamicTable from '../../components/DynamicTable';
+import AccionesTabla from '../../components/AccionesTabla';
+import ConfirmationDialog from '../../components/ConfirmationDialog';
+import CampoFormulario from '../../components/CampoFormulario';
 
-const COLOR_GUINDA = '#801A36'; 
+const VALORES_INICIALES = { titulo: '', mensaje: '', areaId: '' };
 
+/**
+ * Administración de avisos.
+ *
+ * Cambios respecto a la versión anterior:
+ *  - El formulario de alta vivía permanentemente sobre la tabla, ocupando un
+ *    tercio de la pantalla aunque no se fuera a usar. Ahora es un diálogo.
+ *  - No se podía editar un aviso: solo crear, encender/apagar y borrar. Para
+ *    corregir una falta de ortografía había que borrarlo y volver a escribirlo.
+ *  - "Eliminar" usaba `window.confirm()` con el texto "¿Eliminar
+ *    definitivamente?", sin decir cuál ni advertir que no tiene vuelta atrás.
+ *  - Montaba su propio Snackbar en lugar de usar el del sistema.
+ *  - Cruzaba el `areaId` contra su lista de áreas para mostrar el nombre; si
+ *    el área no estaba en esa lista, el aviso decía "Área específica" sin
+ *    aclarar cuál. Ahora el backend envía `areaNombre` resuelto.
+ *  - `areaService.getAll()` ahora devuelve una página, no un array: la versión
+ *    anterior habría dejado el selector de áreas vacío.
+ */
 export default function AdminAvisosPage() {
+    const { notificar, notificarError } = useNotification();
+
+    const theme = useTheme();
+    const esMovil = useMediaQuery(theme.breakpoints.down('sm'));
+
+    const estadoRed = useNetworkStatus();
+    const sinConexion = Boolean(estadoRed.sinConexion ?? estadoRed);
+
+    const [areas, setAreas] = useState([]);
     const [avisos, setAvisos] = useState([]);
-    const [areas, setAreas] = useState([]); 
-    const [titulo, setTitulo] = useState('');
-    const [mensaje, setMensaje] = useState('');
-    const [areaDestino, setAreaDestino] = useState(null); 
-    const [enviando, setEnviando] = useState(false);
+    const [cargando, setCargando] = useState(true);
 
-    // ---> ESTADO PARA EL MENSAJE DE ÉXITO <---
-    const [notificacion, setNotificacion] = useState({ open: false, mensaje: '', tipo: 'success' });
+    const [avisoEditando, setAvisoEditando] = useState(null);
+    const [modalAbierto, setModalAbierto] = useState(false);
+    const [avisoABorrar, setAvisoABorrar] = useState(null);
+    const [procesando, setProcesando] = useState(false);
 
-    const cargarDatos = async () => {
+    const {
+        control,
+        handleSubmit,
+        reset,
+        formState: { isSubmitting },
+    } = useForm({
+        resolver: zodResolver(esquemaAviso),
+        mode: 'onBlur',
+        defaultValues: VALORES_INICIALES,
+    });
+
+    // El endpoint de avisos no está paginado: son pocos por definición, ya que
+    // todos se muestran a la vez en la barra superior de cada panel.
+    //
+    // `mostrarCarga` permite recargar tras una acción sin vaciar la tabla: el
+    // esqueleto de carga en mitad de una edición produce un parpadeo molesto.
+    const cargarAvisos = useCallback(async (mostrarCarga = false) => {
+        if (mostrarCarga) setCargando(true);
         try {
-            const [resAvisos, resAreas] = await Promise.all([
-                api.get('/v1/avisos'),
-                areaService.getAll() 
-            ]);
-            setAvisos(resAvisos.data);
-            setAreas(resAreas.data);
+            const respuesta = await avisoService.getAll();
+            setAvisos(Array.isArray(respuesta?.data) ? respuesta.data : []);
         } catch (error) {
-            console.error("Error al cargar datos:", error);
+            notificarError(error);
+            setAvisos([]);
+        } finally {
+            setCargando(false);
         }
+    }, [notificarError]);
+
+    useEffect(() => {
+        // La carga inicial se lanza desde el efecto sin tocar el estado de
+        // forma sincrona: `cargando` ya empieza en true.
+        cargarAvisos();
+    }, [cargarAvisos]);
+
+    useEffect(() => {
+        let cancelado = false;
+
+        areaService.getTodas()
+            .then((respuesta) => {
+                if (cancelado) return;
+                const lista = Array.isArray(respuesta?.data) ? respuesta.data : [];
+                // Un aviso dirigido a un área dada de baja no lo vería nadie.
+                setAreas(lista.filter((a) => a.activo));
+            })
+            .catch(() => {
+                if (!cancelado) setAreas([]);
+            });
+
+        return () => { cancelado = true; };
+    }, []);
+
+    // --- Alta y edición ---------------------------------------------------
+    const abrirAlta = () => {
+        setAvisoEditando(null);
+        reset(VALORES_INICIALES);
+        setModalAbierto(true);
     };
 
-    useEffect(() => { cargarDatos(); }, []);
-
-    // Función para cerrar la notificación flotante
-    const handleCloseNotificacion = (event, reason) => {
-        if (reason === 'clickaway') return;
-        setNotificacion({ ...notificacion, open: false });
+    const abrirEdicion = (aviso) => {
+        setAvisoEditando(aviso);
+        reset({
+            titulo: aviso.titulo || '',
+            mensaje: aviso.mensaje || '',
+            areaId: aviso.areaId ? String(aviso.areaId) : '',
+        });
+        setModalAbierto(true);
     };
 
-    const handlePublicar = async (e) => {
-        e.preventDefault();
-        if (!titulo || !mensaje) return alert("Título y mensaje son obligatorios");
-        
-        setEnviando(true);
+    const guardar = async (datos) => {
+        const carga = {
+            titulo: datos.titulo.trim(),
+            mensaje: datos.mensaje.trim(),
+            areaId: datos.areaId ? Number(datos.areaId) : null,
+            activo: avisoEditando ? avisoEditando.activo : true,
+        };
+
         try {
-            await api.post('/v1/avisos', { 
-                titulo, 
-                mensaje, 
-                activo: true, 
-                areaId: areaDestino ? areaDestino.id : null 
-            });
-            setTitulo(''); setMensaje(''); setAreaDestino(null);
-            cargarDatos();
-            // ✅ MOSTRAR MENSAJE DE ÉXITO AL CREAR
-            setNotificacion({ open: true, mensaje: 'Aviso creado y publicado correctamente.', tipo: 'success' });
-        } catch (error) { 
-            setNotificacion({ open: true, mensaje: 'Error al guardar el aviso.', tipo: 'error' });
-        } finally { setEnviando(false); }
+            const respuesta = avisoEditando
+                ? await avisoService.update(avisoEditando.id, carga)
+                : await avisoService.create(carga);
+
+            notificar(respuesta?.mensaje
+                || (avisoEditando ? 'Aviso actualizado correctamente.' : 'Aviso publicado correctamente.'));
+            setModalAbierto(false);
+            cargarAvisos();
+        } catch (error) {
+            notificarError(error);
+        }
     };
 
-    const handleToggleEstado = async (aviso, isChecked) => {
+    const alternarEstado = async (aviso, activo) => {
         try {
-            await api.put(`/v1/avisos/${aviso.id}`, { 
-                ...aviso,
-                activo: isChecked
+            await avisoService.update(aviso.id, {
+                titulo: aviso.titulo,
+                mensaje: aviso.mensaje,
+                areaId: aviso.areaId,
+                activo,
             });
-            cargarDatos(); 
-            // ✅ MOSTRAR MENSAJE DE ÉXITO AL ENCENDER/APAGAR
-            setNotificacion({ 
-                open: true, 
-                mensaje: isChecked ? 'Aviso encendido en pantallas.' : 'Aviso apagado.', 
-                tipo: 'info' 
-            });
-        } catch (error) { 
-            setNotificacion({ open: true, mensaje: 'Error al actualizar estado.', tipo: 'error' });
+            notificar(activo
+                ? 'El aviso vuelve a mostrarse en los paneles.'
+                : 'El aviso deja de mostrarse en los paneles.');
+            cargarAvisos();
+        } catch (error) {
+            notificarError(error);
         }
     };
 
-    const handleEliminar = async (id) => {
-        if (window.confirm('¿Eliminar definitivamente?')) {
-            try {
-                await api.delete(`/v1/avisos/${id}`); 
-                cargarDatos();
-                // ✅ MOSTRAR MENSAJE DE ÉXITO AL ELIMINAR
-                setNotificacion({ open: true, mensaje: 'Aviso eliminado de la base de datos.', tipo: 'success' });
-            } catch (error) {
-                setNotificacion({ open: true, mensaje: 'Error al eliminar.', tipo: 'error' });
-            }
+    const confirmarBorrado = async () => {
+        setProcesando(true);
+        try {
+            const respuesta = await avisoService.delete(avisoABorrar.id);
+            notificar(respuesta?.mensaje || 'Aviso eliminado correctamente.');
+            setAvisoABorrar(null);
+            cargarAvisos();
+        } catch (error) {
+            notificarError(error);
+        } finally {
+            setProcesando(false);
         }
     };
+
+    // --- Columnas ---------------------------------------------------------
+    const columnas = [
+        {
+            id: 'titulo',
+            etiqueta: 'Título',
+            principal: true,
+            ancho: '22%',
+            render: (a) => (
+                <Typography variant="body2" fontWeight={500}>
+                    {truncar(a.titulo, 40)}
+                </Typography>
+            ),
+        },
+        {
+            id: 'mensaje',
+            etiqueta: 'Mensaje',
+            render: (a) => (
+                <Tooltip title={a.mensaje || ''} arrow placement="top-start">
+                    <Typography variant="body2" color="text.secondary">
+                        {truncar(a.mensaje, 70)}
+                    </Typography>
+                </Tooltip>
+            ),
+        },
+        {
+            id: 'areaNombre',
+            etiqueta: 'Alcance',
+            ancho: '18%',
+            render: (a) => (
+                <Chip
+                    label={a.areaId ? (a.areaNombre || 'Área específica') : 'Toda la institución'}
+                    size="small"
+                    color={a.areaId ? 'default' : 'primary'}
+                    variant="outlined"
+                />
+            ),
+        },
+        {
+            id: 'activo',
+            etiqueta: 'Visible',
+            alineacion: 'center',
+            ancho: 110,
+            render: (a) => (
+                <Tooltip
+                    title={a.activo ? 'Se muestra en los paneles' : 'Oculto para los usuarios'}
+                    arrow
+                >
+                    <span>
+                        <Switch
+                            checked={Boolean(a.activo)}
+                            onChange={(e) => alternarEstado(a, e.target.checked)}
+                            disabled={sinConexion}
+                            color="success"
+                            inputProps={{ 'aria-label': `Visibilidad del aviso ${a.titulo}` }}
+                        />
+                    </span>
+                </Tooltip>
+            ),
+        },
+        {
+            id: 'acciones',
+            etiqueta: 'Acciones',
+            alineacion: 'center',
+            ancho: 110,
+            sinOrden: true,
+            render: (a) => (
+                <AccionesTabla
+                    acciones={[
+                        {
+                            id: 'editar',
+                            icono: <EditIcon />,
+                            titulo: 'Editar',
+                            etiqueta: `Editar el aviso ${a.titulo}`,
+                            onClick: () => abrirEdicion(a),
+                            deshabilitada: sinConexion,
+                            motivoDeshabilitada: 'Sin conexión con el servidor',
+                        },
+                        {
+                            id: 'borrar',
+                            icono: <DeleteOutlineIcon />,
+                            titulo: 'Eliminar',
+                            etiqueta: `Eliminar el aviso ${a.titulo}`,
+                            color: 'error',
+                            onClick: () => setAvisoABorrar(a),
+                            deshabilitada: sinConexion,
+                            motivoDeshabilitada: 'Sin conexión con el servidor',
+                        },
+                    ]}
+                />
+            ),
+        },
+    ];
 
     return (
-        <Box sx={{ p: 3, width: '100%' }}>
-            
-            {/* ---> COMPONENTE SNACKBAR FLOTANTE <--- */}
-            <Snackbar 
-                open={notificacion.open} 
-                autoHideDuration={4000} // Desaparece a los 4 segundos
-                onClose={handleCloseNotificacion} 
-                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }} // Sale abajo a la derecha
+        <Box>
+            <Box
+                sx={{
+                    display: 'flex',
+                    flexDirection: { xs: 'column', sm: 'row' },
+                    justifyContent: 'space-between',
+                    alignItems: { xs: 'stretch', sm: 'center' },
+                    gap: 2,
+                    mb: 3,
+                }}
             >
-                <Alert onClose={handleCloseNotificacion} severity={notificacion.tipo} sx={{ width: '100%', fontWeight: 'bold', boxShadow: 3 }}>
-                    {notificacion.mensaje}
-                </Alert>
-            </Snackbar>
+                <Box>
+                    <Typography
+                        variant="h4"
+                        component="h2"
+                        color="primary.main"
+                        sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
+                    >
+                        <CampaignIcon fontSize="large" aria-hidden="true" />
+                        Avisos
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                        Mensajes que aparecen en la parte superior del panel de cada usuario.
+                    </Typography>
+                </Box>
 
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
-                <CampaignIcon sx={{ fontSize: 35, color: COLOR_GUINDA }} />
-                <Typography variant="h4" fontWeight="bold" sx={{ color: COLOR_GUINDA }}>Gestión de Avisos</Typography>
+                <Button
+                    variant="contained"
+                    startIcon={<AddIcon />}
+                    onClick={abrirAlta}
+                    disabled={sinConexion}
+                >
+                    Nuevo aviso
+                </Button>
             </Box>
 
-            <Paper elevation={2} sx={{ p: 3, borderRadius: 2, mb: 3 }}>
-                <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>Crear Nuevo Aviso</Typography>
-                <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-                    <TextField label="Título" sx={{ flex: 1, minWidth: '200px' }} value={titulo} onChange={(e) => setTitulo(toUpper(e.target.value))} />
-                    <TextField label="Mensaje" sx={{ flex: 2, minWidth: '300px' }} value={mensaje} onChange={(e) => setMensaje(toUpper(e.target.value))} />
-                    
-                    <Autocomplete
-                        options={areas}
-                        getOptionLabel={(option) => option.nombre || ''}
-                        value={areaDestino}
-                        onChange={(event, newValue) => setAreaDestino(newValue)}
-                        sx={{ flex: 1, minWidth: '200px' }}
-                        renderInput={(params) => <TextField {...params} label="Área (Vacío = Global)" />}
-                    />
+            <DynamicTable
+                columnas={columnas}
+                filas={avisos}
+                cargando={cargando}
+                anchoMinimo={900}
+                onRecargar={() => cargarAvisos(true)}
+                vacio={{
+                    icono: CampaignIcon,
+                    titulo: 'No hay avisos publicados',
+                    descripcion: 'Los avisos aparecen en la parte superior del panel de cada usuario, útiles para comunicar mantenimientos o incidencias generales.',
+                    textoAccion: 'Publicar el primer aviso',
+                    onAccion: abrirAlta,
+                }}
+            />
 
-                    <Button variant="contained" onClick={handlePublicar} sx={{ bgcolor: COLOR_GUINDA, height: '56px', px: 4 }}>
-                        {enviando ? 'Guardando...' : 'Publicar'}
-                    </Button>
-                </Box>
-            </Paper>
+            {/* ------------------------------------------ alta y edición ---- */}
+            <Dialog
+                open={modalAbierto}
+                onClose={() => !isSubmitting && setModalAbierto(false)}
+                fullWidth
+                maxWidth="sm"
+                fullScreen={esMovil}
+                aria-labelledby="titulo-aviso"
+            >
+                <DialogTitle id="titulo-aviso">
+                    {avisoEditando ? 'Editar aviso' : 'Nuevo aviso'}
+                </DialogTitle>
 
-            <TableContainer component={Paper} sx={{ borderRadius: 2 }}>
-                <Table>
-                    <TableHead sx={{ bgcolor: '#f8fafc' }}>
-                        <TableRow>
-                            <TableCell>Título</TableCell>
-                            <TableCell>Mensaje</TableCell>
-                            <TableCell>Alcance</TableCell>
-                            <TableCell align="center">Estado</TableCell>
-                            <TableCell align="center">Acciones</TableCell>
-                        </TableRow>
-                    </TableHead>
-                    <TableBody>
-                        {avisos.map((aviso) => (
-                            <TableRow key={aviso.id} hover>
-                                <TableCell sx={{ fontWeight: 'bold' }}>{aviso.titulo}</TableCell>
-                                <TableCell>{aviso.mensaje}</TableCell>
-                                <TableCell>
-                                    <Chip 
-                                        label={aviso.areaId ? areas.find(a => a.id === aviso.areaId)?.nombre || 'Área específica' : 'GLOBAL'} 
-                                        color={aviso.areaId ? "primary" : "secondary"}
-                                        size="small"
-                                        variant="outlined"
-                                    />
-                                </TableCell>
-                                <TableCell align="center">
-                                    <Chip label={aviso.activo ? "ACTIVO" : "INACTIVO"} color={aviso.activo ? "success" : "default"} size="small" />
-                                </TableCell>
-                                <TableCell align="center">
-                                    <Switch checked={aviso.activo} onChange={(e) => handleToggleEstado(aviso, e.target.checked)} color="success" />
-                                    <IconButton color="error" onClick={() => handleEliminar(aviso.id)}><DeleteIcon /></IconButton>
-                                </TableCell>
-                            </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
-            </TableContainer>
+                <form onSubmit={handleSubmit(guardar)} noValidate>
+                    <DialogContent dividers>
+                        <Stack spacing={2.5}>
+                            <CampoFormulario
+                                control={control}
+                                nombre="titulo"
+                                etiqueta="Título"
+                                obligatorio
+                                maximo={150}
+                                mayusculas
+                                ayuda="Resume el aviso en pocas palabras."
+                            />
+
+                            <CampoFormulario
+                                control={control}
+                                nombre="mensaje"
+                                etiqueta="Mensaje"
+                                obligatorio
+                                maximo={2000}
+                                multiline
+                                rows={4}
+                                ayuda="Lo que leerán los usuarios en su panel."
+                            />
+
+                            <CampoFormulario
+                                control={control}
+                                nombre="areaId"
+                                etiqueta="Dirigido a"
+                                opciones={[
+                                    { valor: '', etiqueta: 'Toda la institución' },
+                                    ...areas.map((a) => ({
+                                        valor: String(a.id),
+                                        etiqueta: a.nombre,
+                                    })),
+                                ]}
+                                ayuda="Elige un área para que solo la vea su personal."
+                            />
+                        </Stack>
+                    </DialogContent>
+
+                    <DialogActions
+                        sx={{ flexDirection: { xs: 'column-reverse', sm: 'row' }, gap: 1, p: 2 }}
+                    >
+                        <Button
+                            onClick={() => setModalAbierto(false)}
+                            color="inherit"
+                            disabled={isSubmitting}
+                            fullWidth={esMovil}
+                            size={esMovil ? 'large' : 'medium'}
+                        >
+                            Cancelar
+                        </Button>
+                        <Button
+                            type="submit"
+                            variant="contained"
+                            disabled={isSubmitting || sinConexion}
+                            fullWidth={esMovil}
+                            size={esMovil ? 'large' : 'medium'}
+                        >
+                            {isSubmitting ? 'Guardando…' : avisoEditando ? 'Guardar cambios' : 'Publicar aviso'}
+                        </Button>
+                    </DialogActions>
+                </form>
+            </Dialog>
+
+            {/* ------------------------------------------------ borrado ---- */}
+            <ConfirmationDialog
+                abierto={Boolean(avisoABorrar)}
+                titulo="¿Eliminar este aviso?"
+                mensaje={`"${avisoABorrar?.titulo}" se eliminará de forma permanente y no se podrá recuperar. Si solo quieres dejar de mostrarlo, apaga su interruptor de visibilidad.`}
+                textoConfirmar="Sí, eliminar"
+                destructivo
+                cargando={procesando}
+                onConfirmar={confirmarBorrado}
+                onCancelar={() => setAvisoABorrar(null)}
+            />
         </Box>
     );
 }

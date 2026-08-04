@@ -1,5 +1,6 @@
 package com.sedif.sistema_tickets.core.aviso;
 
+import com.sedif.sistema_tickets.core.area.AreaRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -13,19 +14,18 @@ import java.util.List;
 public class AvisoService {
 
     private final AvisoRepository avisoRepository;
+    private final AreaRepository areaRepository;
 
     @Transactional
     public AvisoResponseRecord crearAvisoGlobal(AvisoRequestRecord request) {
-        if (request == null || request.titulo() == null || request.titulo().isBlank()) {
-            throw new IllegalArgumentException("El título del aviso es obligatorio.");
-        }
-        if (request.mensaje() == null || request.mensaje().isBlank()) {
-            throw new IllegalArgumentException("El mensaje del aviso es obligatorio.");
-        }
+        // El titulo y el mensaje los valida @Valid sobre el DTO: la
+        // comprobacion manual que habia aqui solo cubria el alta, asi que una
+        // edicion podia dejar el aviso en blanco.
+        verificarAreaExiste(request.areaId());
 
         Aviso nuevoAviso = new Aviso();
-        nuevoAviso.setTitulo(request.titulo());
-        nuevoAviso.setMensaje(request.mensaje());
+        nuevoAviso.setTitulo(request.titulo().trim());
+        nuevoAviso.setMensaje(request.mensaje().trim());
         nuevoAviso.setActivo(request.activo() != null ? request.activo() : true);
         nuevoAviso.setAreaId(request.areaId());
         nuevoAviso.setEliminado(false); // Por defecto al crear no está eliminado
@@ -38,7 +38,7 @@ public class AvisoService {
         }
 
         Aviso avisoGuardado = avisoRepository.save(nuevoAviso);
-        return AvisoResponseRecord.desdeEntidad(avisoGuardado);
+        return mapear(avisoGuardado);
     }
 
     @Transactional(readOnly = true)
@@ -46,7 +46,7 @@ public class AvisoService {
         // Ahora llama al método que excluye a los eliminados
         return avisoRepository.findByActivoTrueAndEliminadoFalseOrderByIdDesc()
                 .stream()
-                .map(AvisoResponseRecord::desdeEntidad)
+                .map(this::mapear)
                 .toList();
     }
 
@@ -55,7 +55,7 @@ public class AvisoService {
         // Ahora llama al método que excluye a los eliminados
         return avisoRepository.findByEliminadoFalseOrderByIdDesc()
                 .stream()
-                .map(AvisoResponseRecord::desdeEntidad)
+                .map(this::mapear)
                 .toList();
     }
 
@@ -64,8 +64,10 @@ public class AvisoService {
         Aviso aviso = avisoRepository.findById(id)
             .orElseThrow(() -> new IllegalArgumentException("Aviso no encontrado"));
         
-        aviso.setTitulo(request.titulo());
-        aviso.setMensaje(request.mensaje());
+        verificarAreaExiste(request.areaId());
+
+        aviso.setTitulo(request.titulo().trim());
+        aviso.setMensaje(request.mensaje().trim());
         if (request.activo() != null) aviso.setActivo(request.activo());
         aviso.setAreaId(request.areaId()); 
         
@@ -81,5 +83,29 @@ public class AvisoService {
         aviso.setEliminado(true);
         aviso.setActivo(false); // También lo apagamos por seguridad
         avisoRepository.save(aviso);
+    }
+
+    /**
+     * Comprueba que el area de destino existe.
+     *
+     * <p>Sin esta validacion, un areaId inexistente creaba un aviso que no
+     * veia nadie: no es global (tiene area) pero ningun usuario pertenece a
+     * ella, asi que desaparecia sin error.</p>
+     */
+    private void verificarAreaExiste(Long areaId) {
+        if (areaId != null && !areaRepository.existsById(areaId)) {
+            throw new IllegalArgumentException("El area de destino indicada no existe.");
+        }
+    }
+
+    /** Resuelve el nombre del area para no obligar al cliente a cruzarlo. */
+    private AvisoResponseRecord mapear(Aviso aviso) {
+        String areaNombre = null;
+        if (aviso.getAreaId() != null) {
+            areaNombre = areaRepository.findById(aviso.getAreaId())
+                    .map(a -> a.getNombre())
+                    .orElse("Area no disponible");
+        }
+        return AvisoResponseRecord.desdeEntidad(aviso, areaNombre);
     }
 }

@@ -98,6 +98,14 @@ export const esquemaArea = z.object({
     prioritaria: z.boolean().optional(),
 });
 
+/** Alta y edición de un aviso. Espeja `AvisoRequestRecord`. */
+export const esquemaAviso = z.object({
+    titulo: textoObligatorio('El título', 150, 4),
+    mensaje: textoObligatorio('El mensaje', 2000, 10),
+    // Cadena vacía = aviso global para toda la institución.
+    areaId: z.string().optional().or(z.literal('')),
+});
+
 /** Resolución de un ticket. Espeja `ResolucionRequest`. */
 export const esquemaResolucion = z.object({
     planTrabajoClave: z.string().min(1, 'Selecciona la meta del plan de trabajo.'),
