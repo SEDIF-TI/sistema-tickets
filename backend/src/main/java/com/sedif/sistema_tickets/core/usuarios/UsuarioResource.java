@@ -1,8 +1,12 @@
 package com.sedif.sistema_tickets.core.usuarios;
 
 import com.sedif.sistema_tickets.exception.ApiResponse;
+import com.sedif.sistema_tickets.exception.PageResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -14,6 +18,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -39,8 +44,28 @@ public class UsuarioResource {
 
     private final UsuarioService usuarioService;
 
+    /**
+     * Listado paginado del panel, con busqueda y filtros por rol y estado
+     * resueltos en la base de datos.
+     */
     @GetMapping
-    public ResponseEntity<ApiResponse<List<UsuarioResponse>>> listarUsuarios() {
+    public ResponseEntity<ApiResponse<PageResponse<UsuarioResponse>>> listarUsuarios(
+            @RequestParam(required = false) String busqueda,
+            @RequestParam(required = false) String rol,
+            @RequestParam(required = false) Boolean activo,
+            @PageableDefault(size = 10, sort = "nombre", direction = Sort.Direction.ASC)
+            Pageable pageable) {
+
+        return ResponseEntity.ok(ApiResponse.ok(
+                usuarioService.listarUsuariosPaginado(busqueda, rol, activo, pageable)));
+    }
+
+    /**
+     * Catalogo completo sin paginar, para los selectores que necesitan todos
+     * los usuarios de golpe.
+     */
+    @GetMapping("/todos")
+    public ResponseEntity<ApiResponse<List<UsuarioResponse>>> listarTodos() {
         return ResponseEntity.ok(ApiResponse.ok(usuarioService.listarUsuarios()));
     }
 

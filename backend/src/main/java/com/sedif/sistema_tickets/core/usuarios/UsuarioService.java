@@ -3,7 +3,12 @@ package com.sedif.sistema_tickets.core.usuarios;
 import com.sedif.sistema_tickets.core.area.Area;
 import com.sedif.sistema_tickets.core.area.AreaRepository;
 import com.sedif.sistema_tickets.exception.MessageConstants;
+import com.sedif.sistema_tickets.exception.PageResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -11,11 +16,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Servicio que contiene la lógica de negocio para la gestión de usuarios.
  */
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class UsuarioService {
 
@@ -35,7 +42,18 @@ public class UsuarioService {
     @Transactional
     public UsuarioResponse crearUsuario(UsuarioRequest request) {
         if (usuarioRepository.existsByCorreo(request.correo())) {
-            throw new IllegalArgumentException("El correo ya está registrado.");
+            throw new IllegalArgumentException(
+                    "Ya existe un usuario con el correo " + request.correo() + ".");
+        }
+
+        // El username es opcional, pero si viene debe ser unico. Sin esta
+        // comprobacion el choque lo detectaba la restriccion UNIQUE de la base
+        // y la respuesta era un 500 generico que no decia que corregir.
+        String username = request.username();
+        if (username != null && !username.isBlank()
+                && usuarioRepository.existsByUsername(username.trim())) {
+            throw new IllegalArgumentException(
+                    "El nombre de usuario '" + username.trim() + "' ya esta en uso.");
         }
 
         // 1. Buscamos el Rol
@@ -47,8 +65,13 @@ public class UsuarioService {
         
         Usuario nuevoUsuario = new Usuario();
         nuevoUsuario.setNombre(request.nombre());
+        // Los apellidos se guardaban vacios: el formulario los capturaba pero
+        // el DTO no los aceptaba, asi que se descartaban en silencio y los
+        // documentos oficiales salian sin ellos.
+        nuevoUsuario.setApellidoPaterno(request.apellidoPaterno());
+        nuevoUsuario.setApellidoMaterno(request.apellidoMaterno());
         nuevoUsuario.setCorreo(request.correo());
-        nuevoUsuario.setUsername(request.username());
+        nuevoUsuario.setUsername(username != null && !username.isBlank() ? username.trim() : null);
         
         // 3. Encriptar contraseña y activar bandera de cambio forzoso
         nuevoUsuario.setPassword(passwordEncoder.encode(passwordTemporal));
@@ -101,12 +124,85 @@ public class UsuarioService {
 
     /**
      * Obtiene la lista de todos los usuarios registrados.
+     *
+     * <p>Se conserva sin paginar para los selectores que necesitan el catalogo
+     * completo. El listado del panel usa {@link #listarUsuariosPaginado}.</p>
      */
     public List<UsuarioResponse> listarUsuarios() {
         return usuarioRepository.findAll()
                 .stream()
                 .map(UsuarioResponse::desdeEntidad)
                 .toList();
+    }
+
+    /** Campos por los que se admite ordenar el listado de usuarios. */
+    private static final Set<String> CAMPOS_ORDENABLES_USUARIO =
+            Set.of("id", "nombre", "apellidoPaterno", "correo", "username", "activo");
+
+    /**
+     * Listado paginado del panel de administracion.
+     *
+     * <p>La busqueda y los filtros de rol y estado se resuelven en la base de
+     * datos. Antes la pantalla descargaba la tabla completa y filtraba en el
+     * navegador, de modo que buscar solo miraba lo ya cargado.</p>
+     */
+    @Transactional(readOnly = true)
+    public PageResponse<UsuarioResponse> listarUsuariosPaginado(
+            String busqueda, String rol, Boolean activo, Pageable pageable) {
+
+        Pageable paginaSegura = sanearOrdenUsuario(pageable);
+
+        return PageResponse.de(
+                usuarioRepository.buscarPaginado(
+                        normalizarBusqueda(busqueda), normalizarTexto(rol), activo, paginaSegura),
+                UsuarioResponse::desdeEntidad);
+    }
+
+    /** Deja en {@code null} los filtros vacios, que las consultas leen como "sin filtrar". */
+    private String normalizarTexto(String valor) {
+        return (valor == null || valor.isBlank()) ? null : valor.trim();
+    }
+
+    /**
+     * Prepara el texto para el LIKE: minusculas, comodines y escape de los
+     * caracteres especiales, para que buscar "100%" busque ese literal.
+     */
+    private String normalizarBusqueda(String valor) {
+        String texto = normalizarTexto(valor);
+        if (texto == null) {
+            return null;
+        }
+        String escapado = texto.toLowerCase()
+                .replace("!", "!!")
+                .replace("%", "!%")
+                .replace("_", "!_");
+        return "%" + escapado + "%";
+    }
+
+    /**
+     * Descarta los campos de ordenacion no permitidos.
+     *
+     * <p>El {@code Pageable} se arma con lo que llega en la URL: sin esta
+     * lista se podria ordenar por {@code password} y deducir informacion a
+     * partir del orden del resultado.</p>
+     */
+    private Pageable sanearOrdenUsuario(Pageable pageable) {
+        if (pageable.getSort().isUnsorted()) {
+            return pageable;
+        }
+
+        List<Sort.Order> permitidos = pageable.getSort().stream()
+                .filter(orden -> {
+                    boolean valido = CAMPOS_ORDENABLES_USUARIO.contains(orden.getProperty());
+                    if (!valido) {
+                        log.warn("Orden por campo no permitido: '{}'. Se ignora.", orden.getProperty());
+                    }
+                    return valido;
+                })
+                .toList();
+
+        return PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(),
+                permitidos.isEmpty() ? Sort.by(Sort.Direction.ASC, "nombre") : Sort.by(permitidos));
     }
 
     /**
@@ -158,8 +254,18 @@ public class UsuarioService {
         Usuario usuario = usuarioRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado con ID: " + id));
 
+        // El correo identifica al usuario en el login: no puede chocar con el
+        // de otra persona. Antes solo se comprobaba al crear, asi que una
+        // edicion podia duplicarlo y romper el acceso de ambos.
+        if (usuarioRepository.existsByCorreoAndIdNot(request.correo(), id)) {
+            throw new IllegalArgumentException(
+                    "Ya existe otro usuario con el correo " + request.correo() + ".");
+        }
+
         // 2. Actualizar campos básicos
         usuario.setNombre(request.nombre());
+        usuario.setApellidoPaterno(request.apellidoPaterno());
+        usuario.setApellidoMaterno(request.apellidoMaterno());
         usuario.setCorreo(request.correo());
 
         // 3. Actualizar Rol (buscando la entidad)

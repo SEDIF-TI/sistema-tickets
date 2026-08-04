@@ -1,6 +1,9 @@
 package com.sedif.sistema_tickets.core.usuarios;
 
 import com.sedif.sistema_tickets.util.enums.EstadoTicket;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -28,9 +31,48 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
     /** Usuarios de un rol concreto, por su nombre (ej. "SOPORTE"). */
     List<Usuario> findByRolNombre(String rolNombre);
 
+    /**
+     * Listado paginado para el panel de administracion.
+     *
+     * <p>Antes la pantalla traia la tabla completa con {@code findAll()} y
+     * filtraba en el navegador: la busqueda solo miraba lo ya descargado y
+     * cada carga crecia con la plantilla.</p>
+     *
+     * <p>Los tres filtros son opcionales ({@code null} = sin filtrar). El
+     * texto llega ya en minusculas y con comodines desde el servicio, y el
+     * {@code CAST} fija su tipo: PostgreSQL no puede inferirlo cuando el
+     * parametro es nulo dentro de {@code LOWER(...)} y la consulta falla con
+     * "function lower(bytea) does not exist".</p>
+     */
+    @EntityGraph(attributePaths = {"rol", "area"})
+    @Query("""
+            SELECT u FROM Usuario u
+            WHERE (CAST(:busqueda AS string) IS NULL
+                   OR LOWER(u.nombre) LIKE :busqueda ESCAPE '!'
+                   OR LOWER(u.apellidoPaterno) LIKE :busqueda ESCAPE '!'
+                   OR LOWER(u.correo) LIKE :busqueda ESCAPE '!'
+                   OR LOWER(u.username) LIKE :busqueda ESCAPE '!')
+              AND (CAST(:rol AS string) IS NULL OR u.rol.nombre = :rol)
+              AND (:activo IS NULL OR u.activo = :activo)
+            """)
+    Page<Usuario> buscarPaginado(@Param("busqueda") String busqueda,
+                                 @Param("rol") String rol,
+                                 @Param("activo") Boolean activo,
+                                 Pageable pageable);
+
     boolean existsByCorreo(String correo);
 
     boolean existsByCorreoAndIdNot(String correo, Long id);
+
+    /**
+     * Comprueba si el nombre de usuario ya esta tomado.
+     *
+     * <p>La columna tiene restriccion UNIQUE, pero sin esta comprobacion previa
+     * el choque lo detectaba la base de datos y el usuario recibia un 500
+     * generico ("Ocurrio un error al procesar la solicitud") en lugar de
+     * saber que el nombre estaba repetido.</p>
+     */
+    boolean existsByUsername(String username);
 
     // ==========================================
     // 3. MOTOR DE ASIGNACIÓN (TICKETS)

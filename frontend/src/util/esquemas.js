@@ -58,6 +58,40 @@ export const esquemaTicket = (exigeSede = false) =>
         }
     });
 
+/**
+ * Alta y edición de usuario. Espeja `UsuarioRequest` y
+ * `ActualizarUsuarioRequest`.
+ *
+ * El área es obligatoria salvo para ADMINISTRADOR, que no pertenece a ninguna
+ * en concreto. Como esa regla depende del rol elegido, se comprueba con
+ * `superRefine` sobre el conjunto y no en el campo.
+ */
+export const esquemaUsuario = (rolesPorId = {}) =>
+    z.object({
+        nombre: textoObligatorio('El nombre', 150),
+        apellidoPaterno: textoObligatorio('El apellido paterno', 255),
+        apellidoMaterno: textoOpcional('El apellido materno', 255),
+        correo: z.string()
+            .trim()
+            .min(1, 'El correo es obligatorio.')
+            .max(100, 'El correo no puede exceder 100 caracteres.')
+            .email('Escribe un correo con formato válido, por ejemplo nombre@sedif.gob.mx.'),
+        username: textoOpcional('El nombre de usuario', 50),
+        rolId: z.string().min(1, 'Selecciona el rol del usuario.'),
+        areaId: z.string().optional().or(z.literal('')),
+    }).superRefine((datos, ctx) => {
+        const rol = rolesPorId[datos.rolId];
+        const exigeArea = rol && rol !== 'ADMINISTRADOR';
+
+        if (exigeArea && !datos.areaId) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ['areaId'],
+                message: 'Selecciona el área a la que pertenece.',
+            });
+        }
+    });
+
 /** Resolución de un ticket. Espeja `ResolucionRequest`. */
 export const esquemaResolucion = z.object({
     planTrabajoClave: z.string().min(1, 'Selecciona la meta del plan de trabajo.'),

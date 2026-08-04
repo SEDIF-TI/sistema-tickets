@@ -16,6 +16,12 @@ public record ActualizarUsuarioRequest(
         @Size(max = 150, message = "El nombre no puede exceder 150 caracteres.")
         String nombre,
 
+        @Size(max = 255, message = "El apellido paterno no puede exceder 255 caracteres.")
+        String apellidoPaterno,
+
+        @Size(max = 255, message = "El apellido materno no puede exceder 255 caracteres.")
+        String apellidoMaterno,
+
         @NotBlank(message = "El correo es obligatorio.")
         @Email(message = "El correo no tiene un formato valido.")
         @Size(max = 100, message = "El correo no puede exceder 100 caracteres.")
