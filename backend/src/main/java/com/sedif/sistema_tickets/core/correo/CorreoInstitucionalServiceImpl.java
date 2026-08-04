@@ -62,42 +62,82 @@ public class CorreoInstitucionalServiceImpl implements CorreoInstitucionalServic
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public com.sedif.sistema_tickets.exception.PageResponse<CorreoInstitucional> listarPaginado(
+            String busqueda, String estado, org.springframework.data.domain.Pageable pageable) {
+
+        // Un estado desconocido se ignora en lugar de romper la consulta.
+        String estadoValido = com.sedif.sistema_tickets.util.enums.EstadoCorreo.desde(estado)
+                .map(Enum::name)
+                .orElse(null);
+
+        return com.sedif.sistema_tickets.exception.PageResponse.de(
+                correoRepository.buscarPaginado(normalizarBusqueda(busqueda), estadoValido, pageable));
+    }
+
+    /** Prepara el texto para el LIKE: minusculas, comodines y escape. */
+    private String normalizarBusqueda(String valor) {
+        if (valor == null || valor.isBlank()) {
+            return null;
+        }
+        String escapado = valor.trim().toLowerCase()
+                .replace("!", "!!")
+                .replace("%", "!%")
+                .replace("_", "!_");
+        return "%" + escapado + "%";
+    }
+
+    @Override
     @Transactional
-    public CorreoInstitucional crear(CorreoInstitucional correo) {
-        String correoLimpio = correo.getCorreo().trim().toLowerCase();
+    public CorreoInstitucional crear(CorreoRequest request) {
+        String correoLimpio = request.correo().trim().toLowerCase();
 
         if (correoRepository.existsByCorreo(correoLimpio)) {
             throw new IllegalArgumentException("El correo '" + correoLimpio + "' ya se encuentra registrado.");
         }
 
-        correo.setCorreo(correoLimpio);
-        if (correo.getEstado() == null || correo.getEstado().isEmpty()) {
-            correo.setEstado("ACTIVO");
-        }
+        CorreoInstitucional correo = new CorreoInstitucional();
+        aplicarDatos(correo, request, correoLimpio);
+
+        // Toda alta nace activa: el estado solo cambia por su propio endpoint,
+        // que es el unico que valida contra el enum EstadoCorreo.
+        correo.setEstado(com.sedif.sistema_tickets.util.enums.EstadoCorreo.ACTIVO.name());
 
         return correoRepository.save(correo);
     }
 
+    /** Vuelca los campos editables. El estado se gestiona aparte a proposito. */
+    private void aplicarDatos(CorreoInstitucional destino, CorreoRequest request, String correoLimpio) {
+        destino.setNombre(request.nombre().trim());
+        destino.setApellidoPaterno(request.apellidoPaterno().trim());
+        destino.setApellidoMaterno(vacioANulo(request.apellidoMaterno()));
+        destino.setArea(request.area().trim());
+        destino.setCargo(vacioANulo(request.cargo()));
+        destino.setExtension(vacioANulo(request.extension()));
+        destino.setCuotaAlmacenamiento(vacioANulo(request.cuotaAlmacenamiento()));
+        destino.setCorreo(correoLimpio);
+    }
+
+    private String vacioANulo(String valor) {
+        return (valor == null || valor.isBlank()) ? null : valor.trim();
+    }
+
     @Override
     @Transactional
-    public CorreoInstitucional actualizar(Long id, CorreoInstitucional datos) {
+    public CorreoInstitucional actualizar(Long id, CorreoRequest request) {
         CorreoInstitucional existente = obtenerPorId(id);
 
-        String correoLimpio = datos.getCorreo().trim().toLowerCase();
+        String correoLimpio = request.correo().trim().toLowerCase();
 
         if (correoRepository.existsByCorreoAndIdNot(correoLimpio, id)) {
             throw new IllegalArgumentException("El correo '" + correoLimpio + "' ya pertenece a otro registro.");
         }
 
-        existente.setNombre(datos.getNombre());
-        existente.setApellidoPaterno(datos.getApellidoPaterno());
-        existente.setApellidoMaterno(datos.getApellidoMaterno());
-        existente.setArea(datos.getArea());
-        existente.setCargo(datos.getCargo());
-        existente.setExtension(datos.getExtension());
-        existente.setCorreo(correoLimpio);
-        existente.setEstado(datos.getEstado());
-        existente.setCuotaAlmacenamiento(datos.getCuotaAlmacenamiento());
+        // El estado NO se toca aqui. Antes se copiaba tal cual del cuerpo de la
+        // peticion, saltandose el endpoint de cambio de estado —el unico que
+        // valida contra el enum—, de modo que una cuenta podia quedar en un
+        // estado inexistente e invisible para los filtros del directorio.
+        aplicarDatos(existente, request, correoLimpio);
 
         return correoRepository.save(existente);
     }

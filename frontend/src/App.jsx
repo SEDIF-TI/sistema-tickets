@@ -1,14 +1,10 @@
-import React, { useContext } from 'react';
+import { useContext } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 
 // --- Material UI y Temas ---
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import theme from './theme/theme.js';
-// Agrega estas dos líneas en tu bloque de importaciones de iconos
-import InventoryIcon from '@mui/icons-material/Inventory';
-import HomeRepairServiceIcon from '@mui/icons-material/HomeRepairService';
-
 // Contextos
 import { AuthContext, AuthProvider } from './context/AuthContext.jsx';
 import { NotificationProvider } from './context/NotificationContext.jsx';
@@ -30,9 +26,10 @@ import DashboardPage from './pages/admin/DashboardPage.jsx';
 import AdminEquiposPage from './pages/admin/AdminEquiposPage.jsx';
 import GestionTaller from './pages/soporte/GestionTaller.jsx';
 import GestionResguardos from './pages/soporte/GestionResguardos.jsx';
+import HistorialResguardos from './pages/admin/HistorialResguardos.jsx';
 
 // Módulo de Correos Institucionales (Ajusta la ruta si lo guardaste en otra carpeta)
-import { GestionCorreos } from './pages/soporte/GestionCorreos.jsx';
+import GestionCorreos from './pages/soporte/GestionCorreos.jsx';
 
 // Componentes Adicionales
 import GeneradorDocumentos from './components/GeneradorDocumentos.jsx'; 
@@ -78,6 +75,10 @@ function AppContent() {
             <Route path="/admin/avisos" element={<MainLayout><AdminAvisosPage /></MainLayout>} />
             <Route path="/admin/bitacora" element={<MainLayout><TicketsPage /></MainLayout>} />
             <Route path="/admin/equipos" element={<MainLayout><AdminEquiposPage /></MainLayout>} />
+            {/* Vista de seguimiento: el alta y las devoluciones viven en
+                /soporte/resguardos. La pantalla existia sin ruta que la
+                alcanzara, asi que era codigo inalcanzable. */}
+            <Route path="/admin/resguardos" element={<MainLayout><HistorialResguardos /></MainLayout>} />
             
             {/* RUTA NUEVA: Correos Institucionales */}
             <Route path="/admin/correos" element={<MainLayout><GestionCorreos /></MainLayout>} />

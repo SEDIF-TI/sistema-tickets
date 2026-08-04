@@ -161,6 +161,22 @@ export const esquemaTaller = z.object({
     solucion: textoOpcional('La solución', 1000),
 });
 
+/** Alta y edición de un correo institucional. Espeja `CorreoRequest`. */
+export const esquemaCorreo = z.object({
+    nombre: textoObligatorio('El nombre', 100, 2),
+    apellidoPaterno: textoObligatorio('El apellido paterno', 100, 2),
+    apellidoMaterno: textoOpcional('El apellido materno', 100),
+    correo: z.string()
+        .trim()
+        .min(1, 'El correo es obligatorio.')
+        .max(150, 'El correo no puede exceder 150 caracteres.')
+        .email('Escribe un correo con formato válido, por ejemplo nombre@sedif.gob.mx.'),
+    area: textoObligatorio('El área', 150, 2),
+    cargo: textoOpcional('El cargo', 150),
+    extension: textoOpcional('La extensión', 20),
+    cuotaAlmacenamiento: textoOpcional('La cuota de almacenamiento', 30),
+});
+
 /** Resolución de un ticket. Espeja `ResolucionRequest`. */
 export const esquemaResolucion = z.object({
     planTrabajoClave: z.string().min(1, 'Selecciona la meta del plan de trabajo.'),

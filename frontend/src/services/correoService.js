@@ -1,61 +1,37 @@
-// Importa tu instancia de Axios que ya inyecta el token automáticamente
-import api from './api'; 
+import api from './api';
 
-const API_URL = '/correos';
+const RUTA = '/correos';
 
+/**
+ * Directorio de correos institucionales. Espeja CorreoInstitucionalResource.
+ *
+ * Exige rol SOPORTE o ADMINISTRADOR; el borrado definitivo solo ADMINISTRADOR.
+ *
+ * Igual que en el taller, la versión anterior envolvía los errores en
+ * `new Error(...)` leyendo `error.response.data.mensaje`, campo que el backend
+ * no usa: todos los fallos mostraban el texto genérico de respaldo. Ahora se
+ * propagan y los traduce el interceptor de api.js.
+ */
 export const correoService = {
-  // Obtener correos con filtros opcionales
-  obtenerCorreos: async (filtro = '', estado = '') => {
-    try {
-      const params = new URLSearchParams();
-      if (filtro) params.append('filtro', filtro);
-      if (estado) params.append('estado', estado);
+    /** Directorio paginado, con búsqueda y filtro de estado en la base. */
+    getAll: (params = {}) => api.get(RUTA, { params }),
 
-      const response = await api.get(`${API_URL}?${params.toString()}`);
-      return response.data;
-    } catch (error) {
-      throw new Error(error.response?.data?.mensaje || 'Error al obtener los correos');
-    }
-  },
+    /** Catálogo de estados de la cuenta, servido desde el enum. */
+    getEstados: () => api.get(`${RUTA}/estados`),
 
-  // Crear un nuevo registro
-  crearCorreo: async (correoData) => {
-    try {
-      const response = await api.post(API_URL, correoData);
-      return response.data;
-    } catch (error) {
-      const msg = error.response?.data?.mensaje || error.response?.data?.message || 'Error al registrar el correo';
-      throw new Error(msg);
-    }
-  },
+    getById: (id) => api.get(`${RUTA}/${id}`),
 
-  // Actualizar un registro existente
-  actualizarCorreo: async (id, correoData) => {
-    try {
-      const response = await api.put(`${API_URL}/${id}`, correoData);
-      return response.data;
-    } catch (error) {
-      throw new Error(error.response?.data?.mensaje || 'Error al actualizar el correo');
-    }
-  },
+    create: (data) => api.post(RUTA, data),
+    update: (id, data) => api.put(`${RUTA}/${id}`, data),
 
-  // Cambiar estado
-  cambiarEstado: async (id, nuevoEstado) => {
-    try {
-      const response = await api.patch(`${API_URL}/${id}/estado`, { estado: nuevoEstado });
-      return response.data;
-    } catch (error) {
-      throw new Error(error.response?.data?.mensaje || 'Error al cambiar estado');
-    }
-  },
+    /**
+     * Alta, baja o suspensión de la cuenta ante el proveedor. Es el único
+     * camino para cambiar el estado: la edición normal ya no lo toca.
+     */
+    cambiarEstado: (id, estado) => api.patch(`${RUTA}/${id}/estado`, { estado }),
 
-  // Eliminar registro
-  eliminarCorreo: async (id) => {
-    try {
-      const response = await api.delete(`${API_URL}/${id}`);
-      return response.data;
-    } catch (error) {
-      throw new Error(error.response?.data?.mensaje || 'Error al eliminar');
-    }
-  },
+    /** Borrado definitivo. Para dar de baja sin perder historial, usa el estado. */
+    delete: (id) => api.delete(`${RUTA}/${id}`),
 };
+
+export default correoService;

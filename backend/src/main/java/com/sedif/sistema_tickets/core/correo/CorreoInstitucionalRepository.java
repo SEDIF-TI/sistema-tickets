@@ -11,6 +11,29 @@ import java.util.Optional;
 @Repository
 public interface CorreoInstitucionalRepository extends JpaRepository<CorreoInstitucional, Long> {
 
+    /**
+     * Directorio paginado con busqueda y filtro de estado, ambos opcionales.
+     *
+     * <p>El texto llega ya en minusculas y con comodines desde el servicio, y
+     * el CAST fija su tipo: PostgreSQL no puede inferirlo cuando el parametro
+     * es nulo dentro de LOWER(...).</p>
+     */
+    @org.springframework.data.jpa.repository.Query("""
+            SELECT c FROM CorreoInstitucional c
+            WHERE (CAST(:busqueda AS string) IS NULL
+                   OR LOWER(c.nombre) LIKE :busqueda ESCAPE '!'
+                   OR LOWER(c.apellidoPaterno) LIKE :busqueda ESCAPE '!'
+                   OR LOWER(c.correo) LIKE :busqueda ESCAPE '!'
+                   OR LOWER(c.area) LIKE :busqueda ESCAPE '!'
+                   OR LOWER(c.cargo) LIKE :busqueda ESCAPE '!')
+              AND (CAST(:estado AS string) IS NULL OR c.estado = :estado)
+            """)
+    org.springframework.data.domain.Page<CorreoInstitucional> buscarPaginado(
+            @org.springframework.data.repository.query.Param("busqueda") String busqueda,
+            @org.springframework.data.repository.query.Param("estado") String estado,
+            org.springframework.data.domain.Pageable pageable);
+
+
     Optional<CorreoInstitucional> findByCorreo(String correo);
 
     boolean existsByCorreo(String correo);

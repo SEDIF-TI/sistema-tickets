@@ -136,6 +136,7 @@ svg {
 
 @media print {
   .no-print,
+  .ocultar-al-imprimir,
   header,
   nav,
   aside {
@@ -144,5 +145,18 @@ svg {
 
   body {
     background: #ffffff !important;
+  }
+
+  /* Sin esto el navegador descarta los rellenos de las gráficas para ahorrar
+     tinta, y el panel sale con las barras en blanco. */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Una tarjeta partida entre dos hojas deja media gráfica en cada una. */
+  .MuiPaper-root {
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
 }

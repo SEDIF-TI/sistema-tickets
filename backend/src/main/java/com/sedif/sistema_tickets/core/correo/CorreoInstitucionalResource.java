@@ -48,12 +48,27 @@ public class CorreoInstitucionalResource {
 
     /** Directorio de correos, con filtro por texto y por estado. */
     @GetMapping
-    public ResponseEntity<ApiResponse<List<CorreoInstitucional>>> obtenerTodos(
-            @RequestParam(required = false) String filtro,
-            @RequestParam(required = false) String estado) {
+    public ResponseEntity<ApiResponse<com.sedif.sistema_tickets.exception.PageResponse<CorreoInstitucional>>> obtenerTodos(
+            @RequestParam(required = false) String busqueda,
+            @RequestParam(required = false) String estado,
+            @org.springframework.data.web.PageableDefault(
+                    size = 10, sort = "nombre",
+                    direction = org.springframework.data.domain.Sort.Direction.ASC)
+            org.springframework.data.domain.Pageable pageable) {
 
         return ResponseEntity.ok(ApiResponse.ok(
-                correoService.buscarPorFiltroYEstado(filtro, estado)));
+                correoService.listarPaginado(busqueda, estado, pageable)));
+    }
+
+    /** Catalogo de estados de la cuenta, servido desde el enum EstadoCorreo. */
+    @GetMapping("/estados")
+    public ResponseEntity<ApiResponse<List<com.sedif.sistema_tickets.core.ticket.CatalogoResponse>>> obtenerEstados() {
+        List<com.sedif.sistema_tickets.core.ticket.CatalogoResponse> estados =
+                java.util.Arrays.stream(com.sedif.sistema_tickets.util.enums.EstadoCorreo.values())
+                        .map(e -> new com.sedif.sistema_tickets.core.ticket.CatalogoResponse(
+                                e.name(), e.getEtiqueta()))
+                        .toList();
+        return ResponseEntity.ok(ApiResponse.ok(estados));
     }
 
     @GetMapping("/{id}")
@@ -63,7 +78,7 @@ public class CorreoInstitucionalResource {
 
     @PostMapping
     public ResponseEntity<ApiResponse<CorreoInstitucional>> crear(
-            @Valid @RequestBody CorreoInstitucional correo) {
+            @Valid @RequestBody CorreoRequest correo) {
 
         CorreoInstitucional creado = correoService.crear(correo);
         return ResponseEntity.status(HttpStatus.CREATED)
@@ -73,7 +88,7 @@ public class CorreoInstitucionalResource {
     @PutMapping("/{id}")
     public ResponseEntity<ApiResponse<CorreoInstitucional>> actualizar(
             @PathVariable Long id,
-            @Valid @RequestBody CorreoInstitucional correo) {
+            @Valid @RequestBody CorreoRequest correo) {
 
         return ResponseEntity.ok(ApiResponse.ok(
                 correoService.actualizar(id, correo), "Correo actualizado correctamente."));

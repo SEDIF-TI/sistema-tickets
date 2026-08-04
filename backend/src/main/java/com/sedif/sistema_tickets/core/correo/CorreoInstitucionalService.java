@@ -13,11 +13,15 @@ public interface CorreoInstitucionalService {
     // Método necesario para combinar filtro de texto y filtro de estado (incluyendo BAJA)
     List<CorreoInstitucional> buscarPorFiltroYEstado(String filtro, String estado);
 
+    /** Directorio paginado con busqueda y filtro de estado resueltos en la base. */
+    com.sedif.sistema_tickets.exception.PageResponse<CorreoInstitucional> listarPaginado(
+            String busqueda, String estado, org.springframework.data.domain.Pageable pageable);
+
     CorreoInstitucional obtenerPorId(Long id);
 
-    CorreoInstitucional crear(CorreoInstitucional correo);
+    CorreoInstitucional crear(CorreoRequest request);
 
-    CorreoInstitucional actualizar(Long id, CorreoInstitucional correoActualizado);
+    CorreoInstitucional actualizar(Long id, CorreoRequest request);
 
     CorreoInstitucional cambiarEstado(Long id, String nuevoEstado);
 
