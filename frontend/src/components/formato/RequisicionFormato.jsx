@@ -1,15 +1,14 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { 
-    Typography, Paper, TextField, Button, Grid, Box, 
+    Box, Typography, Paper, TextField, Button, Grid,
     IconButton, Table, TableBody, TableCell, TableContainer, TableHead, TableRow 
 } from '@mui/material';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddCircleIcon from '@mui/icons-material/AddCircle';
 
-const COLOR_GUINDA = '#801A36';
 
-export default function RequisicionFormato({ solicitarPdf }) {
+export default function RequisicionFormato({ solicitarPdf, generando = false }) {
     const [requisicion, setRequisicion] = useState({
         areaSolicitante: 'Soporte Técnico',
         fechaRequerida: '',
@@ -40,19 +39,19 @@ export default function RequisicionFormato({ solicitarPdf }) {
 
     return (
         <Paper sx={{ p: 4, borderRadius: 2 }}>
-            <Typography variant="h6" sx={{ mb: 3, color: COLOR_GUINDA }}>Solicitud de Insumos</Typography>
+            <Typography variant="h6" sx={{ mb: 3, color: 'primary.main' }}>Solicitud de Insumos</Typography>
             <Grid container spacing={3}>
-                <Grid item xs={12} sm={6}>
+                <Grid size={{ xs: 12, sm: 6 }}>
                     <TextField fullWidth label="Área Solicitante" name="areaSolicitante" value={requisicion.areaSolicitante} onChange={handleChange} />
                 </Grid>
-                <Grid item xs={12} sm={6}>
+                <Grid size={{ xs: 12, sm: 6 }}>
                     <TextField fullWidth type="date" label="Fecha Requerida" name="fechaRequerida" InputLabelProps={{ shrink: true }} value={requisicion.fechaRequerida} onChange={handleChange} />
                 </Grid>
-                <Grid item xs={12}>
+                <Grid size={{ xs: 12 }}>
                     <TextField fullWidth label="Justificación de la compra" name="justificacion" value={requisicion.justificacion} onChange={handleChange} />
                 </Grid>
                 
-                <Grid item xs={12}>
+                <Grid size={{ xs: 12 }}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1, mt: 2 }}>
                         <Typography variant="subtitle1" fontWeight="bold">Artículos Requeridos</Typography>
                         <Button size="small" startIcon={<AddCircleIcon />} onClick={handleAddArticulo} color="primary">Agregar Fila</Button>
@@ -92,12 +91,12 @@ export default function RequisicionFormato({ solicitarPdf }) {
                     </TableContainer>
                 </Grid>
 
-                <Grid item xs={12} sx={{ display: 'flex', justifyContent: 'flex-end', mt: 3 }}>
-                    <Button 
+                <Grid size={{ xs: 12 }} sx={{ display: 'flex', justifyContent: 'flex-end', mt: 3 }}>
+                    <Button disabled={generando} 
                         variant="contained" 
                         onClick={() => solicitarPdf('requisicion', requisicion, `Requisicion.pdf`)} 
                         startIcon={<PictureAsPdfIcon />} 
-                        sx={{ bgcolor: COLOR_GUINDA, px: 4, py: 1.5 }}
+                        sx={{ bgcolor: 'primary.main', px: 4, py: 1.5 }}
                     >
                         Generar PDF
                     </Button>

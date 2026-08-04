@@ -1,142 +1,259 @@
-import React, { useState, useContext } from 'react';
-import { Box, Typography, Paper, TextField, Button, Alert, Divider, Grid } from '@mui/material';
-import { useNavigate } from 'react-router-dom'; 
-import { AuthContext } from '../context/AuthContext';
-import api from '../services/api';
+import { useState, useContext } from 'react';
+import {
+    Box, Typography, Paper, Button, Alert, Divider, Stack, useMediaQuery
+} from '@mui/material';
+import { useTheme } from '@mui/material/styles';
+import { useNavigate } from 'react-router-dom';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 
-// Iconos
 import LockResetIcon from '@mui/icons-material/LockReset';
 import TelegramIcon from '@mui/icons-material/Telegram';
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
+import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 
-const COLOR_GUINDA = '#801A36';
+import { AuthContext } from '../context/AuthContext.jsx';
+import { perfilService } from '../services/perfilService';
+import { useNotification } from '../context/NotificationContext.jsx';
+import { useNetworkStatus } from '../hooks/useNetworkStatus.jsx';
+import { useRol } from '../hooks/useRol.jsx';
+import { esquemaPassword } from '../util/esquemas';
 
-// ---> CONFIGURA AQUÍ EL USERNAME REAL DE TU BOT (EL QUE TE DIO BOTFATHER)
-const TELEGRAM_BOT_USERNAME = 'Notificaciones_SEDIF_bot'; 
+import CampoFormulario from '../components/CampoFormulario';
 
+const VALORES_INICIALES = {
+    passwordActual: '',
+    nuevaPassword: '',
+    confirmarPassword: '',
+};
+
+/**
+ * Perfil del usuario: cambio de contraseña y vinculación con Telegram.
+ *
+ * Cambios respecto a la versión anterior:
+ *  - Llamaba a `PUT /v1/admin/usuarios/password`, ruta que dejó de existir al
+ *    trasladarse el cambio de contraseña a `/v1/perfil`. **Nadie podía cambiar
+ *    su contraseña**, ni siquiera en el primer acceso, que es obligatorio: el
+ *    usuario quedaba atrapado en esta pantalla.
+ *  - No pedía la contraseña actual, que el backend exige desde la auditoría.
+ *  - Validaba 6 caracteres cuando el servidor pide 8 con letra y número, así
+ *    que daba por buena una clave que el servidor luego rechazaba.
+ *  - El usuario del bot de Telegram estaba escrito a mano en el código, con lo
+ *    que apuntar a otro bot obligaba a recompilar; ahora sale del entorno.
+ *  - El enlace de Telegram leía `user.id`, campo que el backend no envía (es
+ *    `usuarioId`), así que la vinculación fallaba con un `alert()`.
+ */
 export default function PerfilPage() {
     const { user, marcarPasswordCambiada } = useContext(AuthContext);
-    const navigate = useNavigate(); 
-    
-    const [password, setPassword] = useState('');
-    const [confirmPassword, setConfirmPassword] = useState('');
-    const [mensaje, setMensaje] = useState({ texto: '', tipo: '' });
+    const { esTecnico, usuarioId, nombre } = useRol();
+    const { notificar, notificarError } = useNotification();
+    const navigate = useNavigate();
 
-    // Obtener el rol para condicionar la vista de Telegram
-    const userRole = user?.rol || user?.role || user?.rolNombre || '';
-    const cleanRole = userRole.replace('ROLE_', '').toUpperCase();
-    const mostrarTelegram = cleanRole === 'ADMINISTRADOR' || cleanRole === 'SOPORTE';
+    const theme = useTheme();
+    const esMovil = useMediaQuery(theme.breakpoints.down('sm'));
 
-    const handleActualizar = async (e) => {
-        e.preventDefault();
-        setMensaje({ texto: '', tipo: '' });
+    const estadoRed = useNetworkStatus();
+    const sinConexion = Boolean(estadoRed.sinConexion ?? estadoRed);
 
-        if (password !== confirmPassword) {
-            setMensaje({ texto: 'Las contraseñas no coinciden.', tipo: 'error' });
-            return;
-        }
+    const [vinculando, setVinculando] = useState(false);
 
-        if (password.length < 6) {
-            setMensaje({ texto: 'La contraseña debe tener al menos 6 caracteres.', tipo: 'warning' });
-            return;
-        }
+    const claveTemporal = Boolean(user?.passwordTemporal);
 
+    const {
+        control,
+        handleSubmit,
+        reset,
+        formState: { isSubmitting },
+    } = useForm({
+        resolver: zodResolver(esquemaPassword),
+        mode: 'onBlur',
+        defaultValues: VALORES_INICIALES,
+    });
+
+    const cambiarPassword = async (datos) => {
         try {
-            await api.put('/v1/admin/usuarios/password', { nuevaPassword: password });
-            
-            if (user?.passwordTemporal) {
-                marcarPasswordCambiada(); 
+            const respuesta = await perfilService.cambiarPassword(
+                datos.passwordActual,
+                datos.nuevaPassword
+            );
+
+            notificar(respuesta?.mensaje || 'Contraseña actualizada correctamente.');
+            reset(VALORES_INICIALES);
+
+            if (claveTemporal) {
+                // Con la clave ya cambiada, el usuario deja de estar retenido
+                // en esta pantalla y entra al sistema.
+                marcarPasswordCambiada();
                 navigate('/', { replace: true });
-            } else {
-                setMensaje({ texto: '¡Contraseña actualizada con éxito!', tipo: 'success' });
-                setPassword('');
-                setConfirmPassword('');
             }
-            
         } catch (error) {
-            setMensaje({ texto: 'Ocurrió un error al actualizar la contraseña.', tipo: 'error' });
+            notificarError(error);
         }
     };
 
-    const handleVincularTelegram = () => {
-        // ---> CORRECCIÓN: Extraemos el ID numérico compatible con Long.parseLong de Java
-        const userId = user?.id || user?.usuarioId || '';
-        
-        if (!userId) {
-            alert("No se pudo recuperar el ID de tu usuario. Intenta cerrar y abrir sesión.");
+    const vincularTelegram = () => {
+        const bot = import.meta.env.VITE_TELEGRAM_BOT_USERNAME;
+
+        if (!bot) {
+            notificarError('El bot de notificaciones no está configurado. Avisa al área de sistemas.');
             return;
         }
 
-        // Construimos la URL limpia con el ID numérico
-        const urlBotTelegram = `https://t.me/${TELEGRAM_BOT_USERNAME}?start=${userId}`;
-        window.open(urlBotTelegram, '_blank');
+        if (!usuarioId) {
+            notificarError('No se pudo identificar tu cuenta. Cierra la sesión y vuelve a entrar.');
+            return;
+        }
+
+        setVinculando(true);
+        // El parámetro `start` lleva el id de usuario: es lo que el bot usa
+        // para asociar la conversación con la cuenta del sistema.
+        const ventana = window.open(`https://t.me/${bot}?start=${usuarioId}`, '_blank');
+
+        if (!ventana) {
+            notificarError('El navegador bloqueó la ventana. Permite las ventanas emergentes para abrir Telegram.');
+        } else {
+            notificar('Se abrió Telegram. Pulsa "Iniciar" en la conversación para completar la vinculación.');
+        }
+
+        setVinculando(false);
     };
 
     return (
-        <Box sx={{ p: 3, maxWidth: mostrarTelegram ? 900 : 500, mx: 'auto' }}>
-            {user?.passwordTemporal && (
-                <Alert severity="warning" variant="filled" sx={{ mb: 4, fontWeight: 'bold', fontSize: '1.1rem' }}>
-                    ¡Atención! Por políticas de seguridad, debes cambiar tu contraseña temporal antes de acceder al sistema.
+        <Box sx={{ maxWidth: 960, mx: 'auto' }}>
+            {claveTemporal && (
+                <Alert severity="warning" sx={{ mb: 3 }}>
+                    Estás usando una contraseña temporal. Cámbiala para poder entrar al
+                    resto del sistema.
                 </Alert>
             )}
 
-            <Typography variant="h4" sx={{ mb: 3, fontWeight: 'bold', color: COLOR_GUINDA }}>
-                Mi Perfil y Configuración
-            </Typography>
+            <Box sx={{ mb: 3 }}>
+                <Typography
+                    variant="h4"
+                    component="h2"
+                    color="primary.main"
+                    sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
+                >
+                    <AccountCircleIcon fontSize="large" aria-hidden="true" />
+                    Mi perfil
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                    {nombre ? `Sesión de ${nombre}.` : 'Configuración de tu cuenta.'}
+                </Typography>
+            </Box>
 
-            <Grid container spacing={3}>
-                {/* COLUMNA IZQUIERDA: Cambio de Contraseña */}
-                <Grid item xs={12} md={mostrarTelegram ? 6 : 12}>
-                    <Paper elevation={3} sx={{ p: { xs: 2, md: 4 }, borderRadius: 2 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2, color: COLOR_GUINDA }}>
-                            <LockResetIcon fontSize="large" />
-                            <Typography variant="h6" fontWeight="bold">Credenciales</Typography>
-                        </Box>
-                        <Divider sx={{ mb: 3 }} />
+            <Box
+                sx={{
+                    display: 'grid',
+                    gridTemplateColumns: { xs: '1fr', md: esTecnico ? 'repeat(2, 1fr)' : '1fr' },
+                    gap: 3,
+                    alignItems: 'start',
+                }}
+            >
+                {/* ------------------------------------------ contraseña ---- */}
+                <Paper variant="outlined" sx={{ p: { xs: 2.5, sm: 3.5 } }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                        <LockResetIcon color="primary" aria-hidden="true" />
+                        <Typography variant="h6" component="h3">
+                            Contraseña
+                        </Typography>
+                    </Box>
+                    <Typography variant="body2" color="text.secondary">
+                        Debe tener al menos 8 caracteres, con una letra y un número.
+                    </Typography>
 
-                        {mensaje.texto && (
-                            <Alert severity={mensaje.tipo} sx={{ mb: 3 }}>{mensaje.texto}</Alert>
-                        )}
+                    <Divider sx={{ my: 2.5 }} />
 
-                        <Box component="form" onSubmit={handleActualizar}>
-                            <TextField label="Nueva Contraseña" type="password" fullWidth margin="normal" value={password} onChange={(e) => setPassword(e.target.value)} required />
-                            <TextField label="Confirmar Nueva Contraseña" type="password" fullWidth margin="normal" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
-                            <Button type="submit" variant="contained" fullWidth sx={{ mt: 3, py: 1.5, bgcolor: COLOR_GUINDA, '&:hover': { bgcolor: '#5e1026' } }}>
-                                {user?.passwordTemporal ? "Establecer y Desbloquear Sistema" : "Actualizar Contraseña"}
+                    <form onSubmit={handleSubmit(cambiarPassword)} noValidate>
+                        <Stack spacing={2.5}>
+                            <CampoFormulario
+                                control={control}
+                                nombre="passwordActual"
+                                etiqueta="Contraseña actual"
+                                obligatorio
+                                type="password"
+                                autoComplete="current-password"
+                                ayuda={claveTemporal
+                                    ? 'La contraseña temporal que te entregaron.'
+                                    : undefined}
+                            />
+
+                            <CampoFormulario
+                                control={control}
+                                nombre="nuevaPassword"
+                                etiqueta="Nueva contraseña"
+                                obligatorio
+                                type="password"
+                                autoComplete="new-password"
+                            />
+
+                            <CampoFormulario
+                                control={control}
+                                nombre="confirmarPassword"
+                                etiqueta="Repite la nueva contraseña"
+                                obligatorio
+                                type="password"
+                                autoComplete="new-password"
+                            />
+
+                            <Button
+                                type="submit"
+                                variant="contained"
+                                size="large"
+                                disabled={isSubmitting || sinConexion}
+                                fullWidth
+                            >
+                                {isSubmitting
+                                    ? 'Guardando…'
+                                    : claveTemporal ? 'Cambiar y entrar al sistema' : 'Cambiar contraseña'}
                             </Button>
-                        </Box>
-                    </Paper>
-                </Grid>
+                        </Stack>
+                    </form>
+                </Paper>
 
-                {/* COLUMNA DERECHA: Telegram (Solo visible para Admin o Soporte) */}
-                {mostrarTelegram && (
-                    <Grid item xs={12} md={6}>
-                        {!user?.passwordTemporal ? (
-                            <Paper elevation={3} sx={{ p: { xs: 2, md: 4 }, borderRadius: 2 }}>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2, color: '#0088cc' }}>
-                                    <NotificationsActiveIcon fontSize="large" />
-                                    <Typography variant="h6" fontWeight="bold">Notificaciones</Typography>
-                                </Box>
-                                <Divider sx={{ mb: 3 }} />
-                                
-                                <Typography variant="body1" color="textSecondary" sx={{ mb: 4, flexGrow: 1 }}>
-                                    Vincula tu cuenta con nuestro Bot de Telegram para recibir alertas en tiempo real cuando te asignen un ticket, haya actualizaciones o recibas comunicados.
+                {/* -------------------------------------------- Telegram ---- */}
+                {esTecnico && (
+                    <Paper variant="outlined" sx={{ p: { xs: 2.5, sm: 3.5 } }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                            <NotificationsActiveIcon color="primary" aria-hidden="true" />
+                            <Typography variant="h6" component="h3">
+                                Notificaciones
+                            </Typography>
+                        </Box>
+                        <Typography variant="body2" color="text.secondary">
+                            Recibe un aviso en tu teléfono cuando se te asigne un ticket.
+                        </Typography>
+
+                        <Divider sx={{ my: 2.5 }} />
+
+                        {claveTemporal ? (
+                            <Alert severity="info">
+                                Cambia primero tu contraseña temporal; después podrás vincular
+                                Telegram.
+                            </Alert>
+                        ) : (
+                            <Stack spacing={2.5}>
+                                <Typography variant="body2" color="text.secondary">
+                                    Al pulsar el botón se abrirá una conversación con el bot del
+                                    sistema. Pulsa <strong>Iniciar</strong> dentro de Telegram y
+                                    tu cuenta quedará vinculada.
                                 </Typography>
 
-                                <Button onClick={handleVincularTelegram} variant="contained" startIcon={<TelegramIcon />} fullWidth sx={{ py: 1.5, bgcolor: '#0088cc', '&:hover': { bgcolor: '#0077b5' }, fontSize: '1.1rem' }}>
+                                <Button
+                                    onClick={vincularTelegram}
+                                    variant="contained"
+                                    size={esMovil ? 'large' : 'medium'}
+                                    startIcon={<TelegramIcon />}
+                                    disabled={vinculando || sinConexion}
+                                    fullWidth
+                                >
                                     Vincular con Telegram
                                 </Button>
-                            </Paper>
-                        ) : (
-                            <Paper elevation={0} sx={{ p: 4, borderRadius: 2, height: '100%', bgcolor: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                <Typography variant="body2" color="textSecondary" align="center">
-                                    Las opciones de notificaciones se habilitarán en cuanto establezcas tu nueva contraseña segura.
-                                </Typography>
-                            </Paper>
+                            </Stack>
                         )}
-                    </Grid>
+                    </Paper>
                 )}
-            </Grid>
+            </Box>
         </Box>
     );
 }

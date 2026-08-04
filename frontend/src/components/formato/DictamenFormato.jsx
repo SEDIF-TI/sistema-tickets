@@ -1,12 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Typography, Paper, TextField, Button, Grid, Box, Divider, Autocomplete } from '@mui/material';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import { toUpper } from '../../util/formater';
 import api from '../../services/api';
 
-const COLOR_GUINDA = '#801A36';
 
-export default function DictamenFormato({ solicitarPdf }) {
+export default function DictamenFormato({ solicitarPdf, generando = false }) {
     // 1. Obtenemos al usuario logueado para que firme automáticamente
     const usuarioLogueado = JSON.parse(localStorage.getItem('user')) || {};
     const nombreTecnico = usuarioLogueado.nombre || 'Técnico de Soporte';
@@ -63,7 +62,7 @@ export default function DictamenFormato({ solicitarPdf }) {
     return (
         <Paper sx={{ p: 4, borderRadius: 2, boxShadow: 2 }}>
             {/* --- SECCIÓN 1: DATOS DEL EQUIPO --- */}
-            <Typography variant="h6" sx={{ color: COLOR_GUINDA, fontWeight: 'bold', mb: 2 }}>
+            <Typography variant="h6" sx={{ color: 'primary.main', fontWeight: 'bold', mb: 2 }}>
                 1. Datos Generales y del Equipo
             </Typography>
             
@@ -134,28 +133,28 @@ export default function DictamenFormato({ solicitarPdf }) {
             <Divider sx={{ my: 4 }} />
 
             {/* --- SECCIÓN 2: DATOS DEL USUARIO --- */}
-            <Typography variant="h6" sx={{ color: COLOR_GUINDA, fontWeight: 'bold', mb: 2 }}>
+            <Typography variant="h6" sx={{ color: 'primary.main', fontWeight: 'bold', mb: 2 }}>
                 2. Datos del Usuario
             </Typography>
             <Grid container spacing={2}>
-                <Grid item xs={12} sm={6}><TextField fullWidth size="small" label="Nombre del Usuario" name="nombreUsuario" value={dictamen.nombreUsuario} onChange={handleChange} /></Grid>
-                <Grid item xs={12} sm={6}><TextField fullWidth size="small" label="Teléfono / Ext" name="telefonoUsuario" value={dictamen.telefonoUsuario} onChange={handleChange} /></Grid>
-                <Grid item xs={12} sm={6}><TextField fullWidth size="small" label="Dirección" name="direccionUsuario" value={dictamen.direccionUsuario} onChange={handleChange} /></Grid>
-                <Grid item xs={12} sm={6}><TextField fullWidth size="small" label="Departamento" name="departamentoUsuario" value={dictamen.departamentoUsuario} onChange={handleChange} /></Grid>
-                <Grid item xs={12} sm={6}><TextField fullWidth size="small" label="Tipo de Reporte / Servicio" name="tipoReporte" value={dictamen.tipoReporte} onChange={handleChange} /></Grid>
+                <Grid size={{ xs: 12, sm: 6 }}><TextField fullWidth size="small" label="Nombre del Usuario" name="nombreUsuario" value={dictamen.nombreUsuario} onChange={handleChange} /></Grid>
+                <Grid size={{ xs: 12, sm: 6 }}><TextField fullWidth size="small" label="Teléfono / Ext" name="telefonoUsuario" value={dictamen.telefonoUsuario} onChange={handleChange} /></Grid>
+                <Grid size={{ xs: 12, sm: 6 }}><TextField fullWidth size="small" label="Dirección" name="direccionUsuario" value={dictamen.direccionUsuario} onChange={handleChange} /></Grid>
+                <Grid size={{ xs: 12, sm: 6 }}><TextField fullWidth size="small" label="Departamento" name="departamentoUsuario" value={dictamen.departamentoUsuario} onChange={handleChange} /></Grid>
+                <Grid size={{ xs: 12, sm: 6 }}><TextField fullWidth size="small" label="Tipo de Reporte / Servicio" name="tipoReporte" value={dictamen.tipoReporte} onChange={handleChange} /></Grid>
             </Grid>
 
             <Divider sx={{ my: 4 }} />
 
             {/* --- SECCIÓN 3: ANÁLISIS TÉCNICO --- */}
-            <Typography variant="h6" sx={{ color: COLOR_GUINDA, fontWeight: 'bold', mb: 2 }}>
+            <Typography variant="h6" sx={{ color: 'primary.main', fontWeight: 'bold', mb: 2 }}>
                 3. Análisis Técnico
             </Typography>
             <Grid container spacing={2}>
-                <Grid item xs={12}><TextField fullWidth multiline minRows={2} label="Descripción de la Falla" name="fallaReportada" value={dictamen.fallaReportada} onChange={handleChange} /></Grid>
-                <Grid item xs={12}><TextField fullWidth multiline minRows={3} label="Diagnóstico Técnico" name="diagnostico" value={dictamen.diagnostico} onChange={handleChange} /></Grid>
-                <Grid item xs={12}><TextField fullWidth multiline minRows={2} label="Hallazgos (Estado físico, batería, disco...)" name="hallazgos" value={dictamen.hallazgos} onChange={handleChange} /></Grid>
-                <Grid item xs={12}>
+                <Grid size={{ xs: 12 }}><TextField fullWidth multiline minRows={2} label="Descripción de la Falla" name="fallaReportada" value={dictamen.fallaReportada} onChange={handleChange} /></Grid>
+                <Grid size={{ xs: 12 }}><TextField fullWidth multiline minRows={3} label="Diagnóstico Técnico" name="diagnostico" value={dictamen.diagnostico} onChange={handleChange} /></Grid>
+                <Grid size={{ xs: 12 }}><TextField fullWidth multiline minRows={2} label="Hallazgos (Estado físico, batería, disco...)" name="hallazgos" value={dictamen.hallazgos} onChange={handleChange} /></Grid>
+                <Grid size={{ xs: 12 }}>
                     <TextField 
                         fullWidth multiline minRows={2} 
                         label="Conclusión Final (Max 200 caracteres)" 
@@ -166,7 +165,7 @@ export default function DictamenFormato({ solicitarPdf }) {
             </Grid>
 
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 4, pt: 2, borderTop: '1px solid #eee' }}>
-                <Button 
+                <Button disabled={generando} 
                     variant="contained" 
                     onClick={async () => {
                         try {
@@ -195,7 +194,7 @@ export default function DictamenFormato({ solicitarPdf }) {
                         solicitarPdf('dictamen', datosParaPdf, `Dictamen_Automatico.pdf`);
                     }} 
                     startIcon={<PictureAsPdfIcon />} 
-                    sx={{ bgcolor: COLOR_GUINDA, '&:hover': { bgcolor: '#5e1227' }, px: 4, py: 1.5, fontWeight: 'bold' }}
+                    sx={{ bgcolor: 'primary.main', '&:hover': { bgcolor: '#5e1227' }, px: 4, py: 1.5, fontWeight: 'bold' }}
                 >
                     Generar Dictamen Oficial
                 </Button>

@@ -177,6 +177,42 @@ export const esquemaCorreo = z.object({
     cuotaAlmacenamiento: textoOpcional('La cuota de almacenamiento', 30),
 });
 
+/**
+ * Cambio de contraseña propia. Espeja `CambioPasswordRequest`.
+ *
+ * Las reglas son las del backend, no unas propias: la pantalla anterior pedía
+ * 6 caracteres cuando el servidor exige 8 con al menos una letra y un número,
+ * así que el formulario daba por buena una contraseña que el servidor luego
+ * rechazaba.
+ */
+export const esquemaPassword = z.object({
+    passwordActual: z.string().min(1, 'Escribe tu contraseña actual.'),
+    nuevaPassword: z.string()
+        .min(8, 'La nueva contraseña debe tener al menos 8 caracteres.')
+        .max(100, 'La contraseña no puede exceder 100 caracteres.')
+        .regex(/[a-zA-Z]/, 'Debe incluir al menos una letra.')
+        .regex(/\d/, 'Debe incluir al menos un número.'),
+    confirmarPassword: z.string().min(1, 'Repite la nueva contraseña.'),
+}).superRefine((datos, ctx) => {
+    if (datos.nuevaPassword !== datos.confirmarPassword) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['confirmarPassword'],
+            message: 'Las contraseñas no coinciden.',
+        });
+    }
+
+    // Repetir la contraseña temporal deja la cuenta con la clave que se envió
+    // por un canal inseguro, que es justo lo que el cambio obligatorio evita.
+    if (datos.passwordActual && datos.nuevaPassword === datos.passwordActual) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['nuevaPassword'],
+            message: 'La nueva contraseña debe ser distinta de la actual.',
+        });
+    }
+});
+
 /** Resolución de un ticket. Espeja `ResolucionRequest`. */
 export const esquemaResolucion = z.object({
     planTrabajoClave: z.string().min(1, 'Selecciona la meta del plan de trabajo.'),

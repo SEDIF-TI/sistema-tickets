@@ -1,143 +1,237 @@
-import React, { useState } from 'react';
-import { 
-    Box, Typography, Paper, Tabs, Tab, FormControl, InputLabel, Select, MenuItem, 
-    Dialog, DialogTitle, DialogContent, IconButton 
+import { useState, useCallback } from 'react';
+import {
+    Box, Typography, Paper, Tabs, Tab, Dialog, DialogTitle, DialogContent,
+    DialogActions, IconButton, Button, TextField, MenuItem, useMediaQuery,
+    CircularProgress
 } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import CloseIcon from '@mui/icons-material/Close';
-import api from "../services/api";
+import DescriptionIcon from '@mui/icons-material/Description';
+import DownloadIcon from '@mui/icons-material/Download';
 
-// Importaciones
-import DictamenFormato from "./formato/DictamenFormato.jsx";
-import FormularioResguardo from "./formato/FormularioResguardo.jsx";
-import ReporteActividadesFormato from "./formato/ReporteActividadesFormato.jsx";
-import MantenimientoPreventivoFormato from "./formato/MantenimientoPreventivoFormato.jsx";
+import api from '../services/api';
+import { useNotification } from '../context/NotificationContext.jsx';
+import { useRol } from '../hooks/useRol.jsx';
 
-const COLOR_GUINDA = '#801A36';
+import DictamenFormato from './formato/DictamenFormato.jsx';
+import FormularioResguardo from './formato/FormularioResguardo.jsx';
+import ReporteActividadesFormato from './formato/ReporteActividadesFormato.jsx';
+import MantenimientoPreventivoFormato from './formato/MantenimientoPreventivoFormato.jsx';
 
-export default function GeneradorDocumentos({ user }) {
-    const [tabIndex, setTabIndex] = useState(0);
-    const [subFormatoTecnico, setSubFormatoTecnico] = useState('DICTAMEN');
+const FORMATOS_TECNICOS = [
+    { valor: 'DICTAMEN', etiqueta: 'Dictamen técnico' },
+    { valor: 'RESGUARDO', etiqueta: 'Responsiva de resguardo' },
+];
 
-    // --- ESTADOS PARA CONTROLAR EL MODAL DEL PDF ---
-    const [openModal, setOpenModal] = useState(false);
-    const [pdfUrl, setPdfUrl] = useState("");
-    const [nombrePdfActual, setNombrePdfActual] = useState("");
+/**
+ * Generador de los documentos oficiales del área.
+ *
+ * Cambios respecto a la versión anterior:
+ *  - Recibía el usuario como prop `user`, pero App.jsx monta el componente sin
+ *    pasársela: llegaba `undefined`, así que el mantenimiento preventivo se
+ *    firmaba siempre como "SOPORTE TÉCNICO" en lugar del técnico real. Ahora
+ *    sale del contexto de sesión.
+ *  - `solicitarPdf` limpiaba la ruta a mano por si los formatos enviaban el
+ *    prefijo repetido, y dejaba un `console.log` con la URL en cada llamada.
+ *    La normalización se conserva —los formatos siguen enviando el prefijo—
+ *    pero sin volcarla a consola.
+ *  - Los errores se mostraban con `alert("… Revisa la consola.")`, que manda al
+ *    usuario a un sitio donde no puede hacer nada.
+ *  - El PDF solo podía verse en el visor: no había forma de descargarlo.
+ *  - El objeto del blob se liberaba solo al cerrar con el botón; si el usuario
+ *    generaba otro documento antes, el anterior quedaba en memoria.
+ */
+export default function GeneradorDocumentos() {
+    const { notificarError } = useNotification();
+    const { nombre } = useRol();
 
-    const solicitarPdf = async (endpoint, payload, nombreArchivo) => {
+    const theme = useTheme();
+    const esMovil = useMediaQuery(theme.breakpoints.down('md'));
+
+    const [pestana, setPestana] = useState(0);
+    const [formatoTecnico, setFormatoTecnico] = useState('DICTAMEN');
+
+    const [pdfUrl, setPdfUrl] = useState('');
+    const [nombrePdf, setNombrePdf] = useState('');
+    const [generando, setGenerando] = useState(false);
+
+    const solicitarPdf = useCallback(async (endpoint, carga, nombreArchivo) => {
+        // Los formatos envían a veces la ruta completa y a veces solo el
+        // nombre; se normaliza para no acabar con /v1/documentos duplicado.
+        const limpio = String(endpoint)
+            .replace('/v1/documentos/', '')
+            .replace(/^\/+/, '');
+
+        setGenerando(true);
         try {
-            // --- SOLUCIÓN DEFINITIVA A LAS RUTAS DUPLICADAS ---
-            // 1. Limpiamos cualquier rastro de "/v1/documentos/" que los hijos puedan enviar por error
-            let cleanEndpoint = endpoint;
-            if (cleanEndpoint.includes('/v1/documentos/')) {
-                cleanEndpoint = cleanEndpoint.replace('/v1/documentos/', '');
-            }
-            if (cleanEndpoint.startsWith('/')) {
-                cleanEndpoint = cleanEndpoint.substring(1);
-            }
+            const respuesta = await api.post(`/v1/documentos/${limpio}`, carga, {
+                responseType: 'blob',
+            });
 
-            // 2. Construimos la ruta limpia de forma segura
-            const rutaFinal = `/v1/documentos/${cleanEndpoint}`;
-            console.log("🚀 URL limpia que se enviará al backend:", rutaFinal);
-
-            // 3. Hacemos la petición
-            const response = await api.post(rutaFinal, payload, { responseType: 'blob' });
-            
-            // 4. Generamos el visor
-            const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
-            setPdfUrl(url);
-            setNombrePdfActual(nombreArchivo);
-            setOpenModal(true);
+            // Se libera el documento anterior antes de sustituirlo: sin esto,
+            // cada PDF generado se quedaba retenido en memoria.
+            setPdfUrl((anterior) => {
+                if (anterior) window.URL.revokeObjectURL(anterior);
+                return window.URL.createObjectURL(
+                    new Blob([respuesta.data], { type: 'application/pdf' })
+                );
+            });
+            setNombrePdf(nombreArchivo || 'Documento');
         } catch (error) {
-            console.error("Error al generar el PDF:", error);
-            alert("Hubo un error al generar el documento. Revisa la consola.");
+            notificarError(error);
+        } finally {
+            setGenerando(false);
         }
+    }, [notificarError]);
+
+    const cerrarVisor = () => {
+        if (pdfUrl) window.URL.revokeObjectURL(pdfUrl);
+        setPdfUrl('');
     };
 
-    const handleCloseModal = () => {
-        if (pdfUrl) {
-            window.URL.revokeObjectURL(pdfUrl);
-        }
-        setPdfUrl("");
-        setOpenModal(false);
+    const descargar = () => {
+        const enlace = document.createElement('a');
+        enlace.href = pdfUrl;
+        enlace.download = `${nombrePdf}.pdf`;
+        enlace.click();
     };
 
     return (
-        <Box sx={{ p: 3, width: '100%', boxSizing: 'border-box' }}>
-            <Typography variant="h5" fontWeight="bold" sx={{ color: COLOR_GUINDA, mb: 3 }}>
-                Generador de Documentos Oficiales
-            </Typography>
+        <Box>
+            <Box sx={{ mb: 3 }}>
+                <Typography
+                    variant="h4"
+                    component="h2"
+                    color="primary.main"
+                    sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
+                >
+                    <DescriptionIcon fontSize="large" aria-hidden="true" />
+                    Documentos oficiales
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                    Dictámenes, responsivas y reportes listos para firma.
+                </Typography>
+            </Box>
 
-            {/* BARRA DE PESTAÑAS */}
-            <Paper sx={{ mb: 3, borderRadius: 2, overflow: 'hidden', width: '100%' }}>
-                <Tabs 
-                    value={tabIndex} 
-                    onChange={(e, newValue) => setTabIndex(newValue)} 
+            <Paper variant="outlined" sx={{ mb: 3 }}>
+                <Tabs
+                    value={pestana}
+                    onChange={(_e, valor) => setPestana(valor)}
                     variant="scrollable"
                     scrollButtons="auto"
-                    TabIndicatorProps={{ style: { backgroundColor: COLOR_GUINDA } }}
-                    sx={{ '& .Mui-selected': { color: `${COLOR_GUINDA} !important`, fontWeight: 'bold' } }}
+                    allowScrollButtonsMobile
                 >
-                    <Tab label="Dictámenes y Resguardos" />
-                    <Tab label="Reporte de Actividades" />
-                    <Tab label="Mantenimiento Preventivo" />
+                    <Tab label="Dictámenes y resguardos" />
+                    <Tab label="Reporte de actividades" />
+                    <Tab label="Mantenimiento preventivo" />
                 </Tabs>
             </Paper>
 
-            <Box sx={{ width: '100%' }}>
-                {/* PESTAÑA 0: Dictámenes y Resguardos */}
-                {tabIndex === 0 && (
+            <Box>
+                {pestana === 0 && (
                     <Box>
-                        <Paper sx={{ p: 3, mb: 3, backgroundColor: '#f9f9f9', borderRadius: 2 }} elevation={0} variant="outlined">
-                            <FormControl fullWidth>
-                                <InputLabel id="select-subformato-label">Formato a Generar</InputLabel>
-                                <Select
-                                    labelId="select-subformato-label"
-                                    value={subFormatoTecnico}
-                                    label="Formato a Generar"
-                                    onChange={(e) => setSubFormatoTecnico(e.target.value)}
-                                    sx={{ backgroundColor: 'white' }}
-                                >
-                                    <MenuItem value="DICTAMEN">Dictamen Técnico</MenuItem>
-                                    <MenuItem value="RESGUARDO">Responsiva de Resguardo</MenuItem>
-                                </Select>
-                            </FormControl>
+                        <Paper variant="outlined" sx={{ p: 2.5, mb: 3 }}>
+                            <TextField
+                                select
+                                fullWidth
+                                label="Formato a generar"
+                                value={formatoTecnico}
+                                onChange={(e) => setFormatoTecnico(e.target.value)}
+                                sx={{ maxWidth: { sm: 420 } }}
+                            >
+                                {FORMATOS_TECNICOS.map((f) => (
+                                    <MenuItem key={f.valor} value={f.valor}>
+                                        {f.etiqueta}
+                                    </MenuItem>
+                                ))}
+                            </TextField>
                         </Paper>
-                        {subFormatoTecnico === 'DICTAMEN' && <DictamenFormato solicitarPdf={solicitarPdf} />}
-                        {subFormatoTecnico === 'RESGUARDO' && <FormularioResguardo solicitarPdf={solicitarPdf} />}
+
+                        {formatoTecnico === 'DICTAMEN' && (
+                            <DictamenFormato solicitarPdf={solicitarPdf} generando={generando} />
+                        )}
+                        {formatoTecnico === 'RESGUARDO' && (
+                            <FormularioResguardo solicitarPdf={solicitarPdf} generando={generando} />
+                        )}
                     </Box>
                 )}
 
-                {/* PESTAÑA 1: Reporte de Actividades */}
-                {tabIndex === 1 && <ReporteActividadesFormato solicitarPdf={solicitarPdf} />}
-                
-                {/* PESTAÑA 2: Mantenimiento Preventivo */}
-                {tabIndex === 2 && <MantenimientoPreventivoFormato solicitarPdf={solicitarPdf} usuarioLogueado={user} />}
+                {pestana === 1 && (
+                    <ReporteActividadesFormato solicitarPdf={solicitarPdf} generando={generando} />
+                )}
+
+                {pestana === 2 && (
+                    <MantenimientoPreventivoFormato
+                        solicitarPdf={solicitarPdf}
+                        generando={generando}
+                        // El nombre sale de la sesión: la prop `user` que
+                        // esperaba antes nunca llegaba a montarse.
+                        nombreTecnico={nombre}
+                    />
+                )}
             </Box>
 
-            {/* MODAL DEL PDF VISUALIZADOR COMPLETADO */}
-            <Dialog open={openModal} onClose={handleCloseModal} maxWidth="lg" fullWidth>
-                <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', bgcolor: '#f5f5f5' }}>
-                    <Typography variant="h6" sx={{ fontWeight: 'bold' }}>{nombrePdfActual}</Typography>
-                    <IconButton onClick={handleCloseModal}>
+            {/* -------------------------------------------- visor del PDF -- */}
+            <Dialog
+                open={Boolean(pdfUrl)}
+                onClose={cerrarVisor}
+                maxWidth="lg"
+                fullWidth
+                fullScreen={esMovil}
+                aria-labelledby="titulo-visor-pdf"
+            >
+                <DialogTitle
+                    id="titulo-visor-pdf"
+                    sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2 }}
+                >
+                    <Typography variant="h6" component="span" noWrap>
+                        {nombrePdf}
+                    </Typography>
+                    <IconButton onClick={cerrarVisor} aria-label="Cerrar la vista previa">
                         <CloseIcon />
                     </IconButton>
                 </DialogTitle>
-                <DialogContent dividers sx={{ height: '82vh', p: 0, overflow: 'hidden' }}>
-                    {pdfUrl ? (
-                        <iframe 
-                            src={pdfUrl} 
-                            width="100%" 
-                            height="100%" 
-                            title="Vista previa PDF"
-                            style={{ border: 'none', display: 'block' }}
-                        />
-                    ) : (
-                        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-                            <Typography>Cargando documento...</Typography>
-                        </Box>
-                    )}
+
+                <DialogContent dividers sx={{ height: { xs: 'auto', md: '78vh' }, p: 0 }}>
+                    <iframe
+                        src={pdfUrl}
+                        title={`Vista previa de ${nombrePdf}`}
+                        style={{ border: 'none', display: 'block', width: '100%', height: '100%', minHeight: '60vh' }}
+                    />
                 </DialogContent>
+
+                <DialogActions sx={{ p: 2, gap: 1 }}>
+                    <Button onClick={cerrarVisor} color="inherit">
+                        Cerrar
+                    </Button>
+                    {/* En móvil el visor embebido suele no funcionar; descargar
+                        es el camino fiable. */}
+                    <Button onClick={descargar} variant="contained" startIcon={<DownloadIcon />}>
+                        Descargar
+                    </Button>
+                </DialogActions>
             </Dialog>
+
+            {generando && (
+                <Box
+                    sx={{
+                        position: 'fixed',
+                        inset: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        bgcolor: 'rgba(0,0,0,0.35)',
+                        zIndex: (t) => t.zIndex.modal + 1,
+                    }}
+                    role="status"
+                    aria-label="Generando el documento"
+                >
+                    <Paper sx={{ p: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <CircularProgress size={28} />
+                        <Typography>Generando el documento…</Typography>
+                    </Paper>
+                </Box>
+            )}
         </Box>
     );
 }

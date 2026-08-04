@@ -1,119 +1,216 @@
-import React from 'react';
-import { 
-    Dialog, DialogTitle, DialogContent, DialogActions, 
-    Button, Typography, Box, Paper, Divider 
+import { useRef } from 'react';
+import {
+    Dialog, DialogTitle, DialogContent, DialogActions, Button, Typography,
+    Box, Paper, Divider, Stack, Alert, Tooltip, useMediaQuery
 } from '@mui/material';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import { useTheme } from '@mui/material/styles';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutlined';
 import PrintIcon from '@mui/icons-material/Print';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 
-const COLOR_GUINDA = '#801A36';
+import { useNotification } from '../context/NotificationContext.jsx';
 
+/**
+ * Credenciales recién generadas de un usuario.
+ *
+ * La contraseña temporal solo viaja en la respuesta que la crea: si no se
+ * copia o se imprime ahora, se pierde y hay que restablecerla.
+ *
+ * Cambios respecto a la versión anterior:
+ *  - La impresión construía una plantilla HTML concatenando los datos del
+ *    usuario y la volcaba con `document.write()`. Un nombre o un área que
+ *    contuvieran `<script>` —o cualquier etiqueta— se ejecutaban en la ventana
+ *    nueva. Ahora se imprime el nodo ya renderizado por React, que escapa el
+ *    texto por construcción, y no se genera HTML por concatenación.
+ *  - Si el navegador bloqueaba la ventana emergente, `printWindow` era `null` y
+ *    la función reventaba con un error en consola sin decir nada al usuario.
+ *  - No había forma de copiar la contraseña: había que teclearla a la vista.
+ */
 export default function ModalCredenciales({ open, onClose, usuarioData }) {
-    
-    const handleImprimir = () => {
-        const printWindow = window.open('', '', 'width=600,height=400');
-        
-        const htmlTemplate = `
-            <html>
-                <head>
-                    <title>Credenciales SEDIF</title>
-                    <style>
-                        body { font-family: 'Arial', sans-serif; padding: 20px; color: #333; }
-                        .tarjeta { 
-                            border: 2px dashed #ccc; 
-                            padding: 30px; 
-                            max-width: 400px; 
-                            margin: 0 auto; 
-                            text-align: center;
-                            border-radius: 10px;
-                        }
-                        .header { color: ${COLOR_GUINDA}; font-size: 22px; font-weight: bold; margin-bottom: 10px; }
-                        .subtitle { font-size: 14px; color: #666; margin-bottom: 20px; }
-                        .dato-box { margin: 15px 0; padding: 10px; background-color: #f9f9f9; border-radius: 5px; }
-                        .label { font-size: 12px; text-transform: uppercase; color: #888; }
-                        .valor { font-size: 18px; font-weight: bold; margin-top: 5px; }
-                        .password { font-size: 24px; color: ${COLOR_GUINDA}; letter-spacing: 2px; }
-                        .footer { margin-top: 25px; font-size: 11px; color: #999; border-top: 1px solid #eee; padding-top: 10px; }
-                        
-                        @page { margin: 0; }
-                        @media print { body { padding: 50px; } }
-                    </style>
-                </head>
-                <body>
-                    <div class="tarjeta">
-                        <div class="header">SEDIF</div>
-                        <div class="subtitle">Sistema de Tickets y Soporte</div>
-                        
-                        <div style="text-align: left; margin-top: 20px;">
-                            <p style="margin: 5px 0;"><strong>Nombre:</strong> ${usuarioData?.nombre}</p>
-                            <p style="margin: 5px 0;"><strong>Área:</strong> ${usuarioData?.area}</p>
-                            <p style="margin: 5px 0;"><strong>Rol:</strong> ${usuarioData?.rol}</p>
-                        </div>
+    const { notificar, notificarError } = useNotification();
+    const theme = useTheme();
+    const esMovil = useMediaQuery(theme.breakpoints.down('sm'));
 
-                        <div class="dato-box">
-                            <div class="label">Usuario / Correo Electrónico</div>
-                            <div class="valor">${usuarioData?.correo}</div>
-                        </div>
+    // Nodo que se manda a imprimir: es el mismo que ve el usuario en pantalla.
+    const areaImprimible = useRef(null);
 
-                        <div class="dato-box" style="border: 2px solid ${COLOR_GUINDA};">
-                            <div class="label" style="color: ${COLOR_GUINDA};">Contraseña Temporal</div>
-                            <div class="valor password">${usuarioData?.password}</div>
-                        </div>
+    const copiar = async () => {
+        try {
+            await navigator.clipboard.writeText(usuarioData?.password ?? '');
+            notificar('Contraseña copiada al portapapeles.');
+        } catch {
+            // El portapapeles exige contexto seguro (HTTPS o localhost).
+            notificarError('El navegador no permitió copiar. Selecciona el texto y cópialo a mano.');
+        }
+    };
 
-                        <div class="footer">
-                            <strong>CONFIDENCIAL:</strong> Entregue este documento al usuario. <br/>
-                            El sistema solicitará el cambio de esta contraseña al iniciar sesión.
-                        </div>
-                    </div>
-                    <script>
-                        window.onload = function() { 
-                            window.print();
-                            setTimeout(function() { window.close(); }, 500);
-                        }
-                    </script>
-                </body>
-            </html>
+    const imprimir = () => {
+        const ventana = window.open('', '_blank', 'width=640,height=560');
+
+        if (!ventana) {
+            notificarError('El navegador bloqueó la ventana. Permite las ventanas emergentes para imprimir.');
+            return;
+        }
+
+        // Se clona el nodo ya renderizado en lugar de rearmar la tarjeta con
+        // cadenas: React escapó el contenido al pintarlo, así que el texto del
+        // usuario no puede convertirse en marcado.
+        const contenido = areaImprimible.current?.cloneNode(true);
+
+        const doc = ventana.document;
+        doc.title = 'Credenciales de acceso';
+
+        const estilo = doc.createElement('style');
+        estilo.textContent = `
+            body { font-family: system-ui, sans-serif; color: #111; padding: 32px; }
+            .tarjeta { max-width: 420px; margin: 0 auto; border: 1px dashed #999;
+                       border-radius: 8px; padding: 24px; }
+            .pie { margin-top: 20px; padding-top: 12px; border-top: 1px solid #ddd;
+                   font-size: 11px; color: #555; }
+            @media print { body { padding: 0; } }
         `;
-        
-        printWindow.document.write(htmlTemplate);
-        printWindow.document.close();
+        doc.head.appendChild(estilo);
+
+        const tarjeta = doc.createElement('div');
+        tarjeta.className = 'tarjeta';
+        if (contenido) tarjeta.appendChild(contenido);
+
+        const pie = doc.createElement('p');
+        pie.className = 'pie';
+        pie.textContent = 'CONFIDENCIAL: entregue este documento a la persona interesada. '
+            + 'El sistema le exigirá cambiar esta contraseña la primera vez que entre.';
+        tarjeta.appendChild(pie);
+
+        doc.body.appendChild(tarjeta);
+
+        // Se imprime tras el repintado para que el contenido esté maquetado.
+        ventana.focus();
+        setTimeout(() => {
+            ventana.print();
+            ventana.close();
+        }, 250);
     };
 
     return (
-        <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3, p: 1 } }}>
-            <DialogTitle sx={{ textAlign: 'center', pb: 1 }}>
-                <CheckCircleIcon sx={{ fontSize: 60, color: '#2ecc71', mb: 1 }} />
-                <Typography variant="h5" fontWeight="bold">¡Usuario Registrado!</Typography>
+        <Dialog
+            open={open}
+            onClose={onClose}
+            maxWidth="sm"
+            fullWidth
+            fullScreen={esMovil}
+            aria-labelledby="titulo-credenciales"
+        >
+            <DialogTitle id="titulo-credenciales" sx={{ textAlign: 'center', pb: 1 }}>
+                <CheckCircleOutlineIcon color="success" sx={{ fontSize: 48, mb: 1 }} aria-hidden="true" />
+                <Typography variant="h6" component="p" sx={{ fontWeight: 600 }}>
+                    Cuenta creada
+                </Typography>
             </DialogTitle>
-            
-            <DialogContent>
-                <Typography textAlign="center" color="textSecondary" mb={3}>
-                    El empleado ha sido dado de alta correctamente en el sistema.
-                </Typography>
 
-                <Paper elevation={0} sx={{ bgcolor: '#f5f6fa', p: 3, borderRadius: 2, border: '1px solid #e0e0e0' }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-                        <Typography variant="body2" color="textSecondary">Usuario / Correo:</Typography>
-                        <Typography variant="body1" fontWeight="bold">{usuarioData?.correo}</Typography>
-                    </Box>
-                    <Divider sx={{ mb: 2 }} />
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Typography variant="body2" color="textSecondary">Contraseña Temporal:</Typography>
-                        <Typography variant="h5" fontWeight="bold" sx={{ color: COLOR_GUINDA, letterSpacing: 2 }}>
-                            {usuarioData?.password}
-                        </Typography>
-                    </Box>
+            <DialogContent dividers>
+                <Alert severity="warning" sx={{ mb: 3 }}>
+                    Esta contraseña se muestra una sola vez. Si cierras sin copiarla ni
+                    imprimirla, tendrás que restablecerla.
+                </Alert>
+
+                <Paper ref={areaImprimible} variant="outlined" sx={{ p: 2.5 }}>
+                    <Typography variant="overline" color="text.secondary">
+                        Datos de acceso
+                    </Typography>
+
+                    <Stack spacing={1.5} sx={{ mt: 1.5 }}>
+                        {usuarioData?.nombre && (
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2 }}>
+                                <Typography variant="body2" color="text.secondary">Nombre</Typography>
+                                <Typography variant="body2" fontWeight={500} sx={{ textAlign: 'right' }}>
+                                    {usuarioData.nombre}
+                                </Typography>
+                            </Box>
+                        )}
+
+                        {usuarioData?.area && (
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2 }}>
+                                <Typography variant="body2" color="text.secondary">Área</Typography>
+                                <Typography variant="body2" sx={{ textAlign: 'right' }}>
+                                    {usuarioData.area}
+                                </Typography>
+                            </Box>
+                        )}
+
+                        {usuarioData?.rol && (
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2 }}>
+                                <Typography variant="body2" color="text.secondary">Rol</Typography>
+                                <Typography variant="body2" sx={{ textAlign: 'right' }}>
+                                    {usuarioData.rol}
+                                </Typography>
+                            </Box>
+                        )}
+
+                        <Divider />
+
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2 }}>
+                            <Typography variant="body2" color="text.secondary">Usuario</Typography>
+                            <Typography variant="body2" fontWeight={500} sx={{ textAlign: 'right', wordBreak: 'break-all' }}>
+                                {usuarioData?.correo}
+                            </Typography>
+                        </Box>
+
+                        <Box>
+                            <Typography variant="body2" color="text.secondary" gutterBottom>
+                                Contraseña temporal
+                            </Typography>
+                            <Typography
+                                variant="h5"
+                                component="p"
+                                sx={{
+                                    // Monoespaciada y con separación: se dicta y
+                                    // se teclea a mano, y hay que distinguir
+                                    // caracteres parecidos.
+                                    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                                    letterSpacing: 1.5,
+                                    wordBreak: 'break-all',
+                                }}
+                            >
+                                {usuarioData?.password}
+                            </Typography>
+                        </Box>
+                    </Stack>
                 </Paper>
-                
-                <Typography variant="body2" textAlign="center" color="error" sx={{ mt: 3, fontWeight: 'medium' }}>
-                    Por favor, imprima estas credenciales y entréguelas en un sobre cerrado al empleado.
-                </Typography>
             </DialogContent>
 
-            <DialogActions sx={{ justifyContent: 'center', pb: 3, gap: 2 }}>
-                <Button onClick={onClose} variant="outlined" color="inherit" sx={{ px: 4 }}>Cerrar</Button>
-                <Button onClick={handleImprimir} variant="contained" startIcon={<PrintIcon />} sx={{ bgcolor: COLOR_GUINDA, '&:hover': { bgcolor: '#5e1026' }, px: 4 }}>
-                    Imprimir Credenciales
+            <DialogActions
+                sx={{ flexDirection: { xs: 'column-reverse', sm: 'row' }, gap: 1, p: 2 }}
+            >
+                <Button
+                    onClick={onClose}
+                    color="inherit"
+                    fullWidth={esMovil}
+                    size={esMovil ? 'large' : 'medium'}
+                >
+                    Cerrar
+                </Button>
+
+                <Tooltip title="Copiar la contraseña" arrow>
+                    <span>
+                        <Button
+                            onClick={copiar}
+                            startIcon={<ContentCopyIcon />}
+                            fullWidth={esMovil}
+                            size={esMovil ? 'large' : 'medium'}
+                        >
+                            Copiar
+                        </Button>
+                    </span>
+                </Tooltip>
+
+                <Button
+                    onClick={imprimir}
+                    variant="contained"
+                    startIcon={<PrintIcon />}
+                    fullWidth={esMovil}
+                    size={esMovil ? 'large' : 'medium'}
+                >
+                    Imprimir
                 </Button>
             </DialogActions>
         </Dialog>

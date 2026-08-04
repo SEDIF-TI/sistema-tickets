@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { 
     Typography, Paper, TextField, Button, Grid, Box, 
     Dialog, DialogTitle, DialogContent, DialogActions, MenuItem,
@@ -9,9 +9,8 @@ import TableViewIcon from '@mui/icons-material/TableView';
 import AddTaskIcon from '@mui/icons-material/AddTask';
 import api from '../../services/api';
 
-const COLOR_GUINDA = '#801A36';
 
-export default function ReporteActividadesFormato({ solicitarPdf }) {
+export default function ReporteActividadesFormato({ solicitarPdf, generando = false }) {
     const [fechas, setFechas] = useState({ fechaInicio: '', fechaFin: '' });
     const [modalAbierto, setModalAbierto] = useState(false);
     
@@ -117,7 +116,7 @@ export default function ReporteActividadesFormato({ solicitarPdf }) {
             <Paper sx={{ p: { xs: 3, md: 4 }, borderRadius: 2, boxShadow: 2, width: '100%', boxSizing: 'border-box' }}>
                 <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', md: 'center' }, mb: 4, gap: 2 }}>
                     <Box>
-                        <Typography variant="h6" sx={{ color: COLOR_GUINDA, fontWeight: 'bold' }}>
+                        <Typography variant="h6" sx={{ color: 'primary.main', fontWeight: 'bold' }}>
                             Reporte de Actividades (Consolidado)
                         </Typography>
                         <Typography variant="body2" color="textSecondary">
@@ -128,7 +127,7 @@ export default function ReporteActividadesFormato({ solicitarPdf }) {
                         variant="outlined" 
                         onClick={() => setModalAbierto(true)} 
                         startIcon={<AddTaskIcon />}
-                        sx={{ color: COLOR_GUINDA, borderColor: COLOR_GUINDA, '&:hover': { bgcolor: '#fce4ec', borderColor: COLOR_GUINDA }, fontWeight: 'bold', minWidth: 'max-content' }}
+                        sx={{ color: 'primary.main', borderColor: 'primary.main', '&:hover': { bgcolor: '#fce4ec', borderColor: 'primary.main' }, fontWeight: 'bold', minWidth: 'max-content' }}
                     >
                         Registrar Actividad Manual
                     </Button>
@@ -136,23 +135,23 @@ export default function ReporteActividadesFormato({ solicitarPdf }) {
 
                 <Paper elevation={0} sx={{ bgcolor: '#f8fafc', p: 3, borderRadius: 2, border: '1px solid #e2e8f0' }}>
                     <Grid container spacing={3} alignItems="flex-end">
-                        <Grid item xs={12} md={3}>
+                        <Grid size={{ xs: 12, md: 3 }}>
                             <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mb: 1, fontWeight: 'bold', ml: 0.5 }}>Fecha de Inicio</Typography>
                             <TextField fullWidth size="small" type="date" value={fechas.fechaInicio} onChange={(e) => setFechas({...fechas, fechaInicio: e.target.value})} sx={{ bgcolor: 'white' }} />
                         </Grid>
-                        <Grid item xs={12} md={3}>
+                        <Grid size={{ xs: 12, md: 3 }}>
                             <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mb: 1, fontWeight: 'bold', ml: 0.5 }}>Fecha Fin</Typography>
                             <TextField fullWidth size="small" type="date" value={fechas.fechaFin} onChange={(e) => setFechas({...fechas, fechaFin: e.target.value})} sx={{ bgcolor: 'white' }} />
                         </Grid>
-                        <Grid item xs={12} md={6} sx={{ display: 'flex', justifyContent: { xs: 'flex-start', md: 'flex-end' }, gap: 2 }}>
-                            <Button variant="contained" onClick={handleGenerarPdf} startIcon={<PictureAsPdfIcon />} sx={{ bgcolor: COLOR_GUINDA, '&:hover': { bgcolor: '#5e1227' }, flexGrow: { xs: 1, md: 0 }, px: 3 }}>Descargar PDF</Button>
-                            <Button variant="contained" onClick={handleGenerarExcel} startIcon={<TableViewIcon />} sx={{ bgcolor: '#1D6F42', '&:hover': { bgcolor: '#155331' }, flexGrow: { xs: 1, md: 0 }, px: 3 }}>Descargar Excel</Button>
+                        <Grid size={{ xs: 12, md: 6 }} sx={{ display: 'flex', justifyContent: { xs: 'flex-start', md: 'flex-end' }, gap: 2 }}>
+                            <Button variant="contained" disabled={generando} onClick={handleGenerarPdf} startIcon={<PictureAsPdfIcon />} sx={{ bgcolor: 'primary.main', '&:hover': { bgcolor: '#5e1227' }, flexGrow: { xs: 1, md: 0 }, px: 3 }}>Descargar PDF</Button>
+                            <Button variant="contained" disabled={generando} onClick={handleGenerarExcel} startIcon={<TableViewIcon />} sx={{ bgcolor: '#1D6F42', '&:hover': { bgcolor: '#155331' }, flexGrow: { xs: 1, md: 0 }, px: 3 }}>Descargar Excel</Button>
                         </Grid>
                     </Grid>
                 </Paper>
                 {/* ... (El resto del modal sigue igual) */}
                 <Dialog open={modalAbierto} onClose={() => setModalAbierto(false)} maxWidth="sm" fullWidth>
-                    <DialogTitle sx={{ bgcolor: COLOR_GUINDA, color: 'white' }}>Registrar Actividad Manual</DialogTitle>
+                    <DialogTitle sx={{ bgcolor: 'primary.main', color: 'white' }}>Registrar Actividad Manual</DialogTitle>
                     <DialogContent sx={{ mt: 2 }}>
                         <TextField select fullWidth label="Clave del Plan de Trabajo *" name="planTrabajoClave" value={actividad.planTrabajoClave} onChange={handleChangeActividad} variant="outlined" margin="dense" sx={{ mb: 2 }}>
                             <MenuItem value="1">1 - Mantenimiento preventivo equipo oficinas centrales</MenuItem>
@@ -167,7 +166,7 @@ export default function ReporteActividadesFormato({ solicitarPdf }) {
                     </DialogContent>
                     <DialogActions sx={{ p: 2, pt: 0 }}>
                         <Button onClick={() => setModalAbierto(false)} color="inherit">Cancelar</Button>
-                        <Button variant="contained" onClick={handleGuardarActividad} sx={{ bgcolor: COLOR_GUINDA }}>Guardar Actividad</Button>
+                        <Button variant="contained" onClick={handleGuardarActividad} sx={{ bgcolor: 'primary.main' }}>Guardar Actividad</Button>
                     </DialogActions>
                 </Dialog>
             </Paper>
