@@ -1,403 +1,563 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import {
-  Box, Typography, Paper, Table, TableBody, TableCell, TableContainer,
-  TableHead, TableRow, Button, Chip, Dialog, DialogTitle, DialogContent,
-  DialogActions, TextField, MenuItem, Grid, IconButton, Tooltip, Alert,
-  CircularProgress, Card, CardContent
+    Box, Typography, Button, Chip, Tooltip, Dialog, DialogTitle, DialogContent,
+    DialogActions, Stack, useMediaQuery, Divider
 } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import AddIcon from '@mui/icons-material/Add';
+import InventoryIcon from '@mui/icons-material/Inventory';
 import AssignmentReturnIcon from '@mui/icons-material/AssignmentReturn';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
-import SearchIcon from '@mui/icons-material/Search';
-import RefreshIcon from '@mui/icons-material/Refresh';
-import InventoryIcon from '@mui/icons-material/Inventory';
+import { useForm, useWatch } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+
 import api from '../../services/api';
+import { resguardoService } from '../../services/resguardoService';
+import { useNotification } from '../../context/NotificationContext.jsx';
+import { useNetworkStatus } from '../../hooks/useNetworkStatus.jsx';
+import { useTablaPaginada } from '../../hooks/useTablaPaginada.jsx';
+import { esquemaResguardo } from '../../util/esquemas';
+import { formatearFecha, diasHasta, truncar } from '../../util/formater';
+import {
+    OPCIONES_ESTADO_RESGUARDO, colorEstadoResguardo, etiquetaEstadoResguardo, estaVigente,
+} from '../../util/estadoResguardo';
 
-const COLOR_GUINDA = '#801A36';
+import DynamicTable from '../../components/DynamicTable';
+import AccionesTabla from '../../components/AccionesTabla';
+import ConfirmationDialog from '../../components/ConfirmationDialog';
+import CampoFormulario from '../../components/CampoFormulario';
 
+/** Unidades de plazo que acepta el backend (ver `ResguardoRequest`). */
+const OPCIONES_DURACION = [
+    { valor: 'dias', etiqueta: 'Días' },
+    { valor: 'semanas', etiqueta: 'Semanas' },
+    { valor: 'meses', etiqueta: 'Meses' },
+    { valor: 'indefinido', etiqueta: 'Sin plazo definido' },
+];
+
+const VALORES_INICIALES = {
+    solicitanteNombre: '',
+    solicitanteNumero: '',
+    departamento: '',
+    telefono: '',
+    equipoNombre: '',
+    numeroSerie: '',
+    numeroInventario: '',
+    condiciones: 'BUENO',
+    accesorios: '',
+    duracionTipo: 'dias',
+    duracionCantidad: '30',
+};
+
+/**
+ * Resguardos de equipo: préstamos temporales al personal.
+ *
+ * Cambios respecto a la versión anterior:
+ *  - Leía `res.data` esperando un array, pero el endpoint devuelve una página:
+ *    la tabla habría quedado vacía.
+ *  - Filtraba en el navegador sobre lo ya descargado, así que buscar un número
+ *    de serie solo miraba los diez resguardos de la página visible.
+ *  - El formulario no validaba nada antes de enviar y usaba `alert()` para los
+ *    errores.
+ *  - La devolución se ejecutaba sin confirmar, pese a cerrar el préstamo.
+ *  - No se distinguía visualmente un resguardo vencido de uno vigente más allá
+ *    del texto del estado.
+ */
 export default function GestionResguardos() {
-  const [resguardos, setResguardos] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [busqueda, setBusqueda] = useState('');
-  const [openModal, setOpenModal] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
+    const { notificar, notificarError } = useNotification();
 
-  // Formulario alineado con el DTO/Entidad mapeado a campos con prefijo
-  const initialFormState = {
-    solicitanteNombre: '',  // s_solicitante_nombre
-    solicitanteNumero: '',  // s_solicitante_numero
-    departamento: '',       // s_departamento
-    telefono: '',           // s_telefono
-    equipoNombre: '',       // s_equipo_nombre
-    numeroSerie: '',        // s_numero_serie
-    numeroInventario: '',   // s_numero_inventario
-    condiciones: 'BUENO',   // s_condiciones
-    accesorios: '',         // s_accesorios
-    duracionCantidad: 1,    // Para calcular d_fecha_vencimiento
-    duracionTipo: 'Dias'   // Para calcular d_fecha_vencimiento
-  };
+    const theme = useTheme();
+    const esMovil = useMediaQuery(theme.breakpoints.down('sm'));
 
-  const [formData, setFormData] = useState(initialFormState);
+    const estadoRed = useNetworkStatus();
+    const sinConexion = Boolean(estadoRed.sinConexion ?? estadoRed);
 
-  // Cargar resguardos desde el API
-  const cargarResguardos = async () => {
-    setLoading(true);
-    try {
-      const res = await api.get('/v1/resguardos');
-      setResguardos(res.data || []);
-      setErrorMsg('');
-    } catch (err) {
-      console.error('Error al cargar resguardos:', err);
-      setErrorMsg('No se pudo obtener la lista de resguardos.');
-    } finally {
-      setLoading(false);
-    }
-  };
+    const [filtroEstado, setFiltroEstado] = useState('');
+    const [modalAbierto, setModalAbierto] = useState(false);
+    const [resguardoADevolver, setResguardoADevolver] = useState(null);
+    const [procesando, setProcesando] = useState(false);
 
-  useEffect(() => {
-    cargarResguardos();
-  }, []);
+    const cargar = useCallback((params) => resguardoService.getAll(params), []);
 
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
+    const tabla = useTablaPaginada({
+        cargar,
+        ordenInicial: { campo: 'fechaCreacion', direccion: 'desc' },
+        filtros: { estado: filtroEstado || undefined },
+    });
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      await api.post('/v1/resguardos', formData);
-      setOpenModal(false);
-      setFormData(initialFormState);
-      cargarResguardos();
-    } catch (err) {
-      console.error('Error creando resguardo:', err);
-      alert('Error al expedir el resguardo. Revisa los datos.');
-    }
-  };
+    const { recargar } = tabla;
 
-  const handleDevolucion = async (id) => {
-    if (!window.confirm('¿Confirmas la recepción del equipo resguardado?')) return;
-    try {
-      await api.put(`/v1/resguardos/${id}/devolucion`);
-      cargarResguardos();
-    } catch (err) {
-      console.error('Error en devolución:', err);
-      alert('No se pudo marcar la devolución del resguardo.');
-    }
-  };
+    const {
+        control,
+        handleSubmit,
+        reset,
+        formState: { isSubmitting },
+    } = useForm({
+        resolver: zodResolver(esquemaResguardo),
+        mode: 'onBlur',
+        defaultValues: VALORES_INICIALES,
+    });
 
-  const handleImprimirPdf = async (resguardo) => {
-    try {
-      const response = await api.post('/v1/documentos/resguardo', resguardo, {
-        responseType: 'blob'
-      });
-      const blob = new Blob([response.data], { type: 'application/pdf' });
-      const url = window.URL.createObjectURL(blob);
-      window.open(url, '_blank');
-    } catch (err) {
-      console.error('Error al generar PDF:', err);
-      alert('Error al generar la vista previa del PDF.');
-    }
-  };
+    // Con plazo indefinido la cantidad sobra: se oculta en lugar de dejar un
+    // campo que no influye en nada.
+    const duracionTipo = useWatch({ control, name: 'duracionTipo' });
+    const exigePlazo = duracionTipo !== 'indefinido';
 
-  // Filtrado de registros en pantalla
-  const resguardosFiltrados = resguardos.filter((r) => {
-    const term = busqueda.toLowerCase();
-    return (
-      (r.solicitanteNombre && r.solicitanteNombre.toLowerCase().includes(term)) ||
-      (r.solicitanteNumero && r.solicitanteNumero.toLowerCase().includes(term)) ||
-      (r.equipoNombre && r.equipoNombre.toLowerCase().includes(term)) ||
-      (r.numeroSerie && r.numeroSerie.toLowerCase().includes(term)) ||
-      (r.numeroInventario && r.numeroInventario.toLowerCase().includes(term)) ||
-      (r.departamento && r.departamento.toLowerCase().includes(term))
-    );
-  });
+    const abrirAlta = () => {
+        reset(VALORES_INICIALES);
+        setModalAbierto(true);
+    };
 
-  const getChipColor = (estado) => {
-    switch (estado) {
-      case 'ENTREGADO':
-      case 'ACTIVO':
-        return 'success';
-      case 'VENCIDO':
-        return 'error';
-      case 'DEVUELTO':
-        return 'default';
-      default:
-        return 'primary';
-    }
-  };
+    const guardar = async (datos) => {
+        try {
+            const respuesta = await resguardoService.create({
+                solicitanteNombre: datos.solicitanteNombre.trim(),
+                solicitanteNumero: datos.solicitanteNumero.trim(),
+                departamento: datos.departamento?.trim() || null,
+                telefono: datos.telefono?.trim() || null,
+                equipoNombre: datos.equipoNombre.trim(),
+                numeroSerie: datos.numeroSerie.trim(),
+                numeroInventario: datos.numeroInventario?.trim() || null,
+                condiciones: datos.condiciones?.trim() || null,
+                accesorios: datos.accesorios?.trim() || null,
+                duracionTipo: datos.duracionTipo,
+                duracionCantidad: exigePlazo ? Number(datos.duracionCantidad) : null,
+            });
 
-  return (
-    <Box sx={{ p: 1 }}>
-      {/* HEADER */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <InventoryIcon sx={{ color: COLOR_GUINDA, fontSize: 32 }} />
-          <Typography variant="h5" sx={{ fontWeight: 'bold', color: COLOR_GUINDA }}>
-            Gestión y Control de Resguardos
-          </Typography>
-        </Box>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => setOpenModal(true)}
-          sx={{ bgcolor: COLOR_GUINDA, '&:hover': { bgcolor: '#5f1328' } }}
-        >
-          Nuevo Resguardo
-        </Button>
-      </Box>
+            notificar(respuesta?.mensaje || 'Resguardo registrado correctamente.');
+            setModalAbierto(false);
+            recargar();
+        } catch (error) {
+            notificarError(error);
+        }
+    };
 
-      {errorMsg && <Alert severity="error" sx={{ mb: 2 }}>{errorMsg}</Alert>}
+    const confirmarDevolucion = async () => {
+        setProcesando(true);
+        try {
+            const respuesta = await resguardoService.devolver(resguardoADevolver.id);
+            notificar(respuesta?.mensaje || 'Devolución registrada correctamente.');
+            setResguardoADevolver(null);
+            recargar();
+        } catch (error) {
+            notificarError(error);
+        } finally {
+            setProcesando(false);
+        }
+    };
 
-      {/* BARRA DE BÚSQUEDA */}
-      <Paper sx={{ p: 2, mb: 3, display: 'flex', gap: 2, alignItems: 'center' }}>
-        <TextField
-          fullWidth
-          size="small"
-          placeholder="Buscar por solicitante, No. empleado, equipo, número de serie o inventario..."
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          InputProps={{ startAdornment: <SearchIcon sx={{ color: 'gray', mr: 1 }} /> }}
-        />
-        <Tooltip title="Actualizar lista">
-          <IconButton onClick={cargarResguardos} color="primary">
-            <RefreshIcon />
-          </IconButton>
-        </Tooltip>
-      </Paper>
+    const imprimir = async (resguardo) => {
+        try {
+            const respuesta = await api.post('/v1/documentos/resguardo', resguardo, {
+                responseType: 'blob',
+            });
 
-      {/* TABLA PRINCIPAL */}
-      <TableContainer component={Paper} sx={{ boxShadow: 2, borderRadius: 1 }}>
-        <Table sx={{ minWidth: 700 }}>
-          <TableHead sx={{ bgcolor: COLOR_GUINDA }}>
-            <TableRow>
-              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Solicitante</TableCell>
-              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Equipo / Serie / Inventario</TableCell>
-              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Ubicación / Teléfono</TableCell>
-              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Condición</TableCell>
-              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Estado</TableCell>
-              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Vencimiento</TableCell>
-              <TableCell sx={{ color: 'white', fontWeight: 'bold', textAlign: 'center' }}>Acciones</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {loading ? (
-              <TableRow>
-                <TableCell colSpan={7} align="center" sx={{ py: 3 }}>
-                  <CircularProgress size={30} sx={{ color: COLOR_GUINDA }} />
-                </TableCell>
-              </TableRow>
-            ) : resguardosFiltrados.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={7} align="center" sx={{ py: 3 }}>
-                  No se encontraron resguardos registrados.
-                </TableCell>
-              </TableRow>
-            ) : (
-              resguardosFiltrados.map((r) => (
-                <TableRow key={r.id} hover>
-                  {/* s_solicitante_nombre & s_solicitante_numero */}
-                  <TableCell>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
-                      {r.solicitanteNombre}
+            const url = window.URL.createObjectURL(
+                new Blob([respuesta.data], { type: 'application/pdf' })
+            );
+            const ventana = window.open(url, '_blank');
+
+            // Si el navegador bloquea la ventana emergente, se avisa en lugar
+            // de dejar al usuario esperando un PDF que nunca aparece.
+            if (!ventana) {
+                notificarError('El navegador bloqueó la ventana. Permite las ventanas emergentes para ver el documento.');
+            }
+
+            // Se libera el objeto pasado un momento: revocarlo de inmediato
+            // cancelaría la carga en la pestaña recién abierta.
+            setTimeout(() => window.URL.revokeObjectURL(url), 60000);
+        } catch (error) {
+            notificarError(error);
+        }
+    };
+
+    // --- Columnas ---------------------------------------------------------
+    const columnas = [
+        {
+            id: 'solicitanteNombre',
+            etiqueta: 'Solicitante',
+            principal: true,
+            ordenable: true,
+            render: (r) => (
+                <Box>
+                    <Typography variant="body2" fontWeight={500}>
+                        {truncar(r.solicitanteNombre, 34)}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
-                      No. Empleado: {r.solicitanteNumero || 'N/A'}
+                        {r.departamento || 'Sin departamento'}
                     </Typography>
-                  </TableCell>
-
-                  {/* s_equipo_nombre, s_numero_serie, s_numero_inventario */}
-                  <TableCell>
-                    <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
-                      {r.equipoNombre}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary" display="block">
-                      S/N: {r.numeroSerie}
-                    </Typography>
-                    {r.numeroInventario && (
-                      <Typography variant="caption" color="text.secondary">
-                        Inv: {r.numeroInventario}
-                      </Typography>
-                    )}
-                  </TableCell>
-
-                  {/* s_departamento & s_telefono */}
-                  <TableCell>
-                    <Typography variant="caption" display="block">
-                      Dep: {r.departamento || 'N/A'}
-                    </Typography>
+                </Box>
+            ),
+        },
+        {
+            id: 'equipoNombre',
+            etiqueta: 'Equipo',
+            ancho: '22%',
+            ordenable: true,
+            render: (r) => (
+                <Box>
+                    <Typography variant="body2">{truncar(r.equipoNombre, 30)}</Typography>
                     <Typography variant="caption" color="text.secondary">
-                      Tel: {r.telefono || 'N/A'}
+                        {r.numeroSerie ? `Serie ${r.numeroSerie}` : 'Sin número de serie'}
                     </Typography>
-                  </TableCell>
+                </Box>
+            ),
+        },
+        {
+            id: 'fechaCreacion',
+            etiqueta: 'Entrega',
+            ancho: 130,
+            ordenable: true,
+            sx: { whiteSpace: 'nowrap' },
+            render: (r) => (
+                <Typography variant="body2" color="text.secondary">
+                    {formatearFecha(r.fechaCreacion)}
+                </Typography>
+            ),
+        },
+        {
+            id: 'fechaVencimiento',
+            etiqueta: 'Vence',
+            ancho: 150,
+            ordenable: true,
+            sx: { whiteSpace: 'nowrap' },
+            render: (r) => {
+                if (!r.fechaVencimiento) {
+                    return (
+                        <Typography variant="body2" color="text.secondary">
+                            Sin plazo
+                        </Typography>
+                    );
+                }
 
-                  {/* s_condiciones */}
-                  <TableCell>
-                    <Typography variant="caption" sx={{ fontWeight: 'bold', color: '#555' }}>
-                      {r.condiciones || 'BUENO'}
-                    </Typography>
-                  </TableCell>
+                const dias = diasHasta(r.fechaVencimiento);
+                const devuelto = !estaVigente(r.estado);
 
-                  {/* s_estado_resguardo */}
-                  <TableCell>
-                    <Chip label={r.estado} color={getChipColor(r.estado)} size="small" />
-                  </TableCell>
+                // Un préstamo devuelto ya no urge, aunque su fecha haya pasado.
+                const urgente = !devuelto && dias !== null && dias <= 7;
 
-                  {/* d_fecha_vencimiento */}
-                  <TableCell>
-                    <Typography variant="body2">
-                      {r.fechaVencimiento
-                        ? new Date(r.fechaVencimiento).toLocaleDateString('es-MX')
-                        : 'Indefinido'}
-                    </Typography>
-                  </TableCell>
-
-                  {/* ACCIONES */}
-                  <TableCell align="center">
-                    <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1 }}>
-                      <Tooltip title="Descargar / Imprimir PDF">
-                        <IconButton
-                          size="small"
-                          color="error"
-                          onClick={() => handleImprimirPdf(r)}
+                return (
+                    <Tooltip
+                        title={devuelto
+                            ? 'El equipo ya fue devuelto'
+                            : dias < 0
+                                ? `Venció hace ${Math.abs(dias)} día(s)`
+                                : `Faltan ${dias} día(s)`}
+                        arrow
+                    >
+                        <Typography
+                            variant="body2"
+                            color={urgente ? 'error.main' : 'text.secondary'}
+                            fontWeight={urgente ? 600 : 400}
                         >
-                          <PictureAsPdfIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                      {r.estado !== 'DEVUELTO' && (
-                        <Tooltip title="Marcar como Devuelto">
-                          <IconButton
-                            size="small"
-                            color="success"
-                            onClick={() => handleDevolucion(r.id)}
-                          >
-                            <AssignmentReturnIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      )}
-                    </Box>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
+                            {formatearFecha(r.fechaVencimiento)}
+                        </Typography>
+                    </Tooltip>
+                );
+            },
+        },
+        {
+            id: 'estado',
+            etiqueta: 'Estado',
+            alineacion: 'center',
+            ancho: 130,
+            render: (r) => (
+                <Chip
+                    label={r.estadoEtiqueta || etiquetaEstadoResguardo(r.estado)}
+                    size="small"
+                    color={colorEstadoResguardo(r.estado)}
+                    variant={estaVigente(r.estado) ? 'filled' : 'outlined'}
+                    sx={{ minWidth: 92 }}
+                />
+            ),
+        },
+        {
+            id: 'acciones',
+            etiqueta: 'Acciones',
+            alineacion: 'center',
+            ancho: 120,
+            sinOrden: true,
+            render: (r) => {
+                const vigente = estaVigente(r.estado);
 
-      {/* MODAL EXPEDIR RESGUARDO */}
-      <Dialog open={openModal} onClose={() => setOpenModal(false)} maxWidth="md" fullWidth>
-        <DialogTitle sx={{ bgcolor: COLOR_GUINDA, color: 'white', mb: 2 }}>
-          Expedir Nuevo Resguardo
-        </DialogTitle>
-        <form onSubmit={handleSubmit}>
-          <DialogContent>
-            <Grid container spacing={2}>
-              {/* DATOS SOLICITANTE */}
-              <Grid item xs={12}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: COLOR_GUINDA }}>
-                  1. Solicitante
-                </Typography>
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth required size="small" label="Nombre del Solicitante (s_solicitante_nombre)"
-                  name="solicitanteNombre" value={formData.solicitanteNombre} onChange={handleChange}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth required size="small" label="No. de Empleado (s_solicitante_numero)"
-                  name="solicitanteNumero" value={formData.solicitanteNumero} onChange={handleChange}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth size="small" label="Departamento (s_departamento)"
-                  name="departamento" value={formData.departamento} onChange={handleChange}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth size="small" label="Teléfono / Extensión (s_telefono)"
-                  name="telefono" value={formData.telefono} onChange={handleChange}
-                />
-              </Grid>
+                return (
+                    <AccionesTabla
+                        acciones={[
+                            {
+                                id: 'pdf',
+                                icono: <PictureAsPdfIcon />,
+                                titulo: 'Imprimir resguardo',
+                                etiqueta: `Imprimir el resguardo de ${r.solicitanteNombre}`,
+                                onClick: () => imprimir(r),
+                                deshabilitada: sinConexion,
+                                motivoDeshabilitada: 'Sin conexión con el servidor',
+                            },
+                            {
+                                id: 'devolver',
+                                icono: <AssignmentReturnIcon />,
+                                titulo: 'Registrar devolución',
+                                etiqueta: `Registrar la devolución del equipo de ${r.solicitanteNombre}`,
+                                color: 'success',
+                                prioritaria: true,
+                                oculta: !vigente,
+                                onClick: () => setResguardoADevolver(r),
+                                deshabilitada: sinConexion,
+                                motivoDeshabilitada: 'Sin conexión con el servidor',
+                            },
+                        ]}
+                    />
+                );
+            },
+        },
+    ];
 
-              {/* DATOS EQUIPO */}
-              <Grid item xs={12} sx={{ mt: 1 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: COLOR_GUINDA }}>
-                  2. Equipo
-                </Typography>
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth required size="small" label="Equipo (s_equipo_nombre)"
-                  name="equipoNombre" value={formData.equipoNombre} onChange={handleChange}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth required size="small" label="Número de Serie (s_numero_serie)"
-                  name="numeroSerie" value={formData.numeroSerie} onChange={handleChange}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth size="small" label="Número de Inventario (s_numero_inventario)"
-                  name="numeroInventario" value={formData.numeroInventario} onChange={handleChange}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  select fullWidth size="small" label="Condiciones (s_condiciones)"
-                  name="condiciones" value={formData.condiciones} onChange={handleChange}
+    return (
+        <Box>
+            <Box
+                sx={{
+                    display: 'flex',
+                    flexDirection: { xs: 'column', sm: 'row' },
+                    justifyContent: 'space-between',
+                    alignItems: { xs: 'stretch', sm: 'center' },
+                    gap: 2,
+                    mb: 3,
+                }}
+            >
+                <Box>
+                    <Typography
+                        variant="h4"
+                        component="h2"
+                        color="primary.main"
+                        sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
+                    >
+                        <InventoryIcon fontSize="large" aria-hidden="true" />
+                        Resguardos
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                        Equipo entregado en préstamo al personal.
+                    </Typography>
+                </Box>
+
+                <Button
+                    variant="contained"
+                    startIcon={<AddIcon />}
+                    onClick={abrirAlta}
+                    disabled={sinConexion}
                 >
-                  <MenuItem value="EXCELENTE">Excelente</MenuItem>
-                  <MenuItem value="BUENO">Bueno</MenuItem>
-                  <MenuItem value="REGULAR">Regular</MenuItem>
-                </TextField>
-              </Grid>
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth multiline rows={2} size="small" label="Accesorios (s_accesorios)"
-                  name="accesorios" value={formData.accesorios} onChange={handleChange}
-                />
-              </Grid>
+                    Nuevo resguardo
+                </Button>
+            </Box>
 
-              {/* VIGENCIA */}
-              <Grid item xs={12} sx={{ mt: 1 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: COLOR_GUINDA }}>
-                  3. Vigencia
-                </Typography>
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth type="number" size="small" label="Duración (Cantidad)"
-                  name="duracionCantidad" value={formData.duracionCantidad} onChange={handleChange}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  select fullWidth size="small" label="Tipo de Duración"
-                  name="duracionTipo" value={formData.duracionTipo} onChange={handleChange}
-                >
-                  <MenuItem value="Dias">Días</MenuItem>
-                  <MenuItem value="Semanas">Semanas</MenuItem>
-                  <MenuItem value="Indefinido">Indefinido</MenuItem>
-                </TextField>
-              </Grid>
-            </Grid>
-          </DialogContent>
-          <DialogActions sx={{ p: 2 }}>
-            <Button onClick={() => setOpenModal(false)} color="inherit">
-              Cancelar
-            </Button>
-            <Button type="submit" variant="contained" sx={{ bgcolor: COLOR_GUINDA }}>
-              Guardar y Expedir
-            </Button>
-          </DialogActions>
-        </form>
-      </Dialog>
-    </Box>
-  );
+            <DynamicTable
+                columnas={columnas}
+                filas={tabla.filas}
+                cargando={tabla.cargando}
+                anchoMinimo={1060}
+                busqueda={tabla.busqueda}
+                onBuscar={tabla.setBusqueda}
+                placeholderBusqueda="Buscar por persona, equipo, serie o inventario…"
+                filtros={[
+                    {
+                        id: 'estado',
+                        etiqueta: 'Estado',
+                        valor: filtroEstado,
+                        valorPorDefecto: '',
+                        opciones: OPCIONES_ESTADO_RESGUARDO,
+                        onChange: setFiltroEstado,
+                        ancho: 190,
+                    },
+                ]}
+                paginacion={tabla.paginacion}
+                onCambiarPagina={tabla.cambiarPagina}
+                onCambiarTamano={tabla.cambiarTamano}
+                orden={tabla.orden}
+                onCambiarOrden={tabla.cambiarOrden}
+                onRecargar={recargar}
+                vacio={{
+                    icono: InventoryIcon,
+                    titulo: tabla.busqueda || filtroEstado
+                        ? 'Sin resultados'
+                        : 'No hay resguardos registrados',
+                    descripcion: tabla.busqueda || filtroEstado
+                        ? 'Prueba con otros términos o cambia el filtro de estado.'
+                        : 'Registra aquí los equipos que se entregan en préstamo al personal.',
+                    textoAccion: !tabla.busqueda && !filtroEstado ? 'Registrar el primero' : undefined,
+                    onAccion: !tabla.busqueda && !filtroEstado ? abrirAlta : undefined,
+                }}
+            />
+
+            {/* --------------------------------------------------- alta ---- */}
+            <Dialog
+                open={modalAbierto}
+                onClose={() => !isSubmitting && setModalAbierto(false)}
+                fullWidth
+                maxWidth="md"
+                fullScreen={esMovil}
+                aria-labelledby="titulo-resguardo"
+            >
+                <DialogTitle id="titulo-resguardo">Nuevo resguardo</DialogTitle>
+
+                <form onSubmit={handleSubmit(guardar)} noValidate>
+                    <DialogContent dividers>
+                        <Stack spacing={3}>
+                            <Box>
+                                <Typography variant="overline" color="text.secondary">
+                                    Quién recibe el equipo
+                                </Typography>
+                                <Stack spacing={2.5} sx={{ mt: 1 }}>
+                                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2.5}>
+                                        <CampoFormulario
+                                            control={control}
+                                            nombre="solicitanteNombre"
+                                            etiqueta="Nombre completo"
+                                            obligatorio
+                                            maximo={100}
+                                            mayusculas
+                                        />
+                                        <CampoFormulario
+                                            control={control}
+                                            nombre="solicitanteNumero"
+                                            etiqueta="Número de empleado"
+                                            obligatorio
+                                            maximo={30}
+                                            mayusculas
+                                        />
+                                    </Stack>
+                                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2.5}>
+                                        <CampoFormulario
+                                            control={control}
+                                            nombre="departamento"
+                                            etiqueta="Departamento"
+                                            maximo={100}
+                                            mayusculas
+                                        />
+                                        <CampoFormulario
+                                            control={control}
+                                            nombre="telefono"
+                                            etiqueta="Teléfono o extensión"
+                                            maximo={50}
+                                        />
+                                    </Stack>
+                                </Stack>
+                            </Box>
+
+                            <Divider />
+
+                            <Box>
+                                <Typography variant="overline" color="text.secondary">
+                                    Equipo entregado
+                                </Typography>
+                                <Stack spacing={2.5} sx={{ mt: 1 }}>
+                                    <CampoFormulario
+                                        control={control}
+                                        nombre="equipoNombre"
+                                        etiqueta="Equipo"
+                                        obligatorio
+                                        maximo={100}
+                                        mayusculas
+                                        ayuda="Por ejemplo LAPTOP DELL LATITUDE 5420."
+                                    />
+                                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2.5}>
+                                        <CampoFormulario
+                                            control={control}
+                                            nombre="numeroSerie"
+                                            etiqueta="Número de serie"
+                                            obligatorio
+                                            maximo={50}
+                                            mayusculas
+                                        />
+                                        <CampoFormulario
+                                            control={control}
+                                            nombre="numeroInventario"
+                                            etiqueta="Número de inventario"
+                                            maximo={50}
+                                            mayusculas
+                                        />
+                                    </Stack>
+                                    <CampoFormulario
+                                        control={control}
+                                        nombre="accesorios"
+                                        etiqueta="Accesorios"
+                                        maximo={500}
+                                        mayusculas
+                                        multiline
+                                        rows={2}
+                                        ayuda="Cargador, maletín, cables… lo que se entrega junto al equipo."
+                                    />
+                                    <CampoFormulario
+                                        control={control}
+                                        nombre="condiciones"
+                                        etiqueta="Condiciones de entrega"
+                                        maximo={500}
+                                        mayusculas
+                                        ayuda="Estado físico en el que se entrega."
+                                    />
+                                </Stack>
+                            </Box>
+
+                            <Divider />
+
+                            <Box>
+                                <Typography variant="overline" color="text.secondary">
+                                    Plazo del préstamo
+                                </Typography>
+                                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2.5} sx={{ mt: 1 }}>
+                                    <CampoFormulario
+                                        control={control}
+                                        nombre="duracionTipo"
+                                        etiqueta="Duración"
+                                        obligatorio
+                                        opciones={OPCIONES_DURACION}
+                                    />
+                                    {exigePlazo && (
+                                        <CampoFormulario
+                                            control={control}
+                                            nombre="duracionCantidad"
+                                            etiqueta="Cantidad"
+                                            obligatorio
+                                            type="number"
+                                            ayuda="Entre 1 y 365."
+                                        />
+                                    )}
+                                </Stack>
+                            </Box>
+                        </Stack>
+                    </DialogContent>
+
+                    <DialogActions
+                        sx={{ flexDirection: { xs: 'column-reverse', sm: 'row' }, gap: 1, p: 2 }}
+                    >
+                        <Button
+                            onClick={() => setModalAbierto(false)}
+                            color="inherit"
+                            disabled={isSubmitting}
+                            fullWidth={esMovil}
+                            size={esMovil ? 'large' : 'medium'}
+                        >
+                            Cancelar
+                        </Button>
+                        <Button
+                            type="submit"
+                            variant="contained"
+                            disabled={isSubmitting || sinConexion}
+                            fullWidth={esMovil}
+                            size={esMovil ? 'large' : 'medium'}
+                        >
+                            {isSubmitting ? 'Guardando…' : 'Registrar resguardo'}
+                        </Button>
+                    </DialogActions>
+                </form>
+            </Dialog>
+
+            <ConfirmationDialog
+                abierto={Boolean(resguardoADevolver)}
+                titulo="¿Registrar la devolución?"
+                mensaje={`El equipo "${resguardoADevolver?.equipoNombre}" que tiene ${resguardoADevolver?.solicitanteNombre} se marcará como devuelto y el resguardo quedará cerrado.`}
+                textoConfirmar="Sí, registrar devolución"
+                cargando={procesando}
+                onConfirmar={confirmarDevolucion}
+                onCancelar={() => setResguardoADevolver(null)}
+            />
+        </Box>
+    );
 }

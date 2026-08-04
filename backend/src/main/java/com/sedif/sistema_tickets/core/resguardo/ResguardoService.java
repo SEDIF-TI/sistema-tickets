@@ -98,7 +98,52 @@ public class ResguardoService {
      */
     @Transactional(readOnly = true)
     public PageResponse<ResguardoResponse> listarPaginado(Pageable pageable) {
-        return PageResponse.de(resguardoRepository.findAll(pageable), ResguardoResponse::desdeEntidad);
+        return listarPaginado(null, null, pageable);
+    }
+
+    /**
+     * Listado paginado con busqueda y filtro de estado resueltos en la base.
+     *
+     * <p>La pantalla filtraba sobre la pagina ya descargada, asi que buscar un
+     * numero de serie solo miraba los diez resguardos visibles.</p>
+     */
+    @Transactional(readOnly = true)
+    public PageResponse<ResguardoResponse> listarPaginado(
+            String busqueda, String estado, Pageable pageable) {
+
+        return PageResponse.de(
+                resguardoRepository.buscarPaginado(
+                        normalizarBusqueda(busqueda), convertirEstado(estado), pageable),
+                ResguardoResponse::desdeEntidad);
+    }
+
+    /** Prepara el texto para el LIKE: minusculas, comodines y escape. */
+    private String normalizarBusqueda(String valor) {
+        if (valor == null || valor.isBlank()) {
+            return null;
+        }
+        String escapado = valor.trim().toLowerCase()
+                .replace("!", "!!")
+                .replace("%", "!%")
+                .replace("_", "!_");
+        return "%" + escapado + "%";
+    }
+
+    /**
+     * Traduce el filtro de estado al enum. Un valor desconocido se ignora en
+     * lugar de romper la consulta: es una comodidad de la interfaz, no un dato
+     * de negocio.
+     */
+    private EstadoResguardo convertirEstado(String valor) {
+        if (valor == null || valor.isBlank()) {
+            return null;
+        }
+        try {
+            return EstadoResguardo.valueOf(valor.trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            log.warn("Filtro de estado de resguardo no reconocido: '{}'. Se ignora.", valor);
+            return null;
+        }
     }
 
     /**

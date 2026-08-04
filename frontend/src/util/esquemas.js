@@ -113,6 +113,37 @@ export const esquemaEquipo = z.object({
     modelo: textoOpcional('El modelo', 255),
 });
 
+/**
+ * Alta de un resguardo. Espeja `ResguardoRequest`.
+ *
+ * La duración solo se exige si el préstamo tiene plazo: con `indefinido`, el
+ * resguardo queda sin fecha de vencimiento y la cantidad sobra.
+ */
+export const esquemaResguardo = z.object({
+    solicitanteNombre: textoObligatorio('El nombre del solicitante', 100, 3),
+    solicitanteNumero: textoObligatorio('El número de empleado', 30),
+    departamento: textoOpcional('El departamento', 100),
+    telefono: textoOpcional('El teléfono', 50),
+    equipoNombre: textoObligatorio('El equipo entregado', 100, 3),
+    numeroSerie: textoObligatorio('El número de serie', 50),
+    numeroInventario: textoOpcional('El número de inventario', 50),
+    condiciones: textoOpcional('Las condiciones', 500),
+    accesorios: textoOpcional('Los accesorios', 500),
+    duracionTipo: z.string().min(1, 'Indica la duración del préstamo.'),
+    duracionCantidad: z.string().optional().or(z.literal('')),
+}).superRefine((datos, ctx) => {
+    if (datos.duracionTipo === 'indefinido') return;
+
+    const cantidad = Number(datos.duracionCantidad);
+    if (!datos.duracionCantidad || Number.isNaN(cantidad) || cantidad < 1 || cantidad > 365) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['duracionCantidad'],
+            message: 'Indica un número entre 1 y 365.',
+        });
+    }
+});
+
 /** Resolución de un ticket. Espeja `ResolucionRequest`. */
 export const esquemaResolucion = z.object({
     planTrabajoClave: z.string().min(1, 'Selecciona la meta del plan de trabajo.'),

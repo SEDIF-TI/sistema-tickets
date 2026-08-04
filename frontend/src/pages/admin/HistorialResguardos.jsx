@@ -1,211 +1,270 @@
-import { useState, useEffect, useContext } from 'react';
-import { 
-    Box, Typography, Paper, Table, TableBody, TableCell, 
-    TableContainer, TableHead, TableRow, Button, Chip, 
-    Snackbar, Alert 
-} from '@mui/material';
+import { useState, useEffect, useCallback } from 'react';
+import { Box, Typography, Chip, Tooltip } from '@mui/material';
+import InventoryIcon from '@mui/icons-material/Inventory';
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import { useLocation } from 'react-router-dom';
+
 import api from '../../services/api';
-import { AuthContext } from '../../context/AuthContext.jsx';
+import { resguardoService } from '../../services/resguardoService';
+import { useNotification } from '../../context/NotificationContext.jsx';
+import { useNetworkStatus } from '../../hooks/useNetworkStatus.jsx';
+import { useTablaPaginada } from '../../hooks/useTablaPaginada.jsx';
+import { formatearFecha, diasHasta, truncar } from '../../util/formater';
+import {
+    OPCIONES_ESTADO_RESGUARDO, colorEstadoResguardo, etiquetaEstadoResguardo, estaVigente,
+} from '../../util/estadoResguardo';
 
-// Importaciones para WebSocket (Asegúrate de tener instalados 'sockjs-client' y '@stomp/stompjs' o ajusta a tu librería actual)
-import SockJS from 'sockjs-client';
-import { Stomp } from '@stomp/stompjs';
+import DynamicTable from '../../components/DynamicTable';
+import AccionesTabla from '../../components/AccionesTabla';
 
-const COLOR_GUINDA = '#5c0a28';
-
+/**
+ * Historial de resguardos para administración: consulta y reimpresión.
+ *
+ * A diferencia de `GestionResguardos`, aquí no se dan de alta ni se registran
+ * devoluciones: es la vista de seguimiento.
+ *
+ * Cambios respecto a la versión anterior:
+ *  - Abría su propia conexión SockJS a `http://localhost:8080/ws`, con la URL
+ *    escrita a mano y apuntando a un endpoint que no existe (el real es
+ *    `/ws-tickets`), además de duplicar la conexión que ya mantiene
+ *    `WebSocketContext`. Las alertas de vencimiento las muestra ahora
+ *    `MainLayout`, que sí está suscrito al canal correcto.
+ *  - Comparaba `usuarioCreadorId` con `user.id`, campo que el backend no envía
+ *    (es `usuarioId`), así que la comprobación siempre fallaba.
+ *  - Leía `response.data` como array, pero el endpoint devuelve una página.
+ *  - Montaba su propio Snackbar en lugar de usar el del sistema.
+ */
 export default function HistorialResguardos() {
-    const { user } = useContext(AuthContext);
     const location = useLocation();
-    
-    // Estados
-    const [resguardos, setResguardos] = useState([]);
-    const [notificacion, setNotificacion] = useState({ open: false, mensaje: '', tipo: 'info' });
+    const { notificar, notificarError, notificarInfo } = useNotification();
 
-    // 1. Cargar la lista inicial de resguardos
-    const cargarResguardos = async () => {
-        try {
-            const response = await api.get('/v1/resguardos');
-            setResguardos(response.data);
-        } catch (error) {
-            console.error("Error al cargar resguardos:", error);
-        }
-    };
+    const estadoRed = useNetworkStatus();
+    const sinConexion = Boolean(estadoRed.sinConexion ?? estadoRed);
 
+    const [filtroEstado, setFiltroEstado] = useState('');
+
+    const cargar = useCallback((params) => resguardoService.getAll(params), []);
+
+    const tabla = useTablaPaginada({
+        cargar,
+        ordenInicial: { campo: 'fechaCreacion', direccion: 'desc' },
+        filtros: { estado: filtroEstado || undefined },
+    });
+
+    // Mensaje traído desde la pantalla de alta.
     useEffect(() => {
-        cargarResguardos();
-        
-        // Si venimos de crear un resguardo, mostramos el mensaje de éxito
         if (location.state?.mensajeExito) {
-            setNotificacion({ open: true, mensaje: location.state.mensajeExito, tipo: 'success' });
-            window.history.replaceState({}, document.title); // Limpiamos el state
+            notificarInfo(location.state.mensajeExito);
+            window.history.replaceState({}, document.title);
         }
-    }, [location]);
+    }, [location, notificarInfo]);
 
-    // 2. Conexión WebSocket para alertas en tiempo real (Cron Job 9:00 AM)
-    useEffect(() => {
-        // Ajusta la URL '/ws' según cómo tengas configurado tu endpoint de WebSockets en Spring Boot
-        const socket = new SockJS('http://localhost:8080/ws'); 
-        const stompClient = Stomp.over(socket);
-        
-        // Desactivamos logs en producción
-        stompClient.debug = () => {}; 
-
-        stompClient.connect({}, () => {
-            stompClient.subscribe('/topic/alertas-resguardos', (mensaje) => {
-                const resguardoVencido = JSON.parse(mensaje.body);
-                
-                // VALIDACIÓN CLAVE: Solo mostramos la alerta si el usuario logueado creó este resguardo
-                if (user && resguardoVencido.usuarioCreadorId === user.id) {
-                    setNotificacion({
-                        open: true,
-                        mensaje: `⚠️ URGENTE: El resguardo de ${resguardoVencido.equipoNombre} asignado a ${resguardoVencido.solicitanteNombre} ha VENCIDO.`,
-                        tipo: 'error'
-                    });
-                    
-                    // Actualizamos la tabla dinámicamente sin recargar la página
-                    setResguardos((prev) => prev.map(r => 
-                        r.id === resguardoVencido.id ? { ...r, estado: 'VENCIDO' } : r
-                    ));
-                }
-            });
-        });
-
-        return () => {
-            if (stompClient) stompClient.disconnect();
-        };
-    }, [user]);
-
-    // 3. Acción para marcar como DEVUELTO
-    const handleDevolucion = async (id) => {
-        if (!window.confirm('¿Confirmas que el equipo ha sido devuelto físicamente?')) return;
-
+    const imprimir = async (resguardo) => {
         try {
-            await api.put(`/v1/resguardos/${id}/devolucion`);
-            setNotificacion({ open: true, mensaje: 'Equipo devuelto correctamente.', tipo: 'success' });
-            
-            // Actualizamos el estado localmente
-            setResguardos((prev) => prev.map(r => 
-                r.id === id ? { ...r, estado: 'DEVUELTO' } : r
-            ));
+            const respuesta = await api.post('/v1/documentos/resguardo', resguardo, {
+                responseType: 'blob',
+            });
+
+            const url = window.URL.createObjectURL(
+                new Blob([respuesta.data], { type: 'application/pdf' })
+            );
+            const ventana = window.open(url, '_blank');
+
+            if (!ventana) {
+                notificarError('El navegador bloqueó la ventana. Permite las ventanas emergentes para ver el documento.');
+            } else {
+                notificar('Documento generado.');
+            }
+
+            setTimeout(() => window.URL.revokeObjectURL(url), 60000);
         } catch (error) {
-            console.error("Error en devolución:", error);
-            setNotificacion({ open: true, mensaje: 'Error al procesar la devolución.', tipo: 'error' });
+            notificarError(error);
         }
     };
 
-    // 4. Utilidades de Formato
-    const formatearFecha = (fecha) => {
-        if (!fecha) return 'PERMANENTE';
-        const d = new Date(fecha);
-        return d.toLocaleDateString('es-MX', { year: 'numeric', month: '2-digit', day: '2-digit' });
-    };
+    const columnas = [
+        {
+            id: 'solicitanteNombre',
+            etiqueta: 'Solicitante',
+            principal: true,
+            ordenable: true,
+            render: (r) => (
+                <Box>
+                    <Typography variant="body2" fontWeight={500}>
+                        {truncar(r.solicitanteNombre, 34)}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                        {r.departamento || 'Sin departamento'}
+                    </Typography>
+                </Box>
+            ),
+        },
+        {
+            id: 'equipoNombre',
+            etiqueta: 'Equipo',
+            ancho: '22%',
+            ordenable: true,
+            render: (r) => (
+                <Box>
+                    <Typography variant="body2">{truncar(r.equipoNombre, 30)}</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                        {r.numeroSerie ? `Serie ${r.numeroSerie}` : 'Sin número de serie'}
+                    </Typography>
+                </Box>
+            ),
+        },
+        {
+            id: 'creadoPor',
+            etiqueta: 'Registró',
+            ancho: '16%',
+            sinOrden: true,
+            render: (r) => (
+                <Typography variant="body2" color="text.secondary">
+                    {truncar(r.creadoPor, 24) || '—'}
+                </Typography>
+            ),
+        },
+        {
+            id: 'fechaCreacion',
+            etiqueta: 'Entrega',
+            ancho: 130,
+            ordenable: true,
+            sx: { whiteSpace: 'nowrap' },
+            render: (r) => (
+                <Typography variant="body2" color="text.secondary">
+                    {formatearFecha(r.fechaCreacion)}
+                </Typography>
+            ),
+        },
+        {
+            id: 'fechaVencimiento',
+            etiqueta: 'Vence',
+            ancho: 140,
+            ordenable: true,
+            sx: { whiteSpace: 'nowrap' },
+            render: (r) => {
+                if (!r.fechaVencimiento) {
+                    return (
+                        <Typography variant="body2" color="text.secondary">
+                            Sin plazo
+                        </Typography>
+                    );
+                }
 
-    const getChipColor = (estado) => {
-        switch (estado) {
-            case 'ENTREGADO': return 'primary';
-            case 'VENCIDO': return 'error';
-            case 'DEVUELTO': return 'success';
-            default: return 'default';
-        }
-    };
+                const dias = diasHasta(r.fechaVencimiento);
+                const urgente = estaVigente(r.estado) && dias !== null && dias <= 7;
+
+                return (
+                    <Tooltip
+                        title={!estaVigente(r.estado)
+                            ? 'El equipo ya fue devuelto'
+                            : dias < 0
+                                ? `Venció hace ${Math.abs(dias)} día(s)`
+                                : `Faltan ${dias} día(s)`}
+                        arrow
+                    >
+                        <Typography
+                            variant="body2"
+                            color={urgente ? 'error.main' : 'text.secondary'}
+                            fontWeight={urgente ? 600 : 400}
+                        >
+                            {formatearFecha(r.fechaVencimiento)}
+                        </Typography>
+                    </Tooltip>
+                );
+            },
+        },
+        {
+            id: 'estado',
+            etiqueta: 'Estado',
+            alineacion: 'center',
+            ancho: 130,
+            render: (r) => (
+                <Chip
+                    label={r.estadoEtiqueta || etiquetaEstadoResguardo(r.estado)}
+                    size="small"
+                    color={colorEstadoResguardo(r.estado)}
+                    variant={estaVigente(r.estado) ? 'filled' : 'outlined'}
+                    sx={{ minWidth: 92 }}
+                />
+            ),
+        },
+        {
+            id: 'acciones',
+            etiqueta: 'Acciones',
+            alineacion: 'center',
+            ancho: 100,
+            sinOrden: true,
+            render: (r) => (
+                <AccionesTabla
+                    acciones={[
+                        {
+                            id: 'pdf',
+                            icono: <PictureAsPdfIcon />,
+                            titulo: 'Imprimir resguardo',
+                            etiqueta: `Imprimir el resguardo de ${r.solicitanteNombre}`,
+                            onClick: () => imprimir(r),
+                            deshabilitada: sinConexion,
+                            motivoDeshabilitada: 'Sin conexión con el servidor',
+                        },
+                    ]}
+                />
+            ),
+        },
+    ];
 
     return (
-        <Box sx={{ maxWidth: 1200, mx: 'auto', p: { xs: 1, sm: 3 } }}>
-            <Typography variant="h5" sx={{ color: COLOR_GUINDA, fontWeight: 'bold', mb: 3 }}>
-                Historial y Trazabilidad de Resguardos
-            </Typography>
-
-            <TableContainer component={Paper} elevation={3} sx={{ borderRadius: 3 }}>
-                <Table>
-                    <TableHead sx={{ bgcolor: COLOR_GUINDA }}>
-                        <TableRow>
-                            <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Solicitante</TableCell>
-                            <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Equipo</TableCell>
-                            <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Vencimiento</TableCell>
-                            <TableCell sx={{ color: 'white', fontWeight: 'bold', align: 'center' }}>Estado</TableCell>
-                            <TableCell sx={{ color: 'white', fontWeight: 'bold', align: 'center' }}>Acciones</TableCell>
-                        </TableRow>
-                    </TableHead>
-                    <TableBody>
-                        {resguardos.length === 0 ? (
-                            <TableRow>
-                                <TableCell colSpan={5} align="center">
-                                    No hay resguardos registrados.
-                                </TableCell>
-                            </TableRow>
-                        ) : (
-                            resguardos.map((r) => (
-                                <TableRow key={r.id} hover>
-                                    <TableCell>
-                                        <Typography variant="body2" fontWeight="bold">
-                                            {r.solicitanteNombre}
-                                        </Typography>
-                                        <Typography variant="caption" color="textSecondary">
-                                            No. {r.solicitanteNumero}
-                                        </Typography>
-                                    </TableCell>
-                                    <TableCell>
-                                        <Typography variant="body2">{r.equipoNombre}</Typography>
-                                        <Typography variant="caption" color="textSecondary">
-                                            SN: {r.numeroSerie}
-                                        </Typography>
-                                    </TableCell>
-                                    <TableCell>
-                                        <Typography 
-                                            variant="body2" 
-                                            fontWeight={r.fechaVencimiento ? 'normal' : 'bold'}
-                                        >
-                                            {formatearFecha(r.fechaVencimiento)}
-                                        </Typography>
-                                    </TableCell>
-                                    <TableCell align="center">
-                                        <Chip 
-                                            label={r.estado} 
-                                            color={getChipColor(r.estado)} 
-                                            size="small" 
-                                            sx={{ fontWeight: 'bold' }} 
-                                        />
-                                    </TableCell>
-                                    <TableCell align="center">
-                                        {r.estado !== 'DEVUELTO' ? (
-                                            <Button 
-                                                variant="outlined" 
-                                                color="success" 
-                                                size="small"
-                                                
-                                                onClick={() => handleDevolucion(r.id)}
-                                            >
-                                                Devolver
-                                            </Button>
-                                        ) : (
-                                            <Typography variant="caption" color="textSecondary">
-                                                Finalizado
-                                            </Typography>
-                                        )}
-                                    </TableCell>
-                                </TableRow>
-                            ))
-                        )}
-                    </TableBody>
-                </Table>
-            </TableContainer>
-
-            {/* Alerta flotante para mensajes de éxito y notificaciones de WebSocket */}
-            <Snackbar
-                open={notificacion.open}
-                autoHideDuration={6000}
-                onClose={() => setNotificacion({ ...notificacion, open: false })}
-                anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-            >
-                <Alert 
-                    onClose={() => setNotificacion({ ...notificacion, open: false })} 
-                    severity={notificacion.tipo} 
-                    sx={{ width: '100%', fontWeight: 'bold' }}
+        <Box>
+            <Box sx={{ mb: 3 }}>
+                <Typography
+                    variant="h4"
+                    component="h2"
+                    color="primary.main"
+                    sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
                 >
-                    {notificacion.mensaje}
-                </Alert>
-            </Snackbar>
+                    <InventoryIcon fontSize="large" aria-hidden="true" />
+                    Historial de resguardos
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                    Todos los préstamos registrados en la institución.
+                </Typography>
+            </Box>
+
+            <DynamicTable
+                columnas={columnas}
+                filas={tabla.filas}
+                cargando={tabla.cargando}
+                anchoMinimo={1080}
+                busqueda={tabla.busqueda}
+                onBuscar={tabla.setBusqueda}
+                placeholderBusqueda="Buscar por persona, equipo, serie o inventario…"
+                filtros={[
+                    {
+                        id: 'estado',
+                        etiqueta: 'Estado',
+                        valor: filtroEstado,
+                        valorPorDefecto: '',
+                        opciones: OPCIONES_ESTADO_RESGUARDO,
+                        onChange: setFiltroEstado,
+                        ancho: 190,
+                    },
+                ]}
+                paginacion={tabla.paginacion}
+                onCambiarPagina={tabla.cambiarPagina}
+                onCambiarTamano={tabla.cambiarTamano}
+                orden={tabla.orden}
+                onCambiarOrden={tabla.cambiarOrden}
+                onRecargar={tabla.recargar}
+                vacio={{
+                    icono: InventoryIcon,
+                    titulo: tabla.busqueda || filtroEstado
+                        ? 'Sin resultados'
+                        : 'No hay resguardos registrados',
+                    descripcion: tabla.busqueda || filtroEstado
+                        ? 'Prueba con otros términos o cambia el filtro de estado.'
+                        : 'Cuando el área de soporte entregue equipo en préstamo, aparecerá aquí.',
+                }}
+            />
         </Box>
     );
 }

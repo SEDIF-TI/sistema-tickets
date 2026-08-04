@@ -59,10 +59,13 @@ public class ResguardoResource {
     /** Historial completo de resguardos, paginado y ordenado por fecha. */
     @GetMapping
     public ResponseEntity<ApiResponse<PageResponse<ResguardoResponse>>> listarTodos(
+            @org.springframework.web.bind.annotation.RequestParam(required = false) String busqueda,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) String estado,
             @PageableDefault(size = 10, sort = "fechaCreacion", direction = Sort.Direction.DESC)
             Pageable pageable) {
 
-        return ResponseEntity.ok(ApiResponse.ok(resguardoService.listarPaginado(pageable)));
+        return ResponseEntity.ok(ApiResponse.ok(
+                resguardoService.listarPaginado(busqueda, estado, pageable)));
     }
 
     /** Marca el equipo como devuelto y cierra el resguardo. */

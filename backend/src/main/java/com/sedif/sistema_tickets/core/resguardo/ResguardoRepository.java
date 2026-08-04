@@ -7,6 +7,29 @@ import java.util.List;
 
 public interface ResguardoRepository extends JpaRepository<Resguardo, Long> {
 
+    /**
+     * Listado paginado con busqueda y filtro de estado, ambos opcionales.
+     *
+     * <p>El texto llega ya en minusculas y con comodines desde el servicio, y
+     * el CAST fija su tipo: PostgreSQL no puede inferirlo cuando el parametro
+     * es nulo dentro de LOWER(...).</p>
+     */
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"usuarioCreador"})
+    @org.springframework.data.jpa.repository.Query("""
+            SELECT r FROM Resguardo r
+            WHERE (CAST(:busqueda AS string) IS NULL
+                   OR LOWER(r.solicitanteNombre) LIKE :busqueda ESCAPE '!'
+                   OR LOWER(r.equipoNombre) LIKE :busqueda ESCAPE '!'
+                   OR LOWER(r.numeroSerie) LIKE :busqueda ESCAPE '!'
+                   OR LOWER(r.numeroInventario) LIKE :busqueda ESCAPE '!'
+                   OR LOWER(r.departamento) LIKE :busqueda ESCAPE '!')
+              AND (:estado IS NULL OR r.estado = :estado)
+            """)
+    org.springframework.data.domain.Page<Resguardo> buscarPaginado(
+            @org.springframework.data.repository.query.Param("busqueda") String busqueda,
+            @org.springframework.data.repository.query.Param("estado") EstadoResguardo estado,
+            org.springframework.data.domain.Pageable pageable);
+
     List<Resguardo> findAllByOrderByFechaCreacionDesc();
 
     /** Resguardos cuya fecha de vencimiento ya paso y siguen sin devolverse. */
