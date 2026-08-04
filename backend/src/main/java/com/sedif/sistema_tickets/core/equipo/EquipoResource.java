@@ -54,10 +54,11 @@ public class EquipoResource {
     /** Listado paginado para el panel de administracion del catalogo. */
     @GetMapping
     public ResponseEntity<ApiResponse<PageResponse<Equipo>>> listarTodos(
+            @RequestParam(required = false) String busqueda,
             @PageableDefault(size = 10, sort = "descripcion", direction = Sort.Direction.ASC)
             Pageable pageable) {
 
-        return ResponseEntity.ok(ApiResponse.ok(equipoService.listarPaginado(pageable)));
+        return ResponseEntity.ok(ApiResponse.ok(equipoService.listarPaginado(busqueda, pageable)));
     }
 
     /**
@@ -66,7 +67,7 @@ public class EquipoResource {
      */
     @PostMapping("/upsert")
     public ResponseEntity<ApiResponse<Equipo>> registrarOActualizar(
-            @Valid @RequestBody Equipo equipoRequest) {
+            @Valid @RequestBody EquipoRequest equipoRequest) {
 
         return ResponseEntity.ok(ApiResponse.ok(
                 equipoService.registrarOActualizar(equipoRequest), "Catalogo actualizado."));
@@ -76,7 +77,7 @@ public class EquipoResource {
     @PreAuthorize("hasRole('ADMINISTRADOR')")
     public ResponseEntity<ApiResponse<Equipo>> actualizarEquipo(
             @PathVariable Long id,
-            @Valid @RequestBody Equipo request) {
+            @Valid @RequestBody EquipoRequest request) {
 
         return ResponseEntity.ok(ApiResponse.ok(
                 equipoService.actualizar(id, request), "Equipo actualizado."));

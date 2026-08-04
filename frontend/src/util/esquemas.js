@@ -106,6 +106,13 @@ export const esquemaAviso = z.object({
     areaId: z.string().optional().or(z.literal('')),
 });
 
+/** Alta y edición de un equipo del catálogo. Espeja `EquipoRequest`. */
+export const esquemaEquipo = z.object({
+    descripcion: textoObligatorio('La descripción', 255, 3),
+    marca: textoOpcional('La marca', 255),
+    modelo: textoOpcional('El modelo', 255),
+});
+
 /** Resolución de un ticket. Espeja `ResolucionRequest`. */
 export const esquemaResolucion = z.object({
     planTrabajoClave: z.string().min(1, 'Selecciona la meta del plan de trabajo.'),

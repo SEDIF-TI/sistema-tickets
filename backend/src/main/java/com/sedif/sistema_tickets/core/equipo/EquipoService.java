@@ -43,8 +43,23 @@ public class EquipoService {
     }
 
     @Transactional(readOnly = true)
-    public PageResponse<Equipo> listarPaginado(Pageable pageable) {
-        return PageResponse.de(equipoRepository.findAll(pageable));
+    public PageResponse<Equipo> listarPaginado(String busqueda, Pageable pageable) {
+        return PageResponse.de(equipoRepository.buscarPaginado(normalizarBusqueda(busqueda), pageable));
+    }
+
+    /**
+     * Prepara el texto para el LIKE: minusculas, comodines y escape, de modo
+     * que buscar "100%" busque ese literal.
+     */
+    private String normalizarBusqueda(String valor) {
+        if (valor == null || valor.isBlank()) {
+            return null;
+        }
+        String escapado = valor.trim().toLowerCase()
+                .replace("!", "!!")
+                .replace("%", "!%")
+                .replace("_", "!_");
+        return "%" + escapado + "%";
     }
 
     @Transactional(readOnly = true)
@@ -62,12 +77,8 @@ public class EquipoService {
      * distintas en un catalogo pensado justo para reutilizar).</p>
      */
     @Transactional
-    public Equipo registrarOActualizar(Equipo peticion) {
-        if (peticion.getDescripcion() == null || peticion.getDescripcion().isBlank()) {
-            throw new IllegalArgumentException("La descripcion del equipo es obligatoria.");
-        }
-
-        String descripcion = peticion.getDescripcion().trim().toUpperCase();
+    public Equipo registrarOActualizar(EquipoRequest peticion) {
+        String descripcion = peticion.descripcion().trim().toUpperCase();
 
         Equipo equipo = equipoRepository.findByDescripcionIgnoreCase(descripcion)
                 .orElseGet(() -> {
@@ -77,25 +88,34 @@ public class EquipoService {
                 });
 
         equipo.setDescripcion(descripcion);
-        if (peticion.getMarca() != null && !peticion.getMarca().isBlank()) {
-            equipo.setMarca(peticion.getMarca().trim().toUpperCase());
+        if (peticion.marca() != null && !peticion.marca().isBlank()) {
+            equipo.setMarca(peticion.marca().trim().toUpperCase());
         }
-        if (peticion.getModelo() != null && !peticion.getModelo().isBlank()) {
-            equipo.setModelo(peticion.getModelo().trim().toUpperCase());
+        if (peticion.modelo() != null && !peticion.modelo().isBlank()) {
+            equipo.setModelo(peticion.modelo().trim().toUpperCase());
         }
 
         return equipoRepository.save(equipo);
     }
 
     @Transactional
-    public Equipo actualizar(Long id, Equipo peticion) {
+    public Equipo actualizar(Long id, EquipoRequest peticion) {
         Equipo equipo = obtenerPorId(id);
 
-        if (peticion.getDescripcion() != null && !peticion.getDescripcion().isBlank()) {
-            equipo.setDescripcion(peticion.getDescripcion().trim().toUpperCase());
+        String descripcion = peticion.descripcion().trim().toUpperCase();
+
+        // La descripcion tiene restriccion UNIQUE. Sin esta comprobacion, el
+        // choque lo detectaba la base y devolvia un 500 sin explicar la causa.
+        if (equipoRepository.existsByDescripcionIgnoreCaseAndIdNot(descripcion, id)) {
+            throw new IllegalArgumentException(
+                    "Ya existe otro equipo con la descripcion " + descripcion + ".");
         }
-        equipo.setMarca(peticion.getMarca() != null ? peticion.getMarca().trim().toUpperCase() : null);
-        equipo.setModelo(peticion.getModelo() != null ? peticion.getModelo().trim().toUpperCase() : null);
+
+        equipo.setDescripcion(descripcion);
+        equipo.setMarca(peticion.marca() != null && !peticion.marca().isBlank()
+                ? peticion.marca().trim().toUpperCase() : null);
+        equipo.setModelo(peticion.modelo() != null && !peticion.modelo().isBlank()
+                ? peticion.modelo().trim().toUpperCase() : null);
 
         return equipoRepository.save(equipo);
     }
