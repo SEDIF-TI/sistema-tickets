@@ -12,6 +12,8 @@ import { useWebSocket } from '../context/useWebSocket.js';
 import { avisoService } from '../services/avisoService';
 import { useNetworkStatus } from '../hooks/useNetworkStatus.jsx';
 
+import PieDePagina from './PieDePagina.jsx';
+
 import logoPuebla from '../assets/logo-puebla.png';
 
 // Iconos
@@ -40,7 +42,16 @@ const ANCHO_MENU = 72;
 const ANCHO_MENU_MOVIL = 268;
 
 /** Alto de la barra superior, que aloja el logotipo institucional. */
-const ALTO_BARRA = { xs: 80, sm: 108 };
+const ALTO_BARRA = { xs: 56, sm: 68 };
+
+/**
+ * Alto del logotipo: deliberadamente cercano al de la barra.
+ *
+ * Los 4px que restan por lado son el respiro minimo para que no parezca
+ * recortado; con la barra mas delgada, un logotipo pequeno dejaba franjas
+ * vacias arriba y abajo.
+ */
+const ALTO_LOGO = { xs: 48, sm: 60 };
 
 /**
  * Traduce el nombre de icono guardado en la tabla `vista` a su componente.
@@ -291,7 +302,7 @@ export default function MainLayout({ children }) {
                             src={logoPuebla}
                             alt="Gobierno del Estado de Puebla"
                             sx={{
-                                height: { xs: 60, sm: 94 },
+                                height: ALTO_LOGO,
                                 width: 'auto',
                                 objectFit: 'contain',
                                 // El logotipo es oscuro; sobre el guinda se
@@ -385,6 +396,12 @@ export default function MainLayout({ children }) {
                 sx={{
                     flexGrow: 1,
                     minWidth: 0,
+                    // Columna con alto minimo de pantalla: deja que el pie use
+                    // `mt: auto` para bajar al fondo cuando el contenido es
+                    // corto, sin fijarlo con `position`.
+                    display: 'flex',
+                    flexDirection: 'column',
+                    minHeight: '100vh',
                     p: { xs: 2, sm: 3 },
                     // En píxeles, no con el valor suelto de ALTO_BARRA: `mt`
                     // interpreta los números como múltiplos del espaciado del
@@ -442,7 +459,14 @@ export default function MainLayout({ children }) {
                     </Box>
                 )}
 
-                {children}
+                {/* El contenido crece para ocupar el hueco disponible, de modo
+                    que el pie quede abajo aunque la pantalla tenga poco que
+                    mostrar. */}
+                <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+                    {children}
+                </Box>
+
+                <PieDePagina />
             </Box>
         </Box>
     );

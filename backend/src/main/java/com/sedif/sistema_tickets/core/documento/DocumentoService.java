@@ -675,56 +675,6 @@ public class DocumentoService {
         }
     }
 
-    // =========================================================================================
-    // 6. GENERACIÓN DE MANTENIMIENTO PREVENTIVO (HORIZONTAL)
-    // =========================================================================================
-    public byte[] generarMantenimientoPreventivoPdf(MantenimientoPreventivoRequest request) {
-        try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
-            Document document = new Document(PageSize.LETTER.rotate(), 36, 36, 36, 36);
-            PdfWriter.getInstance(document, baos);
-            document.open();
-
-            Paragraph titulo = new Paragraph("LISTADO DE EQUIPOS DE CÓMPUTO - MANTENIMIENTO PREVENTIVO", 
-                               FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12));
-            titulo.setAlignment(Element.ALIGN_CENTER);
-            document.add(titulo);
-            document.add(new Paragraph("Departamento: " + request.departamento(), 
-                               FontFactory.getFont(FontFactory.HELVETICA, 10)));
-            document.add(new Paragraph("Periodo: " + request.fechaInicio() + " al " + request.fechaFin() + "\n\n", 
-                               FontFactory.getFont(FontFactory.HELVETICA, 10)));
-
-            float[] widths = {0.5f, 1.5f, 2f, 1f, 1f, 1.5f, 1.5f, 1f, 1f, 1.5f};
-            PdfPTable table = new PdfPTable(widths);
-            table.setWidthPercentage(100);
-
-            String[] cabeceras = {"No.", "Área", "Usuario", "CPU", "Marca", "Modelo", "No. Serie", "RAM", "Disco", "Inventario"};
-            for (String cab : cabeceras) {
-                PdfPCell cell = new PdfPCell(new Phrase(cab, FontFactory.getFont(FontFactory.HELVETICA_BOLD, 8, Color.WHITE)));
-                cell.setBackgroundColor(new Color(92, 10, 40)); 
-                cell.setHorizontalAlignment(Element.ALIGN_CENTER);
-                table.addCell(cell);
-            }
-
-            int i = 1;
-            for (EquipoMantenimientoDTO eq : request.equipos()) {
-                table.addCell(crearCeldaNormal(String.valueOf(i++)));
-                table.addCell(crearCeldaNormal(eq.area()));
-                table.addCell(crearCeldaNormal(eq.usuarioResponsable()));
-                table.addCell(crearCeldaNormal(eq.tipoCpu()));
-                table.addCell(crearCeldaNormal(eq.marca()));
-                table.addCell(crearCeldaNormal(eq.modelo()));
-                table.addCell(crearCeldaNormal(eq.numeroSerie()));
-                table.addCell(crearCeldaNormal(eq.memoriaRam()));
-                table.addCell(crearCeldaNormal(eq.capacidadDisco()));
-                table.addCell(crearCeldaNormal(eq.numeroInventario()));
-            }
-            document.add(table);
-            document.close();
-            return baos.toByteArray();
-        } catch (Exception e) {
-            throw new IllegalStateException("No se pudo generar el reporte de mantenimiento preventivo.", e);
-        }
-    }
 
     // =========================================================================================
     // MÉTODOS AUXILIARES GLOBALES

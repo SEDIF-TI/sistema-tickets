@@ -11,12 +11,10 @@ import DownloadIcon from '@mui/icons-material/Download';
 
 import api from '../services/api';
 import { useNotification } from '../context/NotificationContext.jsx';
-import { useRol } from '../hooks/useRol.jsx';
 
 import DictamenFormato from './formato/DictamenFormato.jsx';
 import FormularioResguardo from './formato/FormularioResguardo.jsx';
 import ReporteActividadesFormato from './formato/ReporteActividadesFormato.jsx';
-import MantenimientoPreventivoFormato from './formato/MantenimientoPreventivoFormato.jsx';
 
 const FORMATOS_TECNICOS = [
     { valor: 'DICTAMEN', etiqueta: 'Dictamen técnico' },
@@ -43,7 +41,6 @@ const FORMATOS_TECNICOS = [
  */
 export default function GeneradorDocumentos() {
     const { notificarError } = useNotification();
-    const { nombre } = useRol();
 
     const theme = useTheme();
     const esMovil = useMediaQuery(theme.breakpoints.down('md'));
@@ -123,7 +120,6 @@ export default function GeneradorDocumentos() {
                 >
                     <Tab label="Dictámenes y resguardos" />
                     <Tab label="Reporte de actividades" />
-                    <Tab label="Mantenimiento preventivo" />
                 </Tabs>
             </Paper>
 
@@ -158,16 +154,6 @@ export default function GeneradorDocumentos() {
 
                 {pestana === 1 && (
                     <ReporteActividadesFormato solicitarPdf={solicitarPdf} generando={generando} />
-                )}
-
-                {pestana === 2 && (
-                    <MantenimientoPreventivoFormato
-                        solicitarPdf={solicitarPdf}
-                        generando={generando}
-                        // El nombre sale de la sesión: la prop `user` que
-                        // esperaba antes nunca llegaba a montarse.
-                        nombreTecnico={nombre}
-                    />
                 )}
             </Box>
 

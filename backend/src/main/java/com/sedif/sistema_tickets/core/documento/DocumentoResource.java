@@ -43,15 +43,6 @@ public class DocumentoResource {
     }
 
     // ==========================================================
-    // 2. GENERACIÓN DE MANTENIMIENTO PREVENTIVO
-    // ==========================================================
-    @PostMapping(value = "/mantenimiento", produces = MediaType.APPLICATION_PDF_VALUE)
-    public ResponseEntity<byte[]> generarMantenimientoPreventivoPdf(@Valid @RequestBody MantenimientoPreventivoRequest request) {
-        byte[] pdfGenerado = documentoService.generarMantenimientoPreventivoPdf(request);
-        return construirRespuestaPdf(pdfGenerado, "Mantenimiento_Preventivo_" + request.departamento() + ".pdf");
-    }
-
-    // ==========================================================
     // 3. GENERACIÓN DE ENTRADA DE EQUIPO
     // ==========================================================
     @PostMapping(value = "/entrada-equipo", produces = MediaType.APPLICATION_PDF_VALUE)

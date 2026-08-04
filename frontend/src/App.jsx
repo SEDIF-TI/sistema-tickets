@@ -28,9 +28,6 @@ import GestionTaller from './pages/soporte/GestionTaller.jsx';
 import GestionResguardos from './pages/soporte/GestionResguardos.jsx';
 import HistorialResguardos from './pages/admin/HistorialResguardos.jsx';
 
-// Módulo de Correos Institucionales (Ajusta la ruta si lo guardaste en otra carpeta)
-import GestionCorreos from './pages/soporte/GestionCorreos.jsx';
-
 // Componentes Adicionales
 import GeneradorDocumentos from './components/GeneradorDocumentos.jsx'; 
 
@@ -79,9 +76,6 @@ function AppContent() {
                 /soporte/resguardos. La pantalla existia sin ruta que la
                 alcanzara, asi que era codigo inalcanzable. */}
             <Route path="/admin/resguardos" element={<MainLayout><HistorialResguardos /></MainLayout>} />
-            
-            {/* RUTA NUEVA: Correos Institucionales */}
-            <Route path="/admin/correos" element={<MainLayout><GestionCorreos /></MainLayout>} />
 
             {/* Rutas de Soporte / Documentos */}
             <Route path="/soporte/bandeja" element={<MainLayout><PanelSoporte /></MainLayout>} />

@@ -2,19 +2,18 @@ import { useState } from 'react';
 import { 
     Typography, Paper, TextField, Button, Grid, Box, 
     Dialog, DialogTitle, DialogContent, DialogActions, MenuItem,
-    Snackbar, Alert 
 } from '@mui/material';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import TableViewIcon from '@mui/icons-material/TableView';
 import AddTaskIcon from '@mui/icons-material/AddTask';
 import api from '../../services/api';
+import { useNotification } from '../../context/NotificationContext.jsx';
 
 
 export default function ReporteActividadesFormato({ solicitarPdf, generando = false }) {
+    const { notificar, notificarError, notificarAdvertencia } = useNotification();
     const [fechas, setFechas] = useState({ fechaInicio: '', fechaFin: '' });
     const [modalAbierto, setModalAbierto] = useState(false);
-    
-    const [notificacion, setNotificacion] = useState({ abierto: false, mensaje: '', tipo: 'success' });
 
     const [actividad, setActividad] = useState({
         planTrabajoClave: '',
@@ -24,19 +23,15 @@ export default function ReporteActividadesFormato({ solicitarPdf, generando = fa
     });
 
     const usuarioLogueado = JSON.parse(localStorage.getItem('user')) || {};
-    const idRealUsuario = usuarioLogueado.usuarioId || usuarioLogueado.id || usuarioLogueado.pn_id; 
-
-    const handleCloseNotificacion = () => {
-        setNotificacion({ ...notificacion, abierto: false });
-    };
+    const idRealUsuario = usuarioLogueado.usuarioId || usuarioLogueado.id || usuarioLogueado.pn_id;
 
     const validarFechas = () => {
         if (!fechas.fechaInicio || !fechas.fechaFin) {
-            setNotificacion({ abierto: true, mensaje: "Por favor selecciona ambas fechas.", tipo: "warning" });
+            notificarAdvertencia('Selecciona las dos fechas del periodo.');
             return false;
         }
         if (fechas.fechaInicio > fechas.fechaFin) {
-            setNotificacion({ abierto: true, mensaje: "La fecha de inicio no puede ser mayor a la final.", tipo: "error" });
+            notificarAdvertencia('La fecha de inicio no puede ser posterior a la final.');
             return false;
         }
         return true;
@@ -75,19 +70,18 @@ export default function ReporteActividadesFormato({ solicitarPdf, generando = fa
              link.click();
              link.remove();
         } catch (error) {
-             console.error("Error al generar Excel:", error);
-             setNotificacion({ abierto: true, mensaje: "Error al descargar el Excel.", tipo: "error" });
+            notificarError(error);
         }
     };
 
     const handleGuardarActividad = async () => {
         if (!actividad.planTrabajoClave || !actividad.actividadSolicitada || !actividad.situacionActual || !actividad.justificacion) {
-            setNotificacion({ abierto: true, mensaje: "Llena todos los campos obligatorios.", tipo: "warning" });
+            notificarAdvertencia('Completa los campos obligatorios de la actividad.');
             return;
         }
         
         if (!idRealUsuario) {
-            setNotificacion({ abierto: true, mensaje: "Error de sesión. Vuelve a entrar.", tipo: "error" });
+            notificarError('No se pudo identificar tu sesión. Cierra sesión y vuelve a entrar.');
             return;
         }
 
@@ -97,12 +91,11 @@ export default function ReporteActividadesFormato({ solicitarPdf, generando = fa
                 usuarioId: String(idRealUsuario)
             });
             
-            setNotificacion({ abierto: true, mensaje: "¡Actividad guardada correctamente!", tipo: "success" });
+            notificar('¡Actividad guardada correctamente!');
             setModalAbierto(false);
             setActividad({ planTrabajoClave: '', actividadSolicitada: '', situacionActual: '', justificacion: '' });
         } catch (error) {
-            console.error("Error al guardar actividad:", error);
-            setNotificacion({ abierto: true, mensaje: "No se pudo guardar la actividad.", tipo: "error" });
+            notificarError(error);
         }
     };
 
@@ -170,9 +163,6 @@ export default function ReporteActividadesFormato({ solicitarPdf, generando = fa
                     </DialogActions>
                 </Dialog>
             </Paper>
-            <Snackbar open={notificacion.abierto} autoHideDuration={4000} onClose={handleCloseNotificacion} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
-                <Alert onClose={handleCloseNotificacion} severity={notificacion.tipo} sx={{ width: '100%', boxShadow: 3 }}>{notificacion.mensaje}</Alert>
-            </Snackbar>
         </>
     );
 }

@@ -366,7 +366,18 @@ export default function DynamicTable({
             <TableContainer sx={{ maxWidth: '100%' }}>
                 <Table sx={{ minWidth: sinDatos ? 'auto' : anchoMinimo }} aria-busy={cargando}>
                     <TableHead>
-                        <TableRow sx={{ bgcolor: 'primary.main' }}>
+                        {/* El `&:hover` se neutraliza aqui y no solo en el
+                            tema: este `sx` genera su propia clase, que gana en
+                            especificidad al selector global. Sin esto, al pasar
+                            el cursor el gris del hover se mezclaba con el
+                            guinda y el texto blanco del encabezado quedaba casi
+                            ilegible. */}
+                        <TableRow
+                            sx={{
+                                bgcolor: 'primary.main',
+                                '&:hover': { bgcolor: 'primary.main' },
+                            }}
+                        >
                             {columnasVisibles.map((col) => {
                                 const ordenable = col.ordenable && onCambiarOrden && !col.sinOrden;
                                 const activo = orden?.campo === col.id;

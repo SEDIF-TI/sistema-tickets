@@ -132,6 +132,25 @@ public class GlobalExceptionHandler {
     }
 
     /** Ruta inexistente. */
+    /**
+     * Ruta inexistente servida por el manejador de recursos estaticos.
+     *
+     * <p>Spring Boot no lanza {@link NoHandlerFoundException} para una URL sin
+     * controlador: la pasa al manejador de recursos, que termina lanzando
+     * {@code NoResourceFoundException}. Al no estar contemplada aqui, caia en
+     * el manejador generico y <b>cualquier URL equivocada devolvia un 500</b>
+     * en lugar de un 404, sugiriendo un fallo del servidor donde solo habia
+     * una direccion mal escrita.</p>
+     */
+    @ExceptionHandler(org.springframework.web.servlet.resource.NoResourceFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> manejarRecursoNoEncontrado(
+            org.springframework.web.servlet.resource.NoResourceFoundException ex) {
+
+        log.debug("Ruta no encontrada: {}", ex.getResourcePath());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.error(MessageConstants.RECURSO_NO_ENCONTRADO));
+    }
+
     @ExceptionHandler(NoHandlerFoundException.class)
     public ResponseEntity<ApiResponse<Void>> manejarRutaNoEncontrada(NoHandlerFoundException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
