@@ -28,6 +28,21 @@ export const AuthProvider = ({ children }) => {
         return userData;
     };
 
+    /**
+     * Sustituye el menú guardado por el que el servidor considera vigente.
+     *
+     * Lo llama MainLayout al montarse: sin esto, el menú se congelaba en el
+     * navegador desde el inicio de sesión.
+     */
+    const actualizarVistas = (vistas) => {
+        setUser((actual) => {
+            if (!actual) return actual;
+            const actualizado = { ...actual, vistasPermitidas: vistas ?? [] };
+            localStorage.setItem('user', JSON.stringify(actualizado));
+            return actualizado;
+        });
+    };
+
     const marcarPasswordCambiada = () => {
         if (user) {
             const usuarioActualizado = { ...user, passwordTemporal: false };
@@ -42,7 +57,7 @@ export const AuthProvider = ({ children }) => {
     };
 
     return (
-        <AuthContext.Provider value={{ user, login, logout, loading, marcarPasswordCambiada }}>
+        <AuthContext.Provider value={{ user, login, logout, loading, marcarPasswordCambiada, actualizarVistas }}>
             {children}
         </AuthContext.Provider>
     );

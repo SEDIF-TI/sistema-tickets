@@ -6,6 +6,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -31,6 +32,27 @@ import org.springframework.web.bind.annotation.RestController;
 public class PerfilResource {
 
     private final UsuarioService usuarioService;
+    private final UsuarioRepository usuarioRepository;
+    private final com.sedif.sistema_tickets.security.auth.AuthService authService;
+
+    /**
+     * Vistas del menu vigentes para el usuario de la sesion.
+     *
+     * <p>El frontend guarda el menu al iniciar sesion, asi que sin esto una
+     * vista retirada seguia dibujandose hasta cerrar sesion —y un permiso
+     * recien concedido no aparecia—. La pantalla lo consulta al montarse y
+     * actualiza lo que tenga guardado.</p>
+     */
+    @GetMapping("/vistas")
+    public ResponseEntity<ApiResponse<java.util.List<VistaDTO>>> obtenerVistas(
+            Authentication authentication) {
+
+        Usuario usuario = usuarioRepository
+                .findByCorreoOrUsername(authentication.getName(), authentication.getName())
+                .orElseThrow(() -> new IllegalArgumentException(MessageConstants.USUARIO_NO_ENCONTRADO));
+
+        return ResponseEntity.ok(ApiResponse.ok(authService.obtenerVistasPermitidas(usuario)));
+    }
 
     /**
      * Cambia la contrasena del usuario autenticado.

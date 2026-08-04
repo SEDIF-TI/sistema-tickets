@@ -10,6 +10,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext.jsx';
 import { useWebSocket } from '../context/useWebSocket.js';
 import { avisoService } from '../services/avisoService';
+import { perfilService } from '../services/perfilService';
 import { useNetworkStatus } from '../hooks/useNetworkStatus.jsx';
 
 import PieDePagina from './PieDePagina.jsx';
@@ -91,7 +92,7 @@ const ICONOS = {
  *    igual a todos.
  */
 export default function MainLayout({ children }) {
-    const { user, logout } = useContext(AuthContext);
+    const { user, logout, actualizarVistas } = useContext(AuthContext);
     // El contexto expone `isConnected`. Antes se desestructuraba `connected`,
     // que no existe: valía siempre `undefined` y la suscripción de avisos de
     // más abajo nunca llegaba a activarse.
@@ -129,6 +130,32 @@ export default function MainLayout({ children }) {
             return () => clearTimeout(temporizador);
         }
     }, [sinConexion, estuvoSinConexion]);
+
+    // --- Menú vigente ------------------------------------------------------
+    // El menú viaja en la respuesta del login y queda guardado en el
+    // navegador. Se refresca al entrar para que una vista retirada deje de
+    // dibujarse sin necesidad de cerrar sesión.
+    useEffect(() => {
+        if (!user || bloqueadoPorPassword) return;
+
+        let cancelado = false;
+
+        perfilService.getVistas()
+            .then((respuesta) => {
+                if (!cancelado && Array.isArray(respuesta?.data)) {
+                    actualizarVistas(respuesta.data);
+                }
+            })
+            .catch(() => {
+                // Sin respuesta se conserva el menú guardado: es preferible uno
+                // desactualizado a dejar al usuario sin navegación.
+            });
+
+        return () => { cancelado = true; };
+        // Solo al montar y al cambiar de sesión: `actualizarVistas` cambia el
+        // usuario, y depender de ella dispararía el efecto en bucle.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [user?.usuarioId, bloqueadoPorPassword]);
 
     // --- Avisos institucionales -------------------------------------------
     useEffect(() => {

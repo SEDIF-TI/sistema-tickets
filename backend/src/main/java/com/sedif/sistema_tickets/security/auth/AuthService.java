@@ -72,7 +72,15 @@ public class AuthService {
     }
 
     /** Vistas activas del menu segun el rol del usuario. */
-    private List<VistaDTO> obtenerVistasPermitidas(Usuario usuario) {
+    /**
+     * Vistas del menu que corresponden al rol del usuario.
+     *
+     * <p>Publico porque tambien lo consulta {@code PerfilResource}: el menu se
+     * guardaba en el navegador al iniciar sesion y no se refrescaba nunca, de
+     * modo que una vista retirada seguia apareciendo hasta cerrar sesion, y un
+     * permiso recien concedido no llegaba al usuario.</p>
+     */
+    public List<VistaDTO> obtenerVistasPermitidas(Usuario usuario) {
         if (usuario.getRol() == null || usuario.getRol().getVistas() == null) {
             return List.of();
         }

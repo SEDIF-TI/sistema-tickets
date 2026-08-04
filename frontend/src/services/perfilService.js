@@ -19,6 +19,15 @@ export const perfilService = {
      */
     cambiarPassword: (passwordActual, nuevaPassword) =>
         api.put('/v1/perfil/password', { passwordActual, nuevaPassword }),
+
+    /**
+     * Vistas del menú vigentes para la sesión.
+     *
+     * El menú se guarda en el navegador al iniciar sesión, así que sin esta
+     * consulta una vista retirada seguía dibujándose hasta cerrar sesión —y un
+     * permiso recién concedido no aparecía—.
+     */
+    getVistas: () => api.get('/v1/perfil/vistas'),
 };
 
 export default perfilService;
