@@ -27,6 +27,32 @@ public class EquipoReparacionServiceImpl implements EquipoReparacionService {
 
     @Override
     @Transactional(readOnly = true)
+    public com.sedif.sistema_tickets.exception.PageResponse<EquipoReparacionDTO> listarPaginado(
+            String busqueda, String estado, org.springframework.data.domain.Pageable pageable) {
+
+        // Un estado desconocido se ignora en lugar de romper la consulta: el
+        // filtro es una comodidad de la interfaz, no un dato de negocio.
+        String estadoValido = EstadoTaller.desde(estado).map(Enum::name).orElse(null);
+
+        return com.sedif.sistema_tickets.exception.PageResponse.de(
+                equipoRepository.buscarPaginado(normalizarBusqueda(busqueda), estadoValido, pageable),
+                this::convertirADto);
+    }
+
+    /** Prepara el texto para el LIKE: minusculas, comodines y escape. */
+    private String normalizarBusqueda(String valor) {
+        if (valor == null || valor.isBlank()) {
+            return null;
+        }
+        String escapado = valor.trim().toLowerCase()
+                .replace("!", "!!")
+                .replace("%", "!%")
+                .replace("_", "!_");
+        return "%" + escapado + "%";
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<EquipoReparacionDTO> obtenerTodos() {
         return equipoRepository.findAll().stream()
                 .map(this::convertirADto)

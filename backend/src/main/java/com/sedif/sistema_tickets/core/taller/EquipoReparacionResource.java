@@ -46,15 +46,33 @@ public class EquipoReparacionResource {
 
     /** Listado del taller, con filtro opcional por texto. */
     @GetMapping
-    public ResponseEntity<ApiResponse<List<EquipoReparacionDTO>>> obtenerTodos(
-            @RequestParam(required = false) String filtro) {
+    public ResponseEntity<ApiResponse<com.sedif.sistema_tickets.exception.PageResponse<EquipoReparacionDTO>>> obtenerTodos(
+            @RequestParam(required = false) String busqueda,
+            @RequestParam(required = false) String estado,
+            @org.springframework.data.web.PageableDefault(
+                    size = 10, sort = "fechaCreacion",
+                    direction = org.springframework.data.domain.Sort.Direction.DESC)
+            org.springframework.data.domain.Pageable pageable) {
 
-        List<EquipoReparacionDTO> resultado =
-                (filtro != null && !filtro.isBlank())
-                        ? equipoService.buscarPorFiltro(filtro)
-                        : equipoService.obtenerTodos();
+        return ResponseEntity.ok(ApiResponse.ok(
+                equipoService.listarPaginado(busqueda, estado, pageable)));
+    }
 
-        return ResponseEntity.ok(ApiResponse.ok(resultado));
+    /**
+     * Catalogo de estados del taller.
+     *
+     * <p>La pantalla los tenia escritos a mano y tres de los siete que
+     * ofrecia —ESPERA_REFACCIONES, DICTAMINADO y LISTO_PARA_ENTREGA— no
+     * existen en el enum EstadoTaller: elegirlos devolvia un error.</p>
+     */
+    @GetMapping("/estados")
+    public ResponseEntity<ApiResponse<List<com.sedif.sistema_tickets.core.ticket.CatalogoResponse>>> obtenerEstados() {
+        List<com.sedif.sistema_tickets.core.ticket.CatalogoResponse> estados =
+                java.util.Arrays.stream(com.sedif.sistema_tickets.util.enums.EstadoTaller.values())
+                        .map(e -> new com.sedif.sistema_tickets.core.ticket.CatalogoResponse(
+                                e.name(), e.getEtiqueta()))
+                        .toList();
+        return ResponseEntity.ok(ApiResponse.ok(estados));
     }
 
     @GetMapping("/{id}")

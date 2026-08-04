@@ -28,7 +28,7 @@ import AdminAvisosPage from './pages/admin/AdminAvisosPage.jsx';
 import AdminAreasPage from './pages/admin/AdminAreasPage';
 import DashboardPage from './pages/admin/DashboardPage.jsx';
 import AdminEquiposPage from './pages/admin/AdminEquiposPage.jsx';
-import {GestionTaller} from './pages/soporte/GestionTaller.jsx';
+import GestionTaller from './pages/soporte/GestionTaller.jsx';
 import GestionResguardos from './pages/soporte/GestionResguardos.jsx';
 
 // Módulo de Correos Institucionales (Ajusta la ruta si lo guardaste en otra carpeta)

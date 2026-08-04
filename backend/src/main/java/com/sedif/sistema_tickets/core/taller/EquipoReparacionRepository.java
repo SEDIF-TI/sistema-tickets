@@ -11,6 +11,30 @@ import java.util.Optional;
 @Repository
 public interface EquipoReparacionRepository extends JpaRepository<EquipoReparacion, Long> {
 
+    /**
+     * Listado paginado con busqueda y filtro de estado, ambos opcionales.
+     *
+     * <p>El texto llega ya en minusculas y con comodines desde el servicio, y
+     * el CAST fija su tipo: PostgreSQL no puede inferirlo cuando el parametro
+     * es nulo dentro de LOWER(...).</p>
+     */
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"tecnicoAsignado"})
+    @org.springframework.data.jpa.repository.Query("""
+            SELECT e FROM EquipoReparacion e
+            WHERE (CAST(:busqueda AS string) IS NULL
+                   OR LOWER(e.folio) LIKE :busqueda ESCAPE '!'
+                   OR LOWER(e.solicitanteNombre) LIKE :busqueda ESCAPE '!'
+                   OR LOWER(e.equipoTipo) LIKE :busqueda ESCAPE '!'
+                   OR LOWER(e.marca) LIKE :busqueda ESCAPE '!'
+                   OR LOWER(e.numeroSerie) LIKE :busqueda ESCAPE '!'
+                   OR LOWER(e.departamento) LIKE :busqueda ESCAPE '!')
+              AND (CAST(:estado AS string) IS NULL OR e.estadoTaller = :estado)
+            """)
+    org.springframework.data.domain.Page<EquipoReparacion> buscarPaginado(
+            @org.springframework.data.repository.query.Param("busqueda") String busqueda,
+            @org.springframework.data.repository.query.Param("estado") String estado,
+            org.springframework.data.domain.Pageable pageable);
+
     Optional<EquipoReparacion> findByFolio(String folio);
 
     List<EquipoReparacion> findByEstadoTaller(String estadoTaller);

@@ -14,6 +14,10 @@ public interface EquipoReparacionService {
 
     List<EquipoReparacionDTO> obtenerTodos();
 
+    /** Listado paginado con busqueda y filtro de estado resueltos en la base. */
+    com.sedif.sistema_tickets.exception.PageResponse<EquipoReparacionDTO> listarPaginado(
+            String busqueda, String estado, org.springframework.data.domain.Pageable pageable);
+
     List<EquipoReparacionDTO> buscarPorFiltro(String filtro);
 
     EquipoReparacionDTO obtenerPorId(Long id);

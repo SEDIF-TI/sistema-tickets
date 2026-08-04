@@ -144,6 +144,23 @@ export const esquemaResguardo = z.object({
     }
 });
 
+/** Ingreso y actualización de un equipo en el taller. Espeja `EquipoReparacionRequest`. */
+export const esquemaTaller = z.object({
+    solicitanteNombre: textoObligatorio('El nombre del solicitante', 200, 3),
+    solicitanteNumero: textoOpcional('El número de empleado', 50),
+    departamento: textoOpcional('El departamento', 150),
+    equipoTipo: textoObligatorio('El tipo de equipo', 100),
+    marca: textoOpcional('La marca', 100),
+    modelo: textoOpcional('El modelo', 100),
+    numeroSerie: textoOpcional('El número de serie', 100),
+    numeroInventario: textoOpcional('El número de inventario', 100),
+    condicionRecepcion: textoOpcional('La condición de recepción', 500),
+    accesorios: textoOpcional('Los accesorios', 500),
+    fallaReportada: textoObligatorio('La falla reportada', 1000, 10),
+    diagnostico: textoOpcional('El diagnóstico', 1000),
+    solucion: textoOpcional('La solución', 1000),
+});
+
 /** Resolución de un ticket. Espeja `ResolucionRequest`. */
 export const esquemaResolucion = z.object({
     planTrabajoClave: z.string().min(1, 'Selecciona la meta del plan de trabajo.'),
