@@ -130,6 +130,38 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
     @Query("SELECT t.usuarioSoporte.nombre, COUNT(t) FROM Ticket t WHERE t.usuarioSoporte IS NOT NULL GROUP BY t.usuarioSoporte.nombre")
     List<Object[]> contarPorIngeniero();
 
+    /**
+     * Calificacion media de cada tecnico, sobre los tickets ya encuestados.
+     *
+     * <p>Los tickets sin responder quedan fuera del promedio: contarlos como
+     * cero castigaria a quien atiende a usuarios que no suelen contestar.</p>
+     *
+     * <p>Devuelve nombre, media ponderada y numero de respuestas. La cantidad
+     * importa tanto como la media: un 3.0 sobre una sola encuesta no dice lo
+     * mismo que un 2.8 sobre cuarenta.</p>
+     */
+    @Query("""
+            SELECT t.usuarioSoporte.nombre,
+                   AVG(CASE t.calificacion
+                         WHEN com.sedif.sistema_tickets.util.enums.Calificacion.BUENO THEN 3.0
+                         WHEN com.sedif.sistema_tickets.util.enums.Calificacion.REGULAR THEN 2.0
+                         ELSE 1.0 END),
+                   COUNT(t)
+            FROM Ticket t
+            WHERE t.usuarioSoporte IS NOT NULL AND t.calificacion IS NOT NULL
+            GROUP BY t.usuarioSoporte.nombre
+            """)
+    List<Object[]> calificacionPromedioPorTecnico();
+
+    /** Reparto global de calificaciones, para ver cuantos malos hubo. */
+    @Query("""
+            SELECT t.calificacion, COUNT(t)
+            FROM Ticket t
+            WHERE t.calificacion IS NOT NULL
+            GROUP BY t.calificacion
+            """)
+    List<Object[]> contarPorCalificacion();
+
     @Query("SELECT CAST(t.fechaCreacion AS date), COUNT(t) FROM Ticket t GROUP BY CAST(t.fechaCreacion AS date) ORDER BY CAST(t.fechaCreacion AS date) ASC")
     List<Object[]> contarPorFecha();
 

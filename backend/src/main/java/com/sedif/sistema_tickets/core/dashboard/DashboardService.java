@@ -29,7 +29,9 @@ public class DashboardService {
             .porPrioridad(mapearGenerico(ticketRepository.contarPorPrioridad()))
             .porFecha(mapearFecha(ticketRepository.contarPorFecha())) 
             // ---> NUEVO: Mapeamos los avisos activos agrupados por área
-            .avisosPorArea(mapearGenerico(avisoRepository.contarAvisosActivosPorArea())) 
+            .avisosPorArea(mapearGenerico(avisoRepository.contarAvisosActivosPorArea()))
+            .porCalificacion(mapearGenerico(ticketRepository.contarPorCalificacion()))
+            .calificacionPorTecnico(mapearCalificacion(ticketRepository.calificacionPromedioPorTecnico()))
             .build();
     }
 
@@ -60,6 +62,9 @@ public class DashboardService {
         if (valor instanceof Prioridad prioridad) {
             return prioridad.getEtiqueta();
         }
+        if (valor instanceof com.sedif.sistema_tickets.util.enums.Calificacion calificacion) {
+            return calificacion.getEtiqueta();
+        }
 
         // La consulta de prioridades agrupa por la columna y devuelve texto,
         // no la constante del enum, asi que se traduce aqui: sin esto la
@@ -69,6 +74,24 @@ public class DashboardService {
         return Prioridad.desde(texto)
                 .map(Prioridad::getEtiqueta)
                 .orElse(texto);
+    }
+
+    /**
+     * Convierte la agregacion de calificaciones por tecnico.
+     *
+     * <p>El promedio se redondea a un decimal: mostrar 2.6666666 sugiere una
+     * precision que una escala de tres niveles no tiene.</p>
+     */
+    private List<DashboardResponse.MetricaCalificacion> mapearCalificacion(List<Object[]> datos) {
+        return datos.stream()
+            .map(obj -> DashboardResponse.MetricaCalificacion.builder()
+                .nombre(obj[0] != null ? obj[0].toString() : "Sin asignar")
+                .promedio(obj[1] != null
+                        ? Math.round(((Number) obj[1]).doubleValue() * 10.0) / 10.0
+                        : null)
+                .respuestas((Long) obj[2])
+                .build())
+            .collect(Collectors.toList());
     }
 
     private List<DashboardResponse.MetricaFecha> mapearFecha(List<Object[]> datos) {

@@ -40,7 +40,7 @@ const ANCHO_MENU = 72;
 const ANCHO_MENU_MOVIL = 268;
 
 /** Alto de la barra superior, que aloja el logotipo institucional. */
-const ALTO_BARRA = { xs: 72, sm: 88 };
+const ALTO_BARRA = { xs: 80, sm: 108 };
 
 /**
  * Traduce el nombre de icono guardado en la tabla `vista` a su componente.
@@ -291,7 +291,7 @@ export default function MainLayout({ children }) {
                             src={logoPuebla}
                             alt="Gobierno del Estado de Puebla"
                             sx={{
-                                height: { xs: 52, sm: 78 },
+                                height: { xs: 60, sm: 94 },
                                 width: 'auto',
                                 objectFit: 'contain',
                                 // El logotipo es oscuro; sobre el guinda se

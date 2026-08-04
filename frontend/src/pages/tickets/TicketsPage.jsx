@@ -1,6 +1,7 @@
 import { useState, useEffect, useContext, useCallback } from 'react';
 import { Box, Button, Typography, Chip, Tooltip } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
+import StarBorderIcon from '@mui/icons-material/StarBorder';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutlined';
 import ConfirmationNumberIcon from '@mui/icons-material/ConfirmationNumber';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -15,10 +16,12 @@ import { formatearFechaHora, tiempoRelativo, truncar } from '../../util/formater
 import {
     OPCIONES_ESTADO_TICKET, colorEstado, etiquetaEstado, estaCerrado,
 } from '../../util/estadoTicket';
+import { colorCalificacion, etiquetaCalificacion } from '../../util/calificacion';
 
 import DynamicTable from '../../components/DynamicTable';
 import AccionesTabla from '../../components/AccionesTabla';
 import ConfirmationDialog from '../../components/ConfirmationDialog';
+import EncuestaDialog from '../../components/EncuestaDialog';
 
 
 /**
@@ -44,6 +47,11 @@ export default function TicketsPage() {
     const [ticketAFinalizar, setTicketAFinalizar] = useState(null);
     const [finalizando, setFinalizando] = useState(false);
 
+    // Ticket cuya encuesta se esta mostrando. Se abre justo despues de cerrar
+    // el ticket, que es cuando el servicio esta fresco y la respuesta vale.
+    const [ticketAEncuestar, setTicketAEncuestar] = useState(null);
+    const [enviandoEncuesta, setEnviandoEncuesta] = useState(false);
+
     const rolCrudo = user?.rol || user?.role || user?.rolNombre || '';
     const rol = rolCrudo.replace('ROLE_', '').toUpperCase();
     const esAdministrador = rol === 'ADMINISTRADOR';
@@ -67,14 +75,32 @@ export default function TicketsPage() {
     const confirmarFinalizacion = async () => {
         setFinalizando(true);
         try {
-            await ticketService.finalizar(ticketAFinalizar.id);
+            const respuesta = await ticketService.finalizar(ticketAFinalizar.id);
             notificar(`Ticket #${ticketAFinalizar.id} finalizado correctamente.`);
+
+            // La encuesta se ofrece con el ticket ya cerrado y sus datos
+            // frescos, incluido el nombre del tecnico que lo atendio.
+            setTicketAEncuestar(respuesta?.data ?? ticketAFinalizar);
             setTicketAFinalizar(null);
             tabla.recargar();
         } catch (error) {
             notificarError(error);
         } finally {
             setFinalizando(false);
+        }
+    };
+
+    const enviarEncuesta = async (calificacion, comentario) => {
+        setEnviandoEncuesta(true);
+        try {
+            await ticketService.calificar(ticketAEncuestar.id, calificacion, comentario);
+            notificar('Gracias por calificar el servicio.');
+            setTicketAEncuestar(null);
+            tabla.recargar();
+        } catch (error) {
+            notificarError(error);
+        } finally {
+            setEnviandoEncuesta(false);
         }
     };
 
@@ -103,6 +129,23 @@ export default function TicketsPage() {
         },
         { id: 'solicitante', etiqueta: 'Solicitante', ancho: '15%' },
         { id: 'departamento', etiqueta: 'Área', ancho: '14%' },
+        {
+            id: 'usuarioSoporteNombre',
+            etiqueta: 'Atiende',
+            ancho: '14%',
+            sinOrden: true,
+            render: (t) => (
+                t.usuarioSoporteNombre ? (
+                    <Typography variant="body2">{t.usuarioSoporteNombre}</Typography>
+                ) : (
+                    <Tooltip title="Todavía no se ha asignado un técnico" arrow>
+                        <Typography variant="body2" color="text.secondary">
+                            Por asignar
+                        </Typography>
+                    </Tooltip>
+                )
+            ),
+        },
         {
             id: 'fechaCreacion',
             etiqueta: 'Creado',
@@ -145,6 +188,36 @@ export default function TicketsPage() {
             ),
         },
         {
+            id: 'calificacion',
+            etiqueta: 'Mi opinión',
+            alineacion: 'center',
+            ancho: 120,
+            sinOrden: true,
+            // Al administrador no le corresponde: es la bitacora global y esa
+            // valoracion la da cada solicitante sobre su propio ticket.
+            oculta: esAdministrador,
+            render: (t) => {
+                if (t.calificacion) {
+                    return (
+                        <Tooltip title={t.comentarioEncuesta || 'Sin comentario'} arrow>
+                            <Chip
+                                label={t.calificacionEtiqueta || etiquetaCalificacion(t.calificacion)}
+                                size="small"
+                                color={colorCalificacion(t.calificacion)}
+                                variant="outlined"
+                            />
+                        </Tooltip>
+                    );
+                }
+
+                return (
+                    <Typography variant="caption" color="text.secondary">
+                        {estaCerrado(t.estatus) ? 'Sin calificar' : '—'}
+                    </Typography>
+                );
+            },
+        },
+        {
             id: 'acciones',
             etiqueta: 'Acciones',
             alineacion: 'center',
@@ -166,6 +239,21 @@ export default function TicketsPage() {
                     <AccionesTabla
                         acciones={[
                             {
+                                id: 'calificar',
+                                icono: <StarBorderIcon />,
+                                titulo: 'Calificar el servicio',
+                                etiqueta: `Calificar el servicio del ticket número ${t.id}`,
+                                color: 'primary',
+                                // Solo tiene sentido en un ticket cerrado y sin
+                                // calificar: quien ya respondio no puede
+                                // cambiar su respuesta.
+                                oculta: !cerrado || Boolean(t.calificacion),
+                                onClick: () => setTicketAEncuestar(t),
+                                deshabilitada: sinConexion,
+                                motivoDeshabilitada: 'Sin conexión con el servidor',
+                            },
+                            {
+                                id: 'finalizar',
                                 icono: <CheckCircleOutlineIcon />,
                                 titulo: 'Finalizar ticket',
                                 etiqueta: `Finalizar el ticket número ${t.id}`,
@@ -259,6 +347,14 @@ export default function TicketsPage() {
                         ? () => navigate('/tickets/nuevo')
                         : undefined,
                 }}
+            />
+
+            <EncuestaDialog
+                abierto={Boolean(ticketAEncuestar)}
+                ticket={ticketAEncuestar}
+                enviando={enviandoEncuesta}
+                onEnviar={enviarEncuesta}
+                onOmitir={() => setTicketAEncuestar(null)}
             />
 
             <ConfirmationDialog

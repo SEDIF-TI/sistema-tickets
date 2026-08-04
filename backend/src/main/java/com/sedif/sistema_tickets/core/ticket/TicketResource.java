@@ -102,6 +102,31 @@ public class TicketResource {
     }
 
     /**
+     * Encuesta de satisfaccion.
+     *
+     * <p>La restriccion de que solo pueda calificar quien levanto el ticket la
+     * aplica el servicio: depende del ticket concreto, no del rol, asi que no
+     * puede expresarse con {@code @PreAuthorize}.</p>
+     */
+    @PutMapping("/{id}/calificar")
+    public ResponseEntity<ApiResponse<TicketResponse>> calificarTicket(
+            @PathVariable Long id,
+            @Valid @RequestBody EncuestaRequest request,
+            Authentication authentication) {
+
+        return ResponseEntity.ok(ApiResponse.ok(
+                ticketService.calificarTicket(id, request.calificacion(),
+                        request.comentario(), authentication.getName()),
+                "Gracias por calificar el servicio."));
+    }
+
+    /** Catalogo de calificaciones, para los botones de la encuesta. */
+    @GetMapping("/calificaciones")
+    public ResponseEntity<ApiResponse<List<CatalogoResponse>>> obtenerCalificaciones() {
+        return ResponseEntity.ok(ApiResponse.ok(ticketService.obtenerCatalogoCalificaciones()));
+    }
+
+    /**
      * Catalogo de prioridades para el formulario de alta.
      *
      * <p>Disponible para cualquier usuario autenticado: todos levantan

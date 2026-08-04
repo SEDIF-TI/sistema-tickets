@@ -75,9 +75,18 @@ export default function DynamicTable({
     const [ocultas, setOcultas] = useState([]);
     const [anclaColumnas, setAnclaColumnas] = useState(null);
 
+    // Se descartan primero las columnas que la pantalla marca como `oculta`
+    // —normalmente por rol— y luego las que el usuario apago desde el menu.
+    // Sin lo primero, una pantalla no podia esconder una columna que no
+    // corresponde a quien la mira.
+    const columnasAplicables = useMemo(
+        () => columnas.filter((c) => !c.oculta),
+        [columnas]
+    );
+
     const columnasVisibles = useMemo(
-        () => columnas.filter((c) => !ocultas.includes(c.id)),
-        [columnas, ocultas]
+        () => columnasAplicables.filter((c) => !ocultas.includes(c.id)),
+        [columnasAplicables, ocultas]
     );
 
     const sinDatos = !cargando && filas.length === 0;
@@ -203,7 +212,7 @@ export default function DynamicTable({
 
             {/* Selector de columnas: útil en tablas anchas, innecesario en
                 móvil, donde ya se muestran como tarjetas. */}
-            {!esMovil && columnas.length > 4 && (
+            {!esMovil && columnasAplicables.length > 4 && (
                 <>
                     <Tooltip title="Mostrar u ocultar columnas">
                         <IconButton
@@ -225,7 +234,7 @@ export default function DynamicTable({
                             </Typography>
                         </MenuItem>
                         <Divider />
-                        {columnas.map((col) => (
+                        {columnasAplicables.map((col) => (
                             <MenuItem key={col.id} onClick={() => alternarColumna(col.id)} dense>
                                 <ListItemIcon sx={{ minWidth: 32 }}>
                                     {!ocultas.includes(col.id) && <CheckIcon fontSize="small" />}
@@ -264,9 +273,9 @@ export default function DynamicTable({
 
     // ------------------------------------------------------- vista tarjetas
     if (esMovil && !cargando && !sinDatos) {
-        const columnaPrincipal = columnas.find((c) => c.principal) ?? columnas[0];
-        const columnaAcciones = columnas.find((c) => c.id === 'acciones');
-        const columnasDetalle = columnas.filter(
+        const columnaPrincipal = columnasAplicables.find((c) => c.principal) ?? columnasAplicables[0];
+        const columnaAcciones = columnasAplicables.find((c) => c.id === 'acciones');
+        const columnasDetalle = columnasAplicables.filter(
             (c) => c.id !== columnaPrincipal.id && c.id !== 'acciones'
         );
 

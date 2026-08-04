@@ -8,6 +8,7 @@ import com.sedif.sistema_tickets.core.ticket.bitacora.BitacoraRepository;
 import com.sedif.sistema_tickets.core.ticket.filtros.TicketFiltroStrategy;
 import com.sedif.sistema_tickets.exception.MessageConstants;
 import com.sedif.sistema_tickets.exception.PageResponse;
+import com.sedif.sistema_tickets.util.enums.Calificacion;
 import com.sedif.sistema_tickets.util.enums.EstadoTicket;
 import com.sedif.sistema_tickets.util.enums.PlanTrabajo;
 import com.sedif.sistema_tickets.util.enums.Prioridad;
@@ -206,7 +207,11 @@ public class TicketService {
                 t.getPrioridad() != null ? t.getPrioridad().getEtiqueta() : null,
                 t.getUsuarioArea()!= null ? t.getUsuarioArea().getId() : null,
                 t.getUsuarioSoporte() != null ? t.getUsuarioSoporte().getId() : null,
-                justificacion
+                t.getUsuarioSoporte() != null ? t.getUsuarioSoporte().getNombre() : null,
+                justificacion,
+                t.getCalificacion() != null ? t.getCalificacion().name() : null,
+                t.getCalificacion() != null ? t.getCalificacion().getEtiqueta() : null,
+                t.getComentarioEncuesta()
         );
     }
 
@@ -228,6 +233,60 @@ public class TicketService {
         emitirEventoTicket(ticketGuardado);
 
         return mapearATicketResponse(ticketGuardado);
+    }
+
+    /**
+     * Registra la encuesta de satisfaccion del solicitante.
+     *
+     * <p>Solo puede calificar quien levanto el ticket, y solo una vez: la
+     * calificacion alimenta la metrica de cada tecnico, de modo que permitir
+     * que la cambiara cualquiera —o varias veces— la volveria inservible.</p>
+     *
+     * <p>Se exige ademas que el ticket este cerrado: calificar un servicio que
+     * todavia no termina no mide nada.</p>
+     */
+    @Transactional
+    public TicketResponse calificarTicket(Long ticketId, String calificacion,
+                                          String comentario, String correoUsuario) {
+
+        Usuario usuario = usuarioRepository.findByCorreoOrUsername(correoUsuario, correoUsuario)
+                .orElseThrow(() -> new IllegalArgumentException(MessageConstants.USUARIO_NO_ENCONTRADO));
+
+        Ticket ticket = ticketRepository.findById(ticketId)
+                .orElseThrow(() -> new IllegalArgumentException("Ticket no encontrado"));
+
+        if (ticket.getUsuarioArea() == null
+                || !ticket.getUsuarioArea().getId().equals(usuario.getId())) {
+            throw new SecurityException(
+                    "Solo quien levanto el ticket puede calificar el servicio recibido.");
+        }
+
+        if (ticket.getEstado() == null || !ticket.getEstado().esFinal()) {
+            throw new IllegalStateException(
+                    "El ticket todavia no esta cerrado: aun no hay servicio que calificar.");
+        }
+
+        if (ticket.getCalificacion() != null) {
+            throw new IllegalStateException("Este ticket ya fue calificado.");
+        }
+
+        Calificacion valor = Calificacion.desde(calificacion)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "La calificacion debe ser MALO, REGULAR o BUENO."));
+
+        ticket.setCalificacion(valor);
+        ticket.setComentarioEncuesta(
+                comentario != null && !comentario.isBlank() ? comentario.trim() : null);
+        ticket.setFechaEncuesta(LocalDateTime.now());
+
+        return mapearATicketResponse(ticketRepository.save(ticket));
+    }
+
+    /** Catalogo de calificaciones, para los botones de la encuesta. */
+    public List<CatalogoResponse> obtenerCatalogoCalificaciones() {
+        return Arrays.stream(Calificacion.values())
+                .map(c -> new CatalogoResponse(c.name(), c.getEtiqueta()))
+                .toList();
     }
 
     @Transactional(readOnly = true)

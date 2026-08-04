@@ -33,6 +33,19 @@ export const ticketService = {
      */
     getPrioridades: () => api.get('/v1/tickets/prioridades'),
 
+    /** Catálogo de calificaciones de la encuesta de satisfacción. */
+    getCalificaciones: () => api.get('/v1/tickets/calificaciones'),
+
+    /**
+     * Registra la encuesta del solicitante.
+     *
+     * Solo puede calificar quien levantó el ticket, una sola vez y con el
+     * ticket ya cerrado: el backend lo comprueba, porque depende del ticket
+     * concreto y no del rol.
+     */
+    calificar: (id, calificacion, comentario = null) =>
+        api.put(`/v1/tickets/${id}/calificar`, { calificacion, comentario }),
+
     create: (data) => api.post('/v1/tickets', data),
 
     /** Cierre por parte de quien solicitó el ticket. */

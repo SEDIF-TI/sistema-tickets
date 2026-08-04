@@ -42,5 +42,18 @@ public record TicketResponse(
     String prioridadEtiqueta,
     Long usuarioAreaId,
     Long usuarioSoporteId,
-    String justificacion
+    /**
+     * Nombre del tecnico asignado, ya resuelto.
+     *
+     * <p>Antes solo viajaba su id, asi que quien levantaba el ticket no tenia
+     * forma de saber quien iba a atenderlo: la pantalla habria tenido que
+     * pedir la lista de usuarios, que un empleado no puede consultar.</p>
+     */
+    String usuarioSoporteNombre,
+    String justificacion,
+    /** Constante de la calificacion, o null si no se ha respondido. */
+    String calificacion,
+    /** Texto legible de la calificacion: solo para mostrar. */
+    String calificacionEtiqueta,
+    String comentarioEncuesta
 ) {}

@@ -3,6 +3,7 @@ package com.sedif.sistema_tickets.core.ticket;
 import com.sedif.sistema_tickets.core.usuarios.Usuario;
 import java.time.LocalDateTime;
 import com.sedif.sistema_tickets.util.audit.Auditable;
+import com.sedif.sistema_tickets.util.enums.Calificacion;
 import com.sedif.sistema_tickets.util.enums.EstadoTicket;
 import com.sedif.sistema_tickets.util.enums.Prioridad;
 import jakarta.persistence.*;
@@ -76,4 +77,20 @@ public class Ticket extends Auditable {
 
     @Column(name = "plan_trabajo_clave")
     private Integer planTrabajoClave;
+
+    /**
+     * Encuesta de satisfaccion que responde el solicitante al cerrar el ticket.
+     *
+     * <p>Nula mientras no se conteste: la encuesta es voluntaria, y "sin
+     * responder" no es lo mismo que una mala calificacion.</p>
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "s_calificacion", length = 20)
+    private Calificacion calificacion;
+
+    @Column(name = "s_comentario_encuesta", length = 500)
+    private String comentarioEncuesta;
+
+    @Column(name = "d_fecha_encuesta")
+    private LocalDateTime fechaEncuesta;
 }

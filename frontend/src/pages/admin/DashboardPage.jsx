@@ -15,6 +15,7 @@ import ListAltIcon from '@mui/icons-material/ListAlt';
 import LocalOfferIcon from '@mui/icons-material/LocalOffer';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import EngineeringIcon from '@mui/icons-material/Engineering';
+import StarBorderIcon from '@mui/icons-material/StarBorder';
 import DomainIcon from '@mui/icons-material/Domain';
 import CampaignIcon from '@mui/icons-material/Campaign';
 import RefreshIcon from '@mui/icons-material/Refresh';
@@ -23,6 +24,7 @@ import PrintIcon from '@mui/icons-material/Print';
 import { dashboardService } from '../../services/dashboardService';
 import { useNotification } from '../../context/NotificationContext.jsx';
 import { colorDeEstado, colorDePrioridad, colorDeSerie } from '../../util/paletaGraficas';
+import { colorCalificacion, colorPromedio } from '../../util/calificacion';
 
 import TarjetaGrafica from '../../components/TarjetaGrafica';
 import TarjetaMetrica from '../../components/TarjetaMetrica';
@@ -105,6 +107,11 @@ export default function DashboardPage() {
     const porIngeniero = datos?.porIngeniero ?? [];
     const porFecha = datos?.porFecha ?? [];
     const avisosPorArea = datos?.avisosPorArea ?? [];
+    const porCalificacion = datos?.porCalificacion ?? [];
+    const calificacionPorTecnico = datos?.calificacionPorTecnico ?? [];
+
+    // Total de encuestas respondidas, para la tarjeta de cifra.
+    const totalEncuestas = porCalificacion.reduce((suma, c) => suma + (c.cantidad ?? 0), 0);
 
     const abiertos = porEstatus.find((e) => e.nombre === 'Abierto')?.cantidad ?? 0;
 
@@ -179,10 +186,10 @@ export default function DashboardPage() {
                     detalle="Altas registradas"
                 />
                 <TarjetaMetrica
-                    etiqueta="Áreas con avisos"
-                    valor={avisosPorArea.length}
-                    icono={CampaignIcon}
-                    detalle="Con aviso activo"
+                    etiqueta="Encuestas respondidas"
+                    valor={totalEncuestas}
+                    icono={StarBorderIcon}
+                    detalle="Sobre el servicio recibido"
                 />
             </Box>
 
@@ -246,6 +253,101 @@ export default function DashboardPage() {
                                 {porPrioridad.map((entrada) => (
                                     <Cell key={entrada.nombre} fill={colorDePrioridad(entrada.nombre)} />
                                 ))}
+                            </Bar>
+                        </BarChart>
+                    </ResponsiveContainer>
+                </TarjetaGrafica>
+
+                <TarjetaGrafica
+                    titulo="Calificación del servicio"
+                    icono={StarBorderIcon}
+                    datos={porCalificacion}
+                    alto={300}
+                    vacio="Cuando los solicitantes respondan la encuesta, verás aquí cómo valoran el servicio."
+                >
+                    <ResponsiveContainer>
+                        <PieChart>
+                            <Pie
+                                data={porCalificacion}
+                                dataKey="cantidad"
+                                nameKey="nombre"
+                                innerRadius={62}
+                                outerRadius={95}
+                                paddingAngle={2}
+                                stroke={theme.palette.background.paper}
+                                strokeWidth={2}
+                            >
+                                {porCalificacion.map((entrada) => (
+                                    <Cell
+                                        key={entrada.nombre}
+                                        fill={theme.palette[colorCalificacion(entrada.nombre)]?.main ?? '#8b8a85'}
+                                    />
+                                ))}
+                            </Pie>
+                            <Tooltip />
+                            <Legend verticalAlign="bottom" height={32} />
+                        </PieChart>
+                    </ResponsiveContainer>
+                </TarjetaGrafica>
+
+                <TarjetaGrafica
+                    titulo="Calificación por técnico"
+                    icono={EngineeringIcon}
+                    datos={calificacionPorTecnico}
+                    alto={Math.max(280, calificacionPorTecnico.length * 34 + 60)}
+                    columnas={[
+                        { id: 'nombre', etiqueta: 'Técnico' },
+                        { id: 'promedio', etiqueta: 'Promedio' },
+                        { id: 'respuestas', etiqueta: 'Respuestas' },
+                    ]}
+                    vacio="Aquí verás el promedio de cada técnico cuando haya encuestas respondidas."
+                >
+                    <ResponsiveContainer>
+                        <BarChart
+                            data={calificacionPorTecnico}
+                            layout="vertical"
+                            margin={{ top: 8, right: 60, left: 8, bottom: 8 }}
+                        >
+                            <CartesianGrid {...REJILLA} horizontal={false} />
+                            {/* La escala va de 1 a 3 y se fija: dejarla
+                                automática exageraría diferencias mínimas al
+                                estirar las barras a todo el ancho. */}
+                            <XAxis
+                                type="number"
+                                domain={[0, 3]}
+                                ticks={[0, 1, 2, 3]}
+                                tick={EJE}
+                                tickLine={false}
+                                axisLine={false}
+                            />
+                            <YAxis
+                                type="category"
+                                dataKey="nombre"
+                                width={esMovil ? 90 : 150}
+                                tick={EJE}
+                                tickLine={false}
+                                axisLine={false}
+                            />
+                            <Tooltip
+                                cursor={{ fill: 'rgba(0,0,0,0.04)' }}
+                                formatter={(valor, _n, item) => [
+                                    `${valor} de 3 · ${item?.payload?.respuestas ?? 0} respuesta(s)`,
+                                    'Promedio',
+                                ]}
+                            />
+                            <Bar dataKey="promedio" name="Promedio" barSize={22} radius={[0, 4, 4, 0]}>
+                                {calificacionPorTecnico.map((entrada) => (
+                                    <Cell key={entrada.nombre} fill={colorPromedio(entrada.promedio)} />
+                                ))}
+                                {/* Se muestra el promedio junto al numero de
+                                    respuestas: una media de 3.0 sobre una sola
+                                    encuesta no dice lo mismo que sobre cuarenta. */}
+                                <LabelList
+                                    dataKey="promedio"
+                                    position="right"
+                                    formatter={(v) => `${v}`}
+                                    style={{ fontSize: 11, fontWeight: 600, fill: '#52514e' }}
+                                />
                             </Bar>
                         </BarChart>
                     </ResponsiveContainer>

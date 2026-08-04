@@ -18,7 +18,13 @@ public class DashboardResponse {
     private List<MetricaFecha> porFecha;
     
     // ---> NUEVO: Lista para alimentar la nueva gráfica de avisos
-    private List<MetricaGenerica> avisosPorArea; 
+    private List<MetricaGenerica> avisosPorArea;
+
+    /** Reparto global de calificaciones: cuantos buenos, regulares y malos. */
+    private List<MetricaGenerica> porCalificacion;
+
+    /** Calificacion media de cada tecnico, con el numero de respuestas. */
+    private List<MetricaCalificacion> calificacionPorTecnico;
 
     @Data
     @Builder
@@ -33,5 +39,20 @@ public class DashboardResponse {
         private String fecha;
         private long total;
         private long resueltos;
+    }
+
+    /**
+     * Calificacion de un tecnico.
+     *
+     * <p>Lleva el numero de respuestas junto a la media a proposito: sin el, un
+     * 3.0 logrado con una sola encuesta pareceria mejor que un 2.8 sostenido
+     * sobre cuarenta.</p>
+     */
+    @Data
+    @Builder
+    public static class MetricaCalificacion {
+        private String nombre;
+        private Double promedio;
+        private Long respuestas;
     }
 }
