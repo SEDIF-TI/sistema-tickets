@@ -300,11 +300,17 @@ const theme = createTheme({
           // va sobre fondo guinda: el gris claro encima la lavaba y el texto
           // blanco quedaba casi ilegible.
           '&:hover': { backgroundColor: neutro[50] },
-          // La fila de encabezado no reacciona en absoluto: se le quita
-          // tambien la transicion, que animaba el fondo aunque el color final
-          // fuese el mismo.
+          // La fila de encabezado no reacciona en absoluto al cursor.
+          //
+          // `backgroundColor: 'transparent'` era justo lo contrario de lo que
+          // hace falta: en lugar de conservar el guinda, lo BORRABA al pasar
+          // el raton y dejaba ver el fondo de debajo. Con la transicion activa,
+          // ese cambio se veia como un desvanecido del color.
+          //
+          // `inherit` mantiene el fondo que la tabla ya le dio, de modo que no
+          // hay nada que animar.
           '.MuiTableHead-root &': { transition: 'none' },
-          '.MuiTableHead-root &:hover': { backgroundColor: 'transparent' },
+          '.MuiTableHead-root &:hover': { backgroundColor: 'inherit' },
         },
       },
     },

@@ -385,9 +385,12 @@ export default function DynamicTable({
                                 bgcolor: 'primary.main',
                                 transition: 'none',
                                 '&:hover': { bgcolor: 'primary.main' },
+                                // La celda no declara fondo al pasar el cursor:
+                                // el guinda lo pone la fila y la celda solo lo
+                                // deja ver. Poniendola en `transparent` se
+                                // borraba ese fondo en lugar de conservarlo.
                                 '& .MuiTableCell-head': {
                                     transition: 'none',
-                                    '&:hover': { bgcolor: 'transparent' },
                                 },
                                 '& .MuiTableSortLabel-root': {
                                     transition: 'none',
