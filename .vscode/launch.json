@@ -1,0 +1,25 @@
+{
+    // Arranque del backend con la extension de Spring Boot de VS Code.
+    //
+    // `envFile` carga el .env de la raiz: sin el, el arranque muere con
+    // "Could not resolve placeholder 'APP_JWT_SECRET'", que no explica que lo
+    // que falta es cargar el archivo.
+    //
+    // El .env apunta a localhost:5433, que es el puerto que el contenedor de
+    // PostgreSQL publica en el equipo. La base debe estar levantada antes:
+    //
+    //   docker compose -f docker-compose.yml -f docker-compose.local.yml up -d postgres-db
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Backend (Spring Boot)",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "mainClass": "com.sedif.sistema_tickets.SistemaTicketsApplication",
+            "projectName": "sistema_tickets",
+            "args": "",
+            "envFile": "${workspaceFolder}/.env"
+        }
+    ]
+}

@@ -50,8 +50,14 @@ yarn-error.log*
 pnpm-debug.log*
 
 # --- Editores / IDE -----------------------------------------------------
-.vscode/
+# La configuracion personal de VS Code no se versiona, pero launch.json si:
+# es lo que arranca el backend con la extension de Spring Boot, que es el
+# flujo de desarrollo del equipo. Sin el, quien clone abre el proyecto sin
+# ninguna configuracion de arranque y tiene que rehacerla a mano.
+.vscode/*
 !.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/settings.json
 .idea/
 *.iml
 *.iws

@@ -1,0 +1,13 @@
+{
+    // Extensiones que VS Code ofrece instalar al abrir el proyecto.
+    //
+    // Las dos primeras son las que permiten arrancar el backend desde el
+    // editor (F5 / panel de Spring Boot Dashboard); sin ellas el flujo de
+    // desarrollo del equipo no funciona.
+    "recommendations": [
+        "vscjava.vscode-java-pack",
+        "vmware.vscode-boot-dev-pack",
+        "dbaeumer.vscode-eslint",
+        "ms-azuretools.vscode-docker"
+    ]
+}
