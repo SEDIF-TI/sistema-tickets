@@ -300,29 +300,53 @@ const theme = createTheme({
           // va sobre fondo guinda: el gris claro encima la lavaba y el texto
           // blanco quedaba casi ilegible.
           '&:hover': { backgroundColor: neutro[50] },
+          // La fila de encabezado no reacciona en absoluto: se le quita
+          // tambien la transicion, que animaba el fondo aunque el color final
+          // fuese el mismo.
+          '.MuiTableHead-root &': { transition: 'none' },
           '.MuiTableHead-root &:hover': { backgroundColor: 'transparent' },
         },
       },
     },
 
-    // Cabeceras de columna ordenables: la flecha solo debe verse al pasar el
-    // cursor o cuando el orden esta activo, para no saturar la cabecera.
+    // Cabeceras de columna ordenables.
+    //
+    // El encabezado se queda COMPLETAMENTE quieto al pasar el cursor: ni color,
+    // ni fondo, ni transiciones, ni aparicion de la flecha. La unica flecha
+    // visible es la de la columna por la que se esta ordenando, que es
+    // informacion sobre el estado de la tabla, no un efecto del cursor.
+    //
+    // Intentos anteriores solo neutralizaron el color y el fondo, y el
+    // movimiento seguia ahi: lo que se percibia como "animacion" era la flecha
+    // apareciendo por opacidad en cada columna al pasar por encima.
     MuiTableSortLabel: {
+      // TableSortLabel es un ButtonBase: al pulsarlo dibujaba la onda de
+      // Material. Se desactiva solo aqui; botones y menus la conservan.
+      defaultProps: { disableRipple: true },
       styleOverrides: {
         root: {
           color: 'inherit',
-          // El encabezado no reacciona al cursor: ni el texto ni el fondo
-          // cambian. MUI aplica por su cuenta un fondo al pasar por encima
-          // del control de orden, y sobre el guinda se veia como un parche
-          // mas claro alrededor del titulo. Se neutraliza texto y fondo, y
-          // el unico realce queda en la flecha de orden.
+          transition: 'none',
           '&:hover': { color: 'inherit', backgroundColor: 'transparent' },
-          '&:hover .MuiTableSortLabel-icon': { opacity: 0.6 },
           '&.Mui-focusVisible': { color: 'inherit', backgroundColor: 'transparent' },
+
+          // La flecha permanece oculta salvo en la columna activa. Sin esto,
+          // MUI la revela al pasar el cursor y esa aparicion es el movimiento
+          // que se veia en todos los encabezados.
+          '& .MuiTableSortLabel-icon': {
+            opacity: 0,
+            transition: 'none',
+          },
+          '&:hover .MuiTableSortLabel-icon': { opacity: 0 },
+
           '&.Mui-active': {
             color: 'inherit',
             '&:hover': { color: 'inherit', backgroundColor: 'transparent' },
-            '& .MuiTableSortLabel-icon': { color: 'inherit !important', opacity: 1 },
+            '& .MuiTableSortLabel-icon': {
+              color: 'inherit !important',
+              opacity: 1,
+              transition: 'none',
+            },
           },
         },
       },

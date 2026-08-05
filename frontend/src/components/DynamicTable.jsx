@@ -371,26 +371,40 @@ export default function DynamicTable({
             <TableContainer sx={{ maxWidth: '100%' }}>
                 <Table sx={{ minWidth: sinDatos ? 'auto' : anchoMinimo }} aria-busy={cargando}>
                     <TableHead>
-                        {/* El `&:hover` se neutraliza aqui y no solo en el
-                            tema: este `sx` genera su propia clase, que gana en
-                            especificidad al selector global. Sin esto, al pasar
-                            el cursor el gris del hover se mezclaba con el
-                            guinda y el texto blanco del encabezado quedaba casi
-                            ilegible.
+                        {/* El encabezado no responde al cursor de ninguna forma:
+                            ni color, ni fondo, ni transiciones, ni la flecha de
+                            orden apareciendo. Se repite aqui lo que ya dice el
+                            tema porque este `sx` genera su propia clase, de
+                            mayor especificidad que el selector global.
 
-                            Se apaga tambien el fondo que MUI pone al control de
-                            orden: el encabezado debe quedarse quieto al pasar
-                            el cursor, sin ningun cambio de color. */}
+                            La unica flecha visible es la de la columna activa
+                            (`.Mui-active`), que informa de como esta ordenada
+                            la tabla; no es un efecto del raton. */}
                         <TableRow
                             sx={{
                                 bgcolor: 'primary.main',
+                                transition: 'none',
                                 '&:hover': { bgcolor: 'primary.main' },
                                 '& .MuiTableCell-head': {
+                                    transition: 'none',
                                     '&:hover': { bgcolor: 'transparent' },
                                 },
-                                '& .MuiTableSortLabel-root:hover': {
-                                    bgcolor: 'transparent',
-                                    color: 'inherit',
+                                '& .MuiTableSortLabel-root': {
+                                    transition: 'none',
+                                    '&:hover': { bgcolor: 'transparent', color: 'inherit' },
+                                },
+                                // La flecha solo se ve en la columna por la que
+                                // se ordena; en el resto no aparece al pasar por
+                                // encima, que era el movimiento que se percibia.
+                                '& .MuiTableSortLabel-icon': {
+                                    opacity: 0,
+                                    transition: 'none',
+                                },
+                                '& .MuiTableSortLabel-root:hover .MuiTableSortLabel-icon': {
+                                    opacity: 0,
+                                },
+                                '& .MuiTableSortLabel-root.Mui-active .MuiTableSortLabel-icon': {
+                                    opacity: 1,
                                 },
                             }}
                         >
