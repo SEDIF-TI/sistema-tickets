@@ -45,7 +45,11 @@ export default function FormularioResguardo({ solicitarPdf, generando = false })
         numeroInventario: '',
         condiciones: 'BUENO',
         duracionCantidad: 1,
-        duracionTipo: 'PERMANENTE',
+        // El valor que viaja al backend es INDEFINIDO, no PERMANENTE: el DTO
+        // solo admite dias/semanas/meses/indefinido y rechazaba con un 400
+        // cualquier resguardo enviado con la opcion por defecto. En pantalla
+        // se sigue leyendo "permanente", que es como lo llama el area.
+        duracionTipo: 'INDEFINIDO',
         accesorios: '',
         observaciones: ''
     });
@@ -59,9 +63,13 @@ export default function FormularioResguardo({ solicitarPdf, generando = false })
     const handleSubmit = async (e) => {
         e.preventDefault();
 
+        // En un resguardo indefinido la cantidad se omite en lugar de enviarse
+        // como 0: el DTO exige @Min(1), asi que el 0 lo rechazaba con un 400.
         const payloadFinal = {
             ...formData,
-            duracionCantidad: formData.duracionTipo === 'PERMANENTE' ? 0 : Number(formData.duracionCantidad)
+            duracionCantidad: formData.duracionTipo === 'INDEFINIDO'
+                ? undefined
+                : Number(formData.duracionCantidad),
         };
 
         try {
@@ -102,17 +110,26 @@ export default function FormularioResguardo({ solicitarPdf, generando = false })
                                 <CardContent sx={{ p: 3 }}>
                                     <SectionHeader icon={PersonIcon} title="I. Identificación del Servidor Público / Solicitante" />
                                     <Grid container spacing={2}>
+                                        {/* Los datos son del servidor público que recibe el
+                                            equipo, no de quien rellena el formulario: los
+                                            captura soporte a mano. Por eso van con el mismo
+                                            borde que el resto del formulario y no con
+                                            `variant="filled"`, cuyo fondo gris se leia como
+                                            campo automatico o de solo lectura. */}
                                         <Grid size={{ xs: 12, md: 6 }}>
-                                            <TextField fullWidth label="Nombre Completo" name="solicitanteNombre" value={formData.solicitanteNombre} onChange={handleChange} required variant="filled" />
+                                            <TextField fullWidth label="Nombre Completo" name="solicitanteNombre" value={formData.solicitanteNombre} onChange={handleChange} required />
                                         </Grid>
                                         <Grid size={{ xs: 12, md: 3 }}>
-                                            <TextField fullWidth label="No. Empleado" name="solicitanteNumero" value={formData.solicitanteNumero} onChange={handleChange} required variant="filled" InputProps={{ startAdornment: <InputAdornment position="start"><BadgeIcon fontSize="small"/></InputAdornment> }} />
+                                            {/* `slotProps.input` sustituye a `InputProps`, retirado
+                                                en MUI 9: React no reconocia la prop y la reenviaba
+                                                al DOM, avisando por consola en cada render. */}
+                                            <TextField fullWidth label="No. Empleado" name="solicitanteNumero" value={formData.solicitanteNumero} onChange={handleChange} slotProps={{ input: { startAdornment: <InputAdornment position="start"><BadgeIcon fontSize="small"/></InputAdornment> } }} />
                                         </Grid>
                                         <Grid size={{ xs: 12, md: 3 }}>
-                                            <TextField fullWidth label="Teléfono / Extensión" name="telefono" value={formData.telefono} onChange={handleChange} variant="filled" InputProps={{ startAdornment: <InputAdornment position="start"><PhoneIcon fontSize="small"/></InputAdornment> }} />
+                                            <TextField fullWidth label="Celular" name="telefono" value={formData.telefono} onChange={handleChange} slotProps={{ input: { startAdornment: <InputAdornment position="start"><PhoneIcon fontSize="small"/></InputAdornment> } }} />
                                         </Grid>
                                         <Grid size={{ xs: 12 }}>
-                                            <TextField fullWidth label="Departamento o Área de Adscripción" name="departamento" value={formData.departamento} onChange={handleChange} required variant="filled" />
+                                            <TextField fullWidth label="Departamento o Área de Adscripción" name="departamento" value={formData.departamento} onChange={handleChange} required />
                                         </Grid>
                                     </Grid>
                                 </CardContent>
@@ -141,14 +158,14 @@ export default function FormularioResguardo({ solicitarPdf, generando = false })
                                                 <MenuItem value="MALO">🔴 MALO</MenuItem>
                                             </TextField>
                                         </Grid>
-                                        <Grid size={{ xs: 12, md: formData.duracionTipo !== 'PERMANENTE' ? 4 : 8 }}>
+                                        <Grid size={{ xs: 12, md: formData.duracionTipo !== 'INDEFINIDO' ? 4 : 8 }}>
                                             <TextField select fullWidth label="Tipo de Vigencia" name="duracionTipo" value={formData.duracionTipo} onChange={handleChange} sx={{ '& .MuiSelect-select': { fontWeight: 'bold' } }}>
-                                                <MenuItem value="PERMANENTE">PERMANENTE (HASTA BAJA LABORAL)</MenuItem>
+                                                <MenuItem value="INDEFINIDO">PERMANENTE (HASTA BAJA LABORAL)</MenuItem>
                                                 <MenuItem value="DIAS">DÍAS HÁBILES</MenuItem>
                                                 <MenuItem value="SEMANAS">SEMANAS</MenuItem>
                                             </TextField>
                                         </Grid>
-                                        {formData.duracionTipo !== 'PERMANENTE' && (
+                                        {formData.duracionTipo !== 'INDEFINIDO' && (
                                             <Grid size={{ xs: 12, md: 4 }}>
                                                 <TextField fullWidth type="number" name="duracionCantidad" label={`Cantidad de ${formData.duracionTipo === 'DIAS' ? 'días' : 'semanas'}`} value={formData.duracionCantidad} onChange={handleChange} inputProps={{ min: 1 }} required color="primary" focused />
                                             </Grid>
@@ -178,8 +195,9 @@ export default function FormularioResguardo({ solicitarPdf, generando = false })
 
                     {/* BOTÓN DE ACCIÓN */}
                     <Box sx={{ mt: 5, display: 'flex', justifyContent: 'center' }}>
-                        <Button disabled={generando} 
-                            type="submit" disabled={generando} 
+                        <Button
+                            type="submit"
+                            disabled={generando}
                             variant="contained" 
                             size="large"
                             sx={{ 

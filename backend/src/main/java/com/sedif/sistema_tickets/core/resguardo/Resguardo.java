@@ -22,7 +22,9 @@ public class Resguardo extends Auditable {
     @Column(name = "s_solicitante_nombre", length = 100, nullable = false)
     private String solicitanteNombre;
 
-    @Column(name = "s_solicitante_numero", length = 30, nullable = false)
+    // Opcional desde la V11: soporte rellena la responsiva al entregar el
+    // equipo y no siempre tiene a mano el numero de empleado.
+    @Column(name = "s_solicitante_numero", length = 30)
     private String solicitanteNumero;
 
     @Column(name = "s_equipo_nombre", length = 100, nullable = false)

@@ -19,7 +19,11 @@ public record ResguardoRequest(
         @Size(max = 100, message = "El nombre no puede exceder 100 caracteres.")
         String solicitanteNombre,
 
-        @NotBlank(message = "El numero de empleado del solicitante es obligatorio.")
+        /**
+         * Opcional desde la V11: soporte rellena la responsiva en el momento de
+         * la entrega y no siempre tiene a mano el numero de empleado. Exigirlo
+         * llevaba a inventar un valor de relleno, peor que dejarlo vacio.
+         */
         @Size(max = 30, message = "El numero de empleado no puede exceder 30 caracteres.")
         String solicitanteNumero,
 

@@ -142,23 +142,28 @@ export default function DynamicTable({
                         maxWidth: { sm: 360 },
                         bgcolor: 'background.paper',
                     }}
-                    InputProps={{
-                        startAdornment: (
-                            <InputAdornment position="start">
-                                <SearchIcon fontSize="small" color="action" />
-                            </InputAdornment>
-                        ),
-                        endAdornment: busqueda ? (
-                            <InputAdornment position="end">
-                                <IconButton
-                                    size="small"
-                                    onClick={() => onBuscar('')}
-                                    aria-label="Limpiar búsqueda"
-                                >
-                                    <ClearIcon fontSize="small" />
-                                </IconButton>
-                            </InputAdornment>
-                        ) : null,
+                    // `slotProps.input` sustituye a `InputProps`, retirado en
+                    // MUI 9: React no reconocia la prop y la reenviaba al DOM,
+                    // avisando por consola en cada tabla del sistema.
+                    slotProps={{
+                        input: {
+                            startAdornment: (
+                                <InputAdornment position="start">
+                                    <SearchIcon fontSize="small" color="action" />
+                                </InputAdornment>
+                            ),
+                            endAdornment: busqueda ? (
+                                <InputAdornment position="end">
+                                    <IconButton
+                                        size="small"
+                                        onClick={() => onBuscar('')}
+                                        aria-label="Limpiar búsqueda"
+                                    >
+                                        <ClearIcon fontSize="small" />
+                                    </IconButton>
+                                </InputAdornment>
+                            ) : null,
+                        },
                     }}
                 />
             )}

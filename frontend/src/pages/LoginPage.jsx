@@ -130,21 +130,25 @@ export default function LoginPage() {
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                             disabled={cargando}
-                            InputProps={{
-                                endAdornment: (
-                                    <InputAdornment position="end">
-                                        <IconButton
-                                            onClick={() => setVerPassword((v) => !v)}
-                                            edge="end"
-                                            size="small"
-                                            aria-label={
-                                                verPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'
-                                            }
-                                        >
-                                            {verPassword ? <VisibilityOff /> : <Visibility />}
-                                        </IconButton>
-                                    </InputAdornment>
-                                ),
+                            // `slotProps.input` sustituye a `InputProps`, retirado en
+                            // MUI 9: React no reconocia la prop y la reenviaba al DOM.
+                            slotProps={{
+                                input: {
+                                    endAdornment: (
+                                        <InputAdornment position="end">
+                                            <IconButton
+                                                onClick={() => setVerPassword((v) => !v)}
+                                                edge="end"
+                                                size="small"
+                                                aria-label={
+                                                    verPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'
+                                                }
+                                            >
+                                                {verPassword ? <VisibilityOff /> : <Visibility />}
+                                            </IconButton>
+                                        </InputAdornment>
+                                    ),
+                                },
                             }}
                         />
 

@@ -503,7 +503,7 @@ public class DocumentoService {
 
             agregarFilaUsu.accept("NOMBRE DE USUARIO:", formatearNombre(request.solicitanteNombre()));
             agregarFilaUsu.accept("DEPARTAMENTO:", request.departamento());
-            agregarFilaUsu.accept("TELÉFONO / EXT:", request.telefono());
+            agregarFilaUsu.accept("CELULAR:", request.telefono());
             document.add(tUsuario);
             document.add(new Paragraph("\n"));
 
