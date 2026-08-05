@@ -311,15 +311,17 @@ const theme = createTheme({
       styleOverrides: {
         root: {
           color: 'inherit',
-          // Sin opacidad al pasar el cursor: sobre el fondo guinda del
-          // encabezado, atenuar el texto blanco lo dejaba casi invisible. El
-          // realce se hace mostrando la flecha de orden, que antes estaba
-          // oculta hasta el hover.
-          '&:hover': { color: 'inherit' },
+          // El encabezado no reacciona al cursor: ni el texto ni el fondo
+          // cambian. MUI aplica por su cuenta un fondo al pasar por encima
+          // del control de orden, y sobre el guinda se veia como un parche
+          // mas claro alrededor del titulo. Se neutraliza texto y fondo, y
+          // el unico realce queda en la flecha de orden.
+          '&:hover': { color: 'inherit', backgroundColor: 'transparent' },
           '&:hover .MuiTableSortLabel-icon': { opacity: 0.6 },
-          '&.Mui-focusVisible': { color: 'inherit' },
+          '&.Mui-focusVisible': { color: 'inherit', backgroundColor: 'transparent' },
           '&.Mui-active': {
             color: 'inherit',
+            '&:hover': { color: 'inherit', backgroundColor: 'transparent' },
             '& .MuiTableSortLabel-icon': { color: 'inherit !important', opacity: 1 },
           },
         },

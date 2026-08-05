@@ -34,7 +34,7 @@ import AccionesTabla from '../../components/AccionesTabla';
  *  - Leía `response.data` como array, pero el endpoint devuelve una página.
  *  - Montaba su propio Snackbar en lugar de usar el del sistema.
  */
-export default function HistorialResguardos() {
+export default function HistorialResguardos({ sinCabecera = false }) {
     const location = useLocation();
     const { notificar, notificarError, notificarInfo } = useNotification();
 
@@ -61,7 +61,7 @@ export default function HistorialResguardos() {
 
     const imprimir = async (resguardo) => {
         try {
-            const respuesta = await api.post('/v1/documentos/resguardo', resguardo, {
+            const respuesta = await api.post('/v1/documentos/resguardos', resguardo, {
                 responseType: 'blob',
             });
 
@@ -215,6 +215,10 @@ export default function HistorialResguardos() {
 
     return (
         <Box>
+            {/* Dentro de una pestaña del historial unificado el título ya lo
+                pone la página contenedora: repetirlo dejaba dos encabezados
+                seguidos. */}
+            {!sinCabecera && (
             <Box sx={{ mb: 3 }}>
                 <Typography
                     variant="h4"
@@ -229,6 +233,7 @@ export default function HistorialResguardos() {
                     Todos los préstamos registrados en la institución.
                 </Typography>
             </Box>
+            )}
 
             <DynamicTable
                 columnas={columnas}

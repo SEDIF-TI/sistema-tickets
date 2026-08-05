@@ -148,7 +148,7 @@ export default function GestionResguardos() {
 
     const imprimir = async (resguardo) => {
         try {
-            const respuesta = await api.post('/v1/documentos/resguardo', resguardo, {
+            const respuesta = await api.post('/v1/documentos/resguardos', resguardo, {
                 responseType: 'blob',
             });
 

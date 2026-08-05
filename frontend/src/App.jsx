@@ -27,6 +27,7 @@ import AdminEquiposPage from './pages/admin/AdminEquiposPage.jsx';
 import GestionTaller from './pages/soporte/GestionTaller.jsx';
 import GestionResguardos from './pages/soporte/GestionResguardos.jsx';
 import HistorialResguardos from './pages/admin/HistorialResguardos.jsx';
+import HistorialPage from './pages/admin/HistorialPage.jsx';
 
 // Componentes Adicionales
 import GeneradorDocumentos from './components/GeneradorDocumentos.jsx'; 
@@ -70,11 +71,16 @@ function AppContent() {
             <Route path="/admin/usuarios" element={<MainLayout><AdminUsuariosPage /></MainLayout>} />
             <Route path="/admin/areas" element={<MainLayout><AdminAreasPage /></MainLayout>} />
             <Route path="/admin/avisos" element={<MainLayout><AdminAvisosPage /></MainLayout>} />
-            <Route path="/admin/bitacora" element={<MainLayout><TicketsPage /></MainLayout>} />
             <Route path="/admin/equipos" element={<MainLayout><AdminEquiposPage /></MainLayout>} />
-            {/* Vista de seguimiento: el alta y las devoluciones viven en
-                /soporte/resguardos. La pantalla existia sin ruta que la
-                alcanzara, asi que era codigo inalcanzable. */}
+
+            {/* Historial unificado: dictamenes, resguardos y tickets en
+                pestanas, bajo una sola entrada de menu (migracion V10).
+
+                Las dos rutas siguientes ya no aparecen en el menu, pero se
+                mantienen declaradas: un enlace guardado en favoritos debe
+                seguir abriendo la pantalla que abria antes. */}
+            <Route path="/historial" element={<MainLayout><HistorialPage /></MainLayout>} />
+            <Route path="/admin/bitacora" element={<MainLayout><TicketsPage /></MainLayout>} />
             <Route path="/admin/resguardos" element={<MainLayout><HistorialResguardos /></MainLayout>} />
 
             {/* Rutas de Soporte / Documentos */}

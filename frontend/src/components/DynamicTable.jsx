@@ -371,11 +371,22 @@ export default function DynamicTable({
                             especificidad al selector global. Sin esto, al pasar
                             el cursor el gris del hover se mezclaba con el
                             guinda y el texto blanco del encabezado quedaba casi
-                            ilegible. */}
+                            ilegible.
+
+                            Se apaga tambien el fondo que MUI pone al control de
+                            orden: el encabezado debe quedarse quieto al pasar
+                            el cursor, sin ningun cambio de color. */}
                         <TableRow
                             sx={{
                                 bgcolor: 'primary.main',
                                 '&:hover': { bgcolor: 'primary.main' },
+                                '& .MuiTableCell-head': {
+                                    '&:hover': { bgcolor: 'transparent' },
+                                },
+                                '& .MuiTableSortLabel-root:hover': {
+                                    bgcolor: 'transparent',
+                                    color: 'inherit',
+                                },
                             }}
                         >
                             {columnasVisibles.map((col) => {

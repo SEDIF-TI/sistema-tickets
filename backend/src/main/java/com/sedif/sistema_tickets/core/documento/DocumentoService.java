@@ -174,11 +174,7 @@ public class DocumentoService {
             cuerpoTextos.add(new Chunk("DESCRIPCIÓN DE LA FALLA:\n", fontBold));
             cuerpoTextos.add(new Chunk((request.fallaReportada() != null ? request.fallaReportada() : "") + "\n\n", fontNorm));
             cuerpoTextos.add(new Chunk("DIAGNÓSTICO TÉCNICO:\n", fontBold));
-            cuerpoTextos.add(new Chunk((request.diagnostico() != null ? request.diagnostico() : "") + "\n\n", fontNorm));
-            cuerpoTextos.add(new Chunk("HALLAZGOS:\n", fontBold));
-            cuerpoTextos.add(new Chunk((request.hallazgos() != null ? request.hallazgos() : "") + "\n\n", fontNorm));
-            cuerpoTextos.add(new Chunk("CONCLUSIÓN:\n", fontBold));
-            cuerpoTextos.add(new Chunk((request.conclusion() != null ? request.conclusion() : ""), fontNorm));
+            cuerpoTextos.add(new Chunk((request.diagnostico() != null ? request.diagnostico() : ""), fontNorm));
             PdfPCell cellTextos = new PdfPCell(cuerpoTextos);
             cellTextos.setPadding(10);
             cellTextos.setMinimumHeight(200f); 
@@ -405,6 +401,10 @@ public class DocumentoService {
             workbook.write(out);
             return out.toByteArray();
         } catch (Exception e) {
+            // La causa se registra antes de envolverla: el handler global solo
+            // devuelve el mensaje, asi que sin esta traza el fallo real de POI
+            // quedaba invisible tanto en el log como en la respuesta.
+            log.error("Fallo al generar el reporte de actividades en Excel.", e);
             throw new IllegalStateException("No se pudo generar el archivo de Excel.", e);
         }
     }

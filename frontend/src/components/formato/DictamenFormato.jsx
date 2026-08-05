@@ -22,7 +22,7 @@ export default function DictamenFormato({ solicitarPdf, generando = false }) {
         direccionUsuario: '', departamentoUsuario: '', nombreUsuario: '', telefonoUsuario: '', tipoReporte: '',
         
         // Análisis Técnico
-        fallaReportada: '', diagnostico: '', hallazgos: '', conclusion: '',
+        fallaReportada: '', diagnostico: '',
 
         // Campos eliminados de la vista, pero se envían vacíos para no romper el backend
         concepto: '', observacion: '', 
@@ -153,15 +153,6 @@ export default function DictamenFormato({ solicitarPdf, generando = false }) {
             <Grid container spacing={2}>
                 <Grid size={{ xs: 12 }}><TextField fullWidth multiline minRows={2} label="Descripción de la Falla" name="fallaReportada" value={dictamen.fallaReportada} onChange={handleChange} /></Grid>
                 <Grid size={{ xs: 12 }}><TextField fullWidth multiline minRows={3} label="Diagnóstico Técnico" name="diagnostico" value={dictamen.diagnostico} onChange={handleChange} /></Grid>
-                <Grid size={{ xs: 12 }}><TextField fullWidth multiline minRows={2} label="Hallazgos (Estado físico, batería, disco...)" name="hallazgos" value={dictamen.hallazgos} onChange={handleChange} /></Grid>
-                <Grid size={{ xs: 12 }}>
-                    <TextField 
-                        fullWidth multiline minRows={2} 
-                        label="Conclusión Final (Max 200 caracteres)" 
-                        name="conclusion" value={dictamen.conclusion} onChange={handleChange}
-                        InputProps={{ maxLength: 200 }} helperText={`${dictamen.conclusion.length}/200 caracteres`}
-                    />
-                </Grid>
             </Grid>
 
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 4, pt: 2, borderTop: '1px solid #eee' }}>

@@ -1,12 +1,17 @@
 package com.sedif.sistema_tickets.core.documento;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
+
+import com.sedif.sistema_tickets.core.dictamen.DictamenService;
 
 import com.sedif.sistema_tickets.core.ticket.Ticket;
 import com.sedif.sistema_tickets.util.enums.EstadoTicket;
@@ -27,19 +32,40 @@ import java.util.stream.Collectors;
 // Documentos con membrete institucional: solo el area de TI los emite.
 @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'SOPORTE')")
 @RequiredArgsConstructor
+@Slf4j
 public class DocumentoResource {
 
     private final DocumentoService documentoService;
-    private final TicketRepository ticketRepository; 
+    private final TicketRepository ticketRepository;
     private final ActividadExtraRepository actividadExtraRepository;
+    private final DictamenService dictamenService;
 
     // ==========================================================
     // 1. GENERACIÓN DE DICTAMEN
     // ==========================================================
+    // Desde la V10 el dictamen queda registrado al emitirse: antes se componia
+    // el PDF y se devolvia sin dejar rastro, de modo que no habia historial que
+    // consultar.
     @PostMapping(value = "/dictamen", produces = MediaType.APPLICATION_PDF_VALUE)
-    public ResponseEntity<byte[]> generarDictamen(@Valid @RequestBody DictamenRequest request) {
+    public ResponseEntity<byte[]> generarDictamen(@Valid @RequestBody DictamenRequest request,
+                                                  Authentication authentication) {
         byte[] pdfGenerado = documentoService.generarDictamenTecnicoPdf(request);
-        return construirRespuestaPdf(pdfGenerado, "Dictamen_Tecnico_" + request.folioTicket() + ".pdf");
+
+        // El registro no debe impedir la entrega del documento: si falla el
+        // guardado, el tecnico se queda igualmente con su PDF y el fallo consta
+        // en el log.
+        String folio = null;
+        try {
+            folio = dictamenService.registrar(
+                    request, authentication != null ? authentication.getName() : null).getFolio();
+        } catch (Exception e) {
+            log.error("El dictamen se genero pero no pudo registrarse en el historial.", e);
+        }
+
+        String nombre = folio != null
+                ? "Dictamen_Tecnico_" + folio + ".pdf"
+                : "Dictamen_Tecnico_" + request.folioTicket() + ".pdf";
+        return construirRespuestaPdf(pdfGenerado, nombre);
     }
 
     // ==========================================================
@@ -65,6 +91,13 @@ public class DocumentoResource {
     // ==========================================================
     // 5. GENERACIÓN DEL REPORTE DE ACTIVIDADES (PDF)
     // ==========================================================
+    // La sesion de Hibernate debe seguir abierta mientras se compone el
+    // documento: el generador recorre `ticket.usuarioArea.area` y
+    // `actividad.usuario.area`, que son proxies perezosos. Sin transaccion, la
+    // sesion se cerraba al volver del repositorio y el primer acceso a esas
+    // relaciones lanzaba LazyInitializationException, de modo que el reporte
+    // fallaba siempre.
+    @Transactional(readOnly = true)
     @PostMapping(value = "/reporte-actividades", produces = MediaType.APPLICATION_PDF_VALUE)
     public ResponseEntity<byte[]> generarReporteActividades(@RequestBody Map<String, Object> payload) {
         LocalDate fechaInicio = LocalDate.parse(payload.get("fechaInicio").toString());
@@ -101,6 +134,9 @@ public class DocumentoResource {
     // ==========================================================
     // 6. GENERACIÓN DEL REPORTE DE ACTIVIDADES (EXCEL)
     // ==========================================================
+    // Mismo motivo que en el reporte en PDF: sin la transaccion abierta, leer
+    // el area del usuario sobre un proxy ya desconectado rompia la generacion.
+    @Transactional(readOnly = true)
     @PostMapping("/reporte-actividades/excel")
     public ResponseEntity<byte[]> generarReporteExcel(@RequestBody Map<String, Object> payload) {
         LocalDate fechaInicio = LocalDate.parse(payload.get("fechaInicio").toString());

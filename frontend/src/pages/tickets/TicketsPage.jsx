@@ -34,7 +34,7 @@ import EncuestaDialog from '../../components/EncuestaDialog';
  *  - La acción "Finalizar" era un botón de texto que ensanchaba la tabla.
  *  - El color guinda estaba escrito a mano.
  */
-export default function TicketsPage() {
+export default function TicketsPage({ sinCabecera = false }) {
     const { user } = useContext(AuthContext);
     const { notificar, notificarError, notificarInfo } = useNotification();
     const navigate = useNavigate();
@@ -273,7 +273,12 @@ export default function TicketsPage() {
 
     return (
         <Box>
-            {/* Cabecera: en móvil el título y el botón se apilan. */}
+            {/* Cabecera: en móvil el título y el botón se apilan.
+
+                Se omite cuando la pantalla vive dentro de una pestaña del
+                historial unificado: allí el título ya lo pone la página
+                contenedora y repetirlo dejaba dos encabezados seguidos. */}
+            {!sinCabecera && (
             <Box
                 sx={{
                     display: 'flex',
@@ -306,6 +311,7 @@ export default function TicketsPage() {
                     </Button>
                 )}
             </Box>
+            )}
 
             <DynamicTable
                 columnas={columnas}

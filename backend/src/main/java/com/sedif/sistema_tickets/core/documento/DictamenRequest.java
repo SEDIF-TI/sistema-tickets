@@ -11,9 +11,9 @@ public record DictamenRequest(
         String noResguardo,
         String fallaReportada,
         String diagnostico,
-        String hallazgos,
-        String conclusion,
-        // Asegúrate de que estos 5 existan en tu record:
+        // El apartado de analisis tecnico se reduce a la falla y el
+        // diagnostico: los campos de hallazgos y conclusion se retiraron del
+        // formato oficial.
         String direccionUsuario,
         String departamentoUsuario,
         String nombreUsuario,
