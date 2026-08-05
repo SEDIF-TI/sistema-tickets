@@ -55,7 +55,6 @@ pnpm-debug.log*
 # flujo de desarrollo del equipo. Sin el, quien clone abre el proyecto sin
 # ninguna configuracion de arranque y tiene que rehacerla a mano.
 .vscode/*
-!.vscode/extensions.json
 !.vscode/launch.json
 !.vscode/settings.json
 .idea/
