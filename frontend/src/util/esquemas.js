@@ -121,9 +121,11 @@ export const esquemaEquipo = z.object({
  */
 export const esquemaResguardo = z.object({
     solicitanteNombre: textoObligatorio('El nombre del solicitante', 100, 3),
-    solicitanteNumero: textoObligatorio('El número de empleado', 30),
+    // Opcional, igual que en `ResguardoRequest`: soporte rellena la responsiva
+    // al entregar el equipo y no siempre tiene a mano el número de empleado.
+    solicitanteNumero: textoOpcional('El número de empleado', 30),
     departamento: textoOpcional('El departamento', 100),
-    telefono: textoOpcional('El teléfono', 50),
+    telefono: textoOpcional('El celular', 50),
     equipoNombre: textoObligatorio('El equipo entregado', 100, 3),
     numeroSerie: textoObligatorio('El número de serie', 50),
     numeroInventario: textoOpcional('El número de inventario', 50),
@@ -142,6 +144,32 @@ export const esquemaResguardo = z.object({
             message: 'Indica un número entre 1 y 365.',
         });
     }
+});
+
+/**
+ * Dictamen técnico. Espeja `DictamenRequest` del backend.
+ *
+ * El apartado de análisis se compone de la falla reportada y el diagnóstico,
+ * que son los dos únicos campos que imprime el formato oficial. La descripción
+ * del equipo y el diagnóstico son lo mínimo con lo que el documento tiene
+ * sentido; el resto queda a criterio de quien lo emite.
+ */
+export const esquemaDictamen = z.object({
+    cve: textoOpcional('La clave', 20),
+    descripcionEquipo: textoObligatorio('La descripción del equipo', 255, 3),
+    marca: textoOpcional('La marca', 100),
+    modelo: textoOpcional('El modelo', 100),
+    serie: textoOpcional('El número de serie', 100),
+    noResguardo: textoOpcional('El número de resguardo', 100),
+
+    nombreUsuario: textoOpcional('El nombre del usuario', 200),
+    telefonoUsuario: textoOpcional('El teléfono', 50),
+    direccionUsuario: textoOpcional('La dirección', 200),
+    departamentoUsuario: textoOpcional('El departamento', 150),
+    tipoReporte: textoOpcional('El tipo de reporte', 150),
+
+    fallaReportada: textoOpcional('La descripción de la falla', 1000),
+    diagnostico: textoObligatorio('El diagnóstico técnico', 1000, 3),
 });
 
 /** Ingreso y actualización de un equipo en el taller. Espeja `EquipoReparacionRequest`. */

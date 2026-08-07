@@ -59,7 +59,7 @@ export default function RequisicionFormato({ solicitarPdf, generando = false }) 
                     
                     <TableContainer component={Paper} variant="outlined">
                         <Table size="small">
-                            <TableHead sx={{ bgcolor: '#f5f5f5' }}>
+                            <TableHead sx={{ bgcolor: 'grey.100' }}>
                                 <TableRow>
                                     <TableCell width="15%">Cantidad</TableCell>
                                     <TableCell width="20%">Unidad</TableCell>

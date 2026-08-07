@@ -11,6 +11,14 @@ import { AuthContext } from '../../context/AuthContext.jsx';
 import { useNotification } from '../../context/NotificationContext.jsx';
 
 
+/**
+ * Verde de Excel, que no forma parte de la paleta institucional: identifica el
+ * formato del archivo, igual que el rojo del icono de PDF, y por eso se define
+ * aquí en lugar de en el tema.
+ */
+const VERDE_EXCEL = '#1D6F42';
+const VERDE_EXCEL_OSCURO = '#155331';
+
 export default function ReporteActividadesFormato({ solicitarPdf, generando = false }) {
     const { user } = useContext(AuthContext);
     const { notificar, notificarError, notificarAdvertencia } = useNotification();
@@ -120,13 +128,13 @@ export default function ReporteActividadesFormato({ solicitarPdf, generando = fa
                         variant="outlined" 
                         onClick={() => setModalAbierto(true)} 
                         startIcon={<AddTaskIcon />}
-                        sx={{ color: 'primary.main', borderColor: 'primary.main', '&:hover': { bgcolor: '#fce4ec', borderColor: 'primary.main' }, fontWeight: 'bold', minWidth: 'max-content' }}
+                        sx={{ minWidth: 'max-content' }}
                     >
                         Registrar Actividad Manual
                     </Button>
                 </Box>
 
-                <Paper elevation={0} sx={{ bgcolor: '#f8fafc', p: 3, borderRadius: 2, border: '1px solid #e2e8f0' }}>
+                <Paper variant="outlined" sx={{ bgcolor: 'grey.50', p: 3 }}>
                     <Grid container spacing={3} alignItems="flex-end">
                         <Grid size={{ xs: 12, md: 3 }}>
                             <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mb: 1, fontWeight: 'bold', ml: 0.5 }}>Fecha de Inicio</Typography>
@@ -137,8 +145,29 @@ export default function ReporteActividadesFormato({ solicitarPdf, generando = fa
                             <TextField fullWidth size="small" type="date" value={fechas.fechaFin} onChange={(e) => setFechas({...fechas, fechaFin: e.target.value})} sx={{ bgcolor: 'white' }} />
                         </Grid>
                         <Grid size={{ xs: 12, md: 6 }} sx={{ display: 'flex', justifyContent: { xs: 'flex-start', md: 'flex-end' }, gap: 2 }}>
-                            <Button variant="contained" disabled={generando} onClick={handleGenerarPdf} startIcon={<PictureAsPdfIcon />} sx={{ bgcolor: 'primary.main', '&:hover': { bgcolor: '#5e1227' }, flexGrow: { xs: 1, md: 0 }, px: 3 }}>Descargar PDF</Button>
-                            <Button variant="contained" disabled={generando} onClick={handleGenerarExcel} startIcon={<TableViewIcon />} sx={{ bgcolor: '#1D6F42', '&:hover': { bgcolor: '#155331' }, flexGrow: { xs: 1, md: 0 }, px: 3 }}>Descargar Excel</Button>
+                            <Button
+                                variant="contained"
+                                disabled={generando}
+                                onClick={handleGenerarPdf}
+                                startIcon={<PictureAsPdfIcon />}
+                                sx={{ flexGrow: { xs: 1, md: 0 }, px: 3 }}
+                            >
+                                Descargar PDF
+                            </Button>
+                            <Button
+                                variant="contained"
+                                disabled={generando}
+                                onClick={handleGenerarExcel}
+                                startIcon={<TableViewIcon />}
+                                sx={{
+                                    bgcolor: VERDE_EXCEL,
+                                    '&:hover': { bgcolor: VERDE_EXCEL_OSCURO },
+                                    flexGrow: { xs: 1, md: 0 },
+                                    px: 3,
+                                }}
+                            >
+                                Descargar Excel
+                            </Button>
                         </Grid>
                     </Grid>
                 </Paper>

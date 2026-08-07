@@ -37,6 +37,7 @@ export default function CampoFormulario({
     mayusculas = false,
     ayuda,
     obligatorio = false,
+    slotProps: slotPropsExternos,
     ...props
 }) {
     return (
@@ -75,10 +76,16 @@ export default function CampoFormulario({
                         // El límite se impone también en el propio input, no
                         // solo en la validación: impedir el exceso ahorra
                         // escribir un texto que luego habría que recortar.
+                        //
+                        // Los slots que declare la pantalla —los adornos de un
+                        // icono, por ejemplo— se conservan: sustituir el objeto
+                        // entero los descartaría.
                         slotProps={{
+                            ...slotPropsExternos,
                             htmlInput: {
                                 maxLength: maximo,
                                 'aria-invalid': hayError,
+                                ...slotPropsExternos?.htmlInput,
                             },
                         }}
                     >
