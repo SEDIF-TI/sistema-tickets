@@ -103,8 +103,13 @@ export default function FormularioTicket() {
     }, [esAdministrador, notificarError]);
 
     const enviar = async (datos) => {
+        // Se corta antes de llamar al servidor, pero sin limpiar el formulario:
+        // lo escrito sigue en pantalla para reenviarlo en cuanto vuelva la
+        // conexión, en lugar de obligar a teclearlo de nuevo.
         if (sinConexion) {
-            notificarError('No hay conexión con el servidor. Inténtalo de nuevo cuando se restablezca.');
+            notificarError('No hay conexión con el servidor, así que el ticket no se puede '
+                + 'registrar todavía. Lo que escribiste sigue aquí: vuelve a enviarlo cuando '
+                + 'se restablezca la conexión.');
             return;
         }
 

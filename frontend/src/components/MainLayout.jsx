@@ -1,7 +1,7 @@
 import { useContext, useEffect, useState, useMemo } from 'react';
 import {
     Box, Drawer, AppBar, Toolbar, List, Typography, ListItem, ListItemButton,
-    ListItemIcon, ListItemText, Button, Tooltip, IconButton, Alert,
+    ListItemIcon, ListItemText, Button, Tooltip, IconButton, Alert, AlertTitle,
     useMediaQuery, Collapse
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
@@ -109,11 +109,42 @@ export default function MainLayout({ children }) {
     const estadoRed = useNetworkStatus();
     const sinConexion = Boolean(estadoRed.sinConexion ?? estadoRed);
 
-    const { rol, esAdministrador } = useRol();
+    const { rol, esAdministrador, esEmpleado } = useRol();
     const bloqueadoPorPassword = Boolean(user?.passwordTemporal);
 
     const vistas = useMemo(() => user?.vistasPermitidas ?? [], [user]);
     const mostrarMenu = Boolean(user) && !bloqueadoPorPassword && vistas.length > 0;
+
+    // Aviso de conectividad. Los dos cortes posibles piden acciones distintas,
+    // así que se distinguen en lugar de mostrar un texto único:
+    //
+    //  - Sin red en el equipo: el resto de la institución sigue trabajando, de
+    //    modo que la vía para pedir ayuda es que otra persona levante el
+    //    ticket. A soporte se le indica la revisión que le corresponde hacer.
+    //  - Servidor caído: no hay nada que el usuario pueda hacer desde aquí, y
+    //    lo importante es que sepa que lo que ve en pantalla puede no estar al
+    //    día y que no pierda lo que estaba capturando.
+    const mensajeDeConexion = useMemo(() => {
+        if (estadoRed.servidorCaido) {
+            return {
+                titulo: 'Sin comunicación con el servidor',
+                detalle: 'Tu equipo tiene internet, pero el sistema no responde. '
+                    + 'Los datos en pantalla pueden estar desactualizados y no se guardará '
+                    + 'nada de lo que captures. Espera unos minutos y vuelve a intentarlo; '
+                    + 'si continúa, avisa al área de soporte técnico.',
+            };
+        }
+
+        return {
+            titulo: 'Sin conexión a internet',
+            detalle: esEmpleado
+                ? 'Espera a que se restablezca para continuar. Si es el único equipo sin '
+                  + 'internet y necesitas reportar una falla, pide a un compañero que levante '
+                  + 'el ticket por ti para que puedan apoyarte.'
+                : 'Espera a que se restablezca para continuar. Si el corte es solo de este '
+                  + 'equipo, revisa el cable de red o la conexión al wifi antes de reportarlo.',
+        };
+    }, [estadoRed.servidorCaido, esEmpleado]);
 
     // El aviso de "conexión restablecida" solo tiene sentido si antes se perdió,
     // de ahí el rastro en `estuvoSinConexion`. Se retira solo a los 5 segundos:
@@ -455,9 +486,8 @@ export default function MainLayout({ children }) {
                 <Box aria-live="polite">
                     <Collapse in={sinConexion}>
                         <Alert severity="error" icon={<WifiOffIcon />} sx={{ mb: 2 }}>
-                            {estadoRed.servidorCaido
-                                ? 'No hay comunicación con el servidor. Los datos que ves pueden estar desactualizados.'
-                                : 'Sin conexión a internet. Revisa tu red para continuar trabajando.'}
+                            <AlertTitle>{mensajeDeConexion.titulo}</AlertTitle>
+                            {mensajeDeConexion.detalle}
                         </Alert>
                     </Collapse>
 
@@ -468,7 +498,8 @@ export default function MainLayout({ children }) {
                             onClose={() => setMostrarRecuperacion(false)}
                             sx={{ mb: 2 }}
                         >
-                            Conexión restablecida.
+                            <AlertTitle>Conexión restablecida</AlertTitle>
+                            Ya puedes continuar. Si algo quedó a medias, vuelve a intentarlo.
                         </Alert>
                     </Collapse>
                 </Box>

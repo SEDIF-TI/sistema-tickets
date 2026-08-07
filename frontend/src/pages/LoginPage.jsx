@@ -56,7 +56,14 @@ export default function LoginPage() {
             if (err.response?.status === 429) {
                 setError('Demasiados intentos fallidos. Espera unos minutos antes de volver a intentarlo.');
             } else if (!err.response) {
-                setError('No hay conexión con el servidor. Verifica tu red e inténtalo de nuevo.');
+                // Sin respuesta del servidor: o el equipo se quedó sin red, o el
+                // sistema está caído. `navigator.onLine` distingue los dos casos,
+                // que piden acciones distintas de quien intenta entrar.
+                setError(navigator.onLine
+                    ? 'El sistema no responde. Espera unos minutos y vuelve a intentarlo; '
+                      + 'si continúa, avisa al área de soporte técnico.'
+                    : 'Este equipo no tiene internet. Revisa el cable de red o la conexión '
+                      + 'al wifi, y vuelve a intentarlo cuando se restablezca.');
             } else {
                 // Mensaje deliberadamente genérico: no revela si la cuenta existe.
                 setError(err.mensaje || 'Credenciales inválidas. Verifica tus datos.');
