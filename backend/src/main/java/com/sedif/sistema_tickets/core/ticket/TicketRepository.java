@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 public interface TicketRepository extends JpaRepository<Ticket, Long> {
@@ -117,6 +118,49 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
     List<Ticket> buscarPorSoporteOCreador(@Param("usuarioId") Long usuarioId);
 
     long countByUsuarioSoporteAndEstado(Usuario usuarioSoporte, EstadoTicket estado);
+
+    // =====================================================================
+    // REPORTE DE ACTIVIDADES
+    // El filtro por estado y por fecha de cierre se resuelve en la base: el
+    // reporte abarca periodos largos y traer la tabla entera para descartarla
+    // en memoria crece con el historial, no con lo que se imprime.
+    //
+    // El fetch join sobre area, tecnico y su area trae en una sola consulta lo
+    // que el generador del documento recorre despues; sin el, cada fila
+    // dispararia sus propias consultas al atravesar esas relaciones perezosas.
+    // =====================================================================
+
+    /** Tickets cerrados en el periodo, de toda la institucion. */
+    @Query("""
+            SELECT DISTINCT t FROM Ticket t
+            LEFT JOIN FETCH t.usuarioArea ua
+            LEFT JOIN FETCH ua.area
+            LEFT JOIN FETCH t.usuarioSoporte us
+            LEFT JOIN FETCH us.area
+            WHERE t.estado = :estado
+              AND t.fechaFin BETWEEN :desde AND :hasta
+            ORDER BY t.fechaFin ASC
+            """)
+    List<Ticket> buscarCerradosEnPeriodo(@Param("estado") EstadoTicket estado,
+                                         @Param("desde") LocalDateTime desde,
+                                         @Param("hasta") LocalDateTime hasta);
+
+    /** Tickets cerrados en el periodo por un tecnico concreto. */
+    @Query("""
+            SELECT DISTINCT t FROM Ticket t
+            LEFT JOIN FETCH t.usuarioArea ua
+            LEFT JOIN FETCH ua.area
+            LEFT JOIN FETCH t.usuarioSoporte us
+            LEFT JOIN FETCH us.area
+            WHERE t.estado = :estado
+              AND t.usuarioSoporte.id = :tecnicoId
+              AND t.fechaFin BETWEEN :desde AND :hasta
+            ORDER BY t.fechaFin ASC
+            """)
+    List<Ticket> buscarCerradosEnPeriodoPorTecnico(@Param("estado") EstadoTicket estado,
+                                                   @Param("tecnicoId") Long tecnicoId,
+                                                   @Param("desde") LocalDateTime desde,
+                                                   @Param("hasta") LocalDateTime hasta);
 
     // =====================================================================
     // METRICAS DEL DASHBOARD

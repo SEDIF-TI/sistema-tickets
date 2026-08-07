@@ -3,6 +3,7 @@ package com.sedif.sistema_tickets.core.area;
 import com.sedif.sistema_tickets.core.usuarios.Usuario;
 import com.sedif.sistema_tickets.core.usuarios.UsuarioRepository;
 import com.sedif.sistema_tickets.exception.PageResponse;
+import com.sedif.sistema_tickets.util.enums.RolUsuario;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
@@ -181,7 +182,7 @@ public class AreaService {
         Usuario tecnico = usuarioRepository.findById(request.soporteFijoId())
                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
 
-        if (tecnico.getRol() == null || !"SOPORTE".equals(tecnico.getRol().getNombre())) {
+        if (tecnico.getRol() == null || !RolUsuario.SOPORTE.es(tecnico.getRol().getNombre())) {
             throw new IllegalArgumentException("Violación de integridad: El usuario asignado debe tener el rol de SOPORTE.");
         }
 

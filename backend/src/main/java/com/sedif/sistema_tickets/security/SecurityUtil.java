@@ -1,5 +1,6 @@
 package com.sedif.sistema_tickets.security;
 
+import com.sedif.sistema_tickets.util.enums.RolUsuario;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 
@@ -67,8 +68,13 @@ public final class SecurityUtil {
                 .orElse(false);
     }
 
+    /** Indica si el usuario autenticado tiene el rol indicado. */
+    public static boolean tieneRol(RolUsuario rol) {
+        return tieneRol(rol.nombreEnBd());
+    }
+
     /** Atajo para la comprobacion de rol mas frecuente del sistema. */
     public static boolean esAdministrador() {
-        return tieneRol("ADMINISTRADOR");
+        return tieneRol(RolUsuario.ADMINISTRADOR);
     }
 }

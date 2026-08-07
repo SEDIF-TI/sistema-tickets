@@ -15,17 +15,15 @@ import com.sedif.sistema_tickets.core.dictamen.DictamenService;
 
 import com.sedif.sistema_tickets.core.ticket.Ticket;
 import com.sedif.sistema_tickets.util.enums.EstadoTicket;
+import com.sedif.sistema_tickets.util.enums.RolUsuario;
 import com.sedif.sistema_tickets.core.ticket.TicketRepository;
 import com.sedif.sistema_tickets.core.actividad.ActividadExtra;
 import com.sedif.sistema_tickets.core.actividad.ActividadExtraRepository;
 import com.sedif.sistema_tickets.core.resguardo.ResguardoRequest;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.util.Map;
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * Emision de los documentos oficiales del area de soporte.
@@ -118,36 +116,15 @@ public class DocumentoResource {
      */
     @Transactional(readOnly = true)
     @PostMapping(value = "/reporte-actividades", produces = MediaType.APPLICATION_PDF_VALUE)
-    public ResponseEntity<byte[]> generarReporteActividades(@RequestBody Map<String, Object> payload) {
-        LocalDate fechaInicio = LocalDate.parse(payload.get("fechaInicio").toString());
-        LocalDate fechaFin = LocalDate.parse(payload.get("fechaFin").toString());
-        LocalDateTime inicioDia = fechaInicio.atStartOfDay();
-        LocalDateTime finDia = fechaFin.atTime(LocalTime.MAX);
+    public ResponseEntity<byte[]> generarReporteActividades(
+            @Valid @RequestBody ReporteActividadesRequest request) {
 
-        String rol = payload.containsKey("rol") && payload.get("rol") != null ? payload.get("rol").toString() : "";
-        Long usuarioId = payload.containsKey("usuarioId") && payload.get("usuarioId") != null ? Long.parseLong(payload.get("usuarioId").toString()) : 0L;
+        DatosReporte datos = reunirDatosDelReporte(request);
 
-        List<Ticket> ticketsCerrados;
-        List<ActividadExtra> actividadesExtra;
+        byte[] pdfBytes = documentoService.generarReporteActividadesPdf(
+                request.fechaInicio(), request.fechaFin(), datos.tickets(), datos.actividades());
 
-        if ("ADMINISTRADOR".equalsIgnoreCase(rol)) {
-            ticketsCerrados = ticketRepository.findAll().stream()
-                .filter(t -> t.getEstado() == EstadoTicket.CERRADO)
-                .filter(t -> t.getFechaFin() != null)
-                .filter(t -> !t.getFechaFin().isBefore(inicioDia) && !t.getFechaFin().isAfter(finDia))
-                .collect(Collectors.toList());
-            actividadesExtra = actividadExtraRepository.findByFechaActividadBetween(inicioDia, finDia);
-        } else {
-            ticketsCerrados = ticketRepository.findByUsuarioSoporteId(usuarioId).stream()
-                .filter(t -> t.getEstado() == EstadoTicket.CERRADO)
-                .filter(t -> t.getFechaFin() != null)
-                .filter(t -> !t.getFechaFin().isBefore(inicioDia) && !t.getFechaFin().isAfter(finDia))
-                .collect(Collectors.toList());
-            actividadesExtra = actividadExtraRepository.findByUsuario_IdAndFechaActividadBetween(usuarioId, inicioDia, finDia);
-        }
-
-        byte[] pdfBytes = documentoService.generarReporteActividadesPdf(fechaInicio, fechaFin, ticketsCerrados, actividadesExtra);
-        return construirRespuestaPdf(pdfBytes, "Reporte_Actividades_" + fechaInicio + "_al_" + fechaFin + ".pdf");
+        return construirRespuestaPdf(pdfBytes, nombreDelReporte(request, ".pdf"));
     }
 
     /**
@@ -159,36 +136,55 @@ public class DocumentoResource {
      */
     @Transactional(readOnly = true)
     @PostMapping("/reporte-actividades/excel")
-    public ResponseEntity<byte[]> generarReporteExcel(@RequestBody Map<String, Object> payload) {
-        LocalDate fechaInicio = LocalDate.parse(payload.get("fechaInicio").toString());
-        LocalDate fechaFin = LocalDate.parse(payload.get("fechaFin").toString());
-        LocalDateTime inicioDia = fechaInicio.atStartOfDay();
-        LocalDateTime finDia = fechaFin.atTime(LocalTime.MAX);
+    public ResponseEntity<byte[]> generarReporteExcel(
+            @Valid @RequestBody ReporteActividadesRequest request) {
 
-        String rol = payload.containsKey("rol") && payload.get("rol") != null ? payload.get("rol").toString() : "";
-        Long usuarioId = payload.containsKey("usuarioId") && payload.get("usuarioId") != null ? Long.parseLong(payload.get("usuarioId").toString()) : 0L;
+        DatosReporte datos = reunirDatosDelReporte(request);
 
-        List<Ticket> ticketsCerrados;
-        List<ActividadExtra> actividadesExtra;
+        byte[] excelBytes = documentoService.generarReporteActividadesExcel(
+                datos.tickets(), datos.actividades());
 
-        if ("ADMINISTRADOR".equalsIgnoreCase(rol)) {
-            ticketsCerrados = ticketRepository.findAll().stream()
-                .filter(t -> t.getEstado() == EstadoTicket.CERRADO)
-                .filter(t -> t.getFechaFin() != null)
-                .filter(t -> !t.getFechaFin().isBefore(inicioDia) && !t.getFechaFin().isAfter(finDia))
-                .collect(Collectors.toList());
-            actividadesExtra = actividadExtraRepository.findByFechaActividadBetween(inicioDia, finDia);
-        } else {
-            ticketsCerrados = ticketRepository.findByUsuarioSoporteId(usuarioId).stream()
-                .filter(t -> t.getEstado() == EstadoTicket.CERRADO)
-                .filter(t -> t.getFechaFin() != null)
-                .filter(t -> !t.getFechaFin().isBefore(inicioDia) && !t.getFechaFin().isAfter(finDia))
-                .collect(Collectors.toList());
-            actividadesExtra = actividadExtraRepository.findByUsuario_IdAndFechaActividadBetween(usuarioId, inicioDia, finDia);
+        return construirRespuestaExcel(excelBytes, nombreDelReporte(request, ".xlsx"));
+    }
+
+    /** Contenido del reporte, comun a los dos formatos. */
+    private record DatosReporte(List<Ticket> tickets, List<ActividadExtra> actividades) {}
+
+    /**
+     * Reune los tickets cerrados y las actividades manuales del periodo.
+     *
+     * <p>El alcance depende del rol: ADMINISTRADOR abarca toda la institucion y
+     * cualquier otro se limita al usuario indicado. Un rol que no figure en
+     * {@link RolUsuario} recibe el trato restringido, que es el seguro.</p>
+     *
+     * <p>El recorte por estado y por fecha lo aplica la consulta, de modo que
+     * solo viajan desde la base las filas que el documento imprime.</p>
+     */
+    private DatosReporte reunirDatosDelReporte(ReporteActividadesRequest request) {
+        request.validarPeriodo();
+
+        LocalDateTime inicioDia = request.fechaInicio().atStartOfDay();
+        LocalDateTime finDia = request.fechaFin().atTime(LocalTime.MAX);
+
+        if (RolUsuario.ADMINISTRADOR.es(request.rol())) {
+            return new DatosReporte(
+                    ticketRepository.buscarCerradosEnPeriodo(EstadoTicket.CERRADO, inicioDia, finDia),
+                    actividadExtraRepository.findByFechaActividadBetween(inicioDia, finDia));
         }
 
-        byte[] excelBytes = documentoService.generarReporteActividadesExcel(ticketsCerrados, actividadesExtra);
-        return construirRespuestaExcel(excelBytes, "Reporte_Actividades_" + fechaInicio + "_al_" + fechaFin + ".xlsx");
+        Long usuarioId = request.usuarioId() != null ? request.usuarioId() : 0L;
+
+        return new DatosReporte(
+                ticketRepository.buscarCerradosEnPeriodoPorTecnico(
+                        EstadoTicket.CERRADO, usuarioId, inicioDia, finDia),
+                actividadExtraRepository.findByUsuario_IdAndFechaActividadBetween(
+                        usuarioId, inicioDia, finDia));
+    }
+
+    /** Nombre del archivo, con el periodo que abarca. */
+    private String nombreDelReporte(ReporteActividadesRequest request, String extension) {
+        return "Reporte_Actividades_" + request.fechaInicio()
+                + "_al_" + request.fechaFin() + extension;
     }
 
     /**

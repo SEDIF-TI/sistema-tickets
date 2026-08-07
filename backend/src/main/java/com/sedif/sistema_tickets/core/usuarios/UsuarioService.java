@@ -4,6 +4,7 @@ import com.sedif.sistema_tickets.core.area.Area;
 import com.sedif.sistema_tickets.core.area.AreaRepository;
 import com.sedif.sistema_tickets.exception.MessageConstants;
 import com.sedif.sistema_tickets.exception.PageResponse;
+import com.sedif.sistema_tickets.util.enums.RolUsuario;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
@@ -211,7 +212,7 @@ public class UsuarioService {
         Usuario usuario = usuarioRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado con el ID: " + id));
 
-        if (!"SOPORTE".equals(usuario.getRol().getNombre())) {
+        if (!RolUsuario.SOPORTE.es(usuario.getRol().getNombre())) {
             throw new IllegalArgumentException("Solo los usuarios con rol de SOPORTE pueden modificar su disponibilidad.");
         }
 
@@ -239,7 +240,7 @@ public class UsuarioService {
 
         usuario.setActivo(false);
 
-        if ("SOPORTE".equals(usuario.getRol().getNombre())) {
+        if (RolUsuario.SOPORTE.es(usuario.getRol().getNombre())) {
             usuario.setDisponibleSoporte(false);
         }
 
@@ -365,7 +366,7 @@ public class UsuarioService {
      */
     @Transactional(readOnly = true)
     public List<UsuarioResponse> listarSoporte() {
-        return usuarioRepository.findByRolNombre("SOPORTE")
+        return usuarioRepository.findByRolNombre(RolUsuario.SOPORTE.nombreEnBd())
                 .stream()
                 .map(UsuarioResponse::desdeEntidad)
                 .toList();

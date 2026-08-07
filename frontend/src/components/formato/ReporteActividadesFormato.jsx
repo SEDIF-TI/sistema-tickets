@@ -37,31 +37,28 @@ export default function ReporteActividadesFormato({ solicitarPdf, generando = fa
         return true;
     };
 
+    /**
+     * Periodo y alcance que espera `ReporteActividadesRequest`. El rol decide
+     * si el reporte abarca la institución o solo los tickets del usuario.
+     */
+    const construirPayload = () => ({
+        ...fechas,
+        usuarioId: Number(idRealUsuario) || 0,
+        rol: usuarioLogueado.rol || '',
+    });
+
     const handleGenerarPdf = async () => {
         if (!validarFechas()) return;
-        
-        const payloadDocumento = {
-            ...fechas,
-            usuarioId: String(idRealUsuario || 0),
-            rol: usuarioLogueado.rol || ''
-        };
 
-        // CORRECCIÓN: Quitamos el prefijo /v1/documentos/ porque solicitarPdf ya lo tiene
-        await solicitarPdf('reporte-actividades', payloadDocumento, `Reporte_Actividades_${fechas.fechaInicio}.pdf`);
+        await solicitarPdf('reporte-actividades', construirPayload(),
+            `Reporte_Actividades_${fechas.fechaInicio}.pdf`);
     };
 
     const handleGenerarExcel = async () => {
         if (!validarFechas()) return;
-        
-        const payloadDocumento = {
-            ...fechas,
-            usuarioId: String(idRealUsuario || 0),
-            rol: usuarioLogueado.rol || ''
-        };
 
         try {
-             // CORRECCIÓN: Quitamos el /api inicial, ya que api.js tiene baseURL: '/api'
-             const response = await api.post('/v1/documentos/reporte-actividades/excel', payloadDocumento, { responseType: 'blob' });
+             const response = await api.post('/v1/documentos/reporte-actividades/excel', construirPayload(), { responseType: 'blob' });
              const url = window.URL.createObjectURL(new Blob([response.data]));
              const link = document.createElement('a');
              link.href = url;

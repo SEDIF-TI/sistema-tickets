@@ -11,7 +11,9 @@ import com.sedif.sistema_tickets.exception.PageResponse;
 import com.sedif.sistema_tickets.util.enums.Calificacion;
 import com.sedif.sistema_tickets.util.enums.EstadoTicket;
 import com.sedif.sistema_tickets.util.enums.PlanTrabajo;
+import com.sedif.sistema_tickets.util.enums.NivelVision;
 import com.sedif.sistema_tickets.util.enums.Prioridad;
+import com.sedif.sistema_tickets.util.enums.RolUsuario;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -107,7 +109,7 @@ public class TicketService {
             nuevoTicket.setUsuarioSoporte(soporteElegido);
             log.debug("Ticket asignado manualmente al tecnico id={}", soporteElegido.getId());
 
-        } else if (usuario.getRol() != null && "SOPORTE".equals(usuario.getRol().getNombre())) {
+        } else if (usuario.getRol() != null && RolUsuario.SOPORTE.es(usuario.getRol().getNombre())) {
             // Via 2: lo levanta un tecnico, que se queda con el ticket.
             nuevoTicket.setUsuarioSoporte(usuario);
             log.debug("Ticket auto-asignado al tecnico que lo creo.");
@@ -184,7 +186,8 @@ public class TicketService {
         }
 
         List<Usuario> disponibles = usuarioRepository
-                .buscarTecnicosDisponiblesOrdenadosPorCarga("SOPORTE", EstadoTicket.ABIERTO);
+                .buscarTecnicosDisponiblesOrdenadosPorCarga(
+                        RolUsuario.SOPORTE.nombreEnBd(), EstadoTicket.ABIERTO);
 
         return disponibles.isEmpty() ? null : disponibles.get(0);
     }
@@ -394,7 +397,9 @@ public class TicketService {
      */
     private void verificarPuedeOperarElTicket(Ticket ticket, Usuario usuario) {
         boolean esAdministrador = usuario.getRol() != null
-                && "GLOBAL".equalsIgnoreCase(usuario.getRol().getNivelVision());
+                && NivelVision.desde(usuario.getRol().getNivelVision())
+                        .filter(NivelVision.GLOBAL::equals)
+                        .isPresent();
 
         if (esAdministrador) {
             return;
@@ -487,28 +492,31 @@ public class TicketService {
         Pageable paginaSegura = sanearOrden(pageable);
 
         String nivelVision = usuario.getRol().getNivelVision();
-        Page<Ticket> pagina = switch (nivelVision == null ? "" : nivelVision.toUpperCase()) {
-            case "GLOBAL" -> ticketRepository.buscarTodosPaginado(textoBusqueda, filtroEstado, paginaSegura);
 
-            case "PERSONAL" -> ticketRepository.buscarPorSoporteOCreadorPaginado(
+        // Un nivel que no figure en el enum niega el acceso en lugar de
+        // conceder todo: ante una configuracion invalida, la opcion segura es
+        // no mostrar nada.
+        NivelVision alcance = NivelVision.desde(nivelVision).orElseThrow(() -> {
+            log.error("Nivel de vision no reconocido: '{}' (usuario id={})", nivelVision, usuario.getId());
+            return new IllegalStateException(
+                    "El rol del usuario no tiene un nivel de visibilidad valido. Contacte al administrador.");
+        });
+
+        Page<Ticket> pagina = switch (alcance) {
+            case GLOBAL -> ticketRepository.buscarTodosPaginado(textoBusqueda, filtroEstado, paginaSegura);
+
+            case PERSONAL -> ticketRepository.buscarPorSoporteOCreadorPaginado(
                     usuario.getId(), textoBusqueda, filtroEstado, paginaSegura);
 
-            case "AREA" -> {
+            case AREA -> {
                 if (usuario.getArea() == null) {
-                    // Sin area no hay nada que mostrar. Devolver todo seria
-                    // repetir exactamente el fallo que se esta corrigiendo.
+                    // Sin area no hay conjunto que mostrar, y devolver todo
+                    // saltaria precisamente el limite que este nivel impone.
                     log.warn("Usuario id={} con vision AREA pero sin area asignada.", usuario.getId());
                     yield Page.empty(paginaSegura);
                 }
                 yield ticketRepository.buscarPorAreaPaginado(
                         usuario.getArea().getId(), textoBusqueda, filtroEstado, paginaSegura);
-            }
-
-            // Nivel desconocido: se niega el acceso en lugar de conceder todo.
-            default -> {
-                log.error("Nivel de vision no reconocido: '{}' (usuario id={})", nivelVision, usuario.getId());
-                throw new IllegalStateException(
-                        "El rol del usuario no tiene un nivel de visibilidad valido. Contacte al administrador.");
             }
         };
 
@@ -533,7 +541,9 @@ public class TicketService {
         Pageable paginaSegura = sanearOrden(pageable);
 
         boolean esAdministrador = usuario.getRol() != null
-                && "GLOBAL".equalsIgnoreCase(usuario.getRol().getNivelVision());
+                && NivelVision.desde(usuario.getRol().getNivelVision())
+                        .filter(NivelVision.GLOBAL::equals)
+                        .isPresent();
 
         if (esAdministrador) {
             return PageResponse.de(
