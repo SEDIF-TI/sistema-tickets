@@ -1,16 +1,18 @@
-import { useState } from 'react';
-import { 
-    Typography, Paper, TextField, Button, Grid, Box, 
+import { useState, useContext } from 'react';
+import {
+    Typography, Paper, TextField, Button, Grid, Box,
     Dialog, DialogTitle, DialogContent, DialogActions, MenuItem,
 } from '@mui/material';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import TableViewIcon from '@mui/icons-material/TableView';
 import AddTaskIcon from '@mui/icons-material/AddTask';
 import api from '../../services/api';
+import { AuthContext } from '../../context/AuthContext.jsx';
 import { useNotification } from '../../context/NotificationContext.jsx';
 
 
 export default function ReporteActividadesFormato({ solicitarPdf, generando = false }) {
+    const { user } = useContext(AuthContext);
     const { notificar, notificarError, notificarAdvertencia } = useNotification();
     const [fechas, setFechas] = useState({ fechaInicio: '', fechaFin: '' });
     const [modalAbierto, setModalAbierto] = useState(false);
@@ -22,8 +24,9 @@ export default function ReporteActividadesFormato({ solicitarPdf, generando = fa
         justificacion: ''
     });
 
-    const usuarioLogueado = JSON.parse(localStorage.getItem('user')) || {};
-    const idRealUsuario = usuarioLogueado.usuarioId || usuarioLogueado.id || usuarioLogueado.pn_id;
+    // La sesión sale del contexto: leerla de localStorage dejaría al componente
+    // sin enterarse de un cambio de sesión mientras está montado.
+    const idRealUsuario = user?.usuarioId;
 
     const validarFechas = () => {
         if (!fechas.fechaInicio || !fechas.fechaFin) {
@@ -44,7 +47,7 @@ export default function ReporteActividadesFormato({ solicitarPdf, generando = fa
     const construirPayload = () => ({
         ...fechas,
         usuarioId: Number(idRealUsuario) || 0,
-        rol: usuarioLogueado.rol || '',
+        rol: user?.rol || '',
     });
 
     const handleGenerarPdf = async () => {

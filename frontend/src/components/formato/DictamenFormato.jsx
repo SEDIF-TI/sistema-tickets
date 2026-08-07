@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import { Typography, Paper, TextField, Button, Grid, Box, Divider, Autocomplete } from '@mui/material';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import { toUpper } from '../../util/formater';
 import api from '../../services/api';
+import { AuthContext } from '../../context/AuthContext.jsx';
 
 
 /**
@@ -18,9 +19,9 @@ import api from '../../services/api';
  * esté disponible en el siguiente dictamen.
  */
 export default function DictamenFormato({ solicitarPdf, generando = false }) {
-    // El técnico que firma sale de la sesión guardada, no se teclea.
-    const usuarioLogueado = JSON.parse(localStorage.getItem('user')) || {};
-    const nombreTecnico = usuarioLogueado.nombre || 'Técnico de Soporte';
+    // El técnico que firma sale de la sesión, no se teclea.
+    const { user } = useContext(AuthContext);
+    const nombreTecnico = user?.nombre || 'Técnico de Soporte';
 
     const [dictamen, setDictamen] = useState({
         // Los rellena el sistema; en pantalla se muestran deshabilitados.
@@ -183,13 +184,18 @@ export default function DictamenFormato({ solicitarPdf, generando = false }) {
                             }
                         } catch (e) { console.error("No se pudo actualizar catálogo JIT", e); }
 
+                        // La firma del técnico se resuelve aquí y no en el estado
+                        // inicial: ese se fija en el primer render, cuando la
+                        // sesión puede no haberse recuperado todavía.
+                        const firmaTecnico = dictamen.realizadoPor || nombreTecnico;
+
                         // El tratamiento "C. " se antepone a los nombres de las
                         // firmas solo en la copia que va al PDF, porque es una
                         // exigencia del formato oficial y no del dato: el
                         // estado del formulario conserva el nombre limpio.
                         const datosParaPdf = {
                             ...dictamen,
-                            realizadoPor: dictamen.realizadoPor.startsWith('C. ') ? dictamen.realizadoPor : `C. ${dictamen.realizadoPor}`,
+                            realizadoPor: firmaTecnico.startsWith('C. ') ? firmaTecnico : `C. ${firmaTecnico}`,
                             nombreUsuario: dictamen.nombreUsuario && !dictamen.nombreUsuario.startsWith('C. ')
                                             ? `C. ${dictamen.nombreUsuario}`
                                             : dictamen.nombreUsuario

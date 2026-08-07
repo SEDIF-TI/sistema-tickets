@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback } from 'react';
 import {
     Box, Typography, CircularProgress, Alert, Button, Stack, useMediaQuery
 } from '@mui/material';
@@ -22,7 +22,7 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import PrintIcon from '@mui/icons-material/Print';
 
 import { dashboardService } from '../../services/dashboardService';
-import { useNotification } from '../../context/NotificationContext.jsx';
+import { useCargarDatos } from '../../hooks/useCargarDatos.jsx';
 import { colorDeEstado, colorDePrioridad, colorDeSerie } from '../../util/paletaGraficas';
 import { colorCalificacion, colorPromedio } from '../../util/calificacion';
 
@@ -57,28 +57,20 @@ const EJE = { fontSize: 11, fill: '#52514e' };
  * lleva `ocultar-al-imprimir` para no salir en el papel.
  */
 export default function DashboardPage() {
-    const { notificarError } = useNotification();
     const theme = useTheme();
     const esMovil = useMediaQuery(theme.breakpoints.down('md'));
 
-    const [datos, setDatos] = useState(null);
-    const [error, setError] = useState('');
-    const [cargando, setCargando] = useState(true);
+    const consultarMetricas = useCallback(() => dashboardService.getMetricas(), []);
 
-    const cargar = useCallback(async () => {
-        try {
-            const respuesta = await dashboardService.getMetricas();
-            setDatos(respuesta?.data ?? null);
-            setError('');
-        } catch (err) {
-            setError(err?.mensaje || 'No se pudieron cargar las métricas del panel.');
-            notificarError(err);
-        } finally {
-            setCargando(false);
-        }
-    }, [notificarError]);
+    const { datos, cargando, recargar } = useCargarDatos({
+        cargar: consultarMetricas,
+        valorInicial: null,
+    });
 
-    useEffect(() => { cargar(); }, [cargar]);
+    // El panel se compone de una sola llamada, de modo que no haber recibido
+    // datos equivale a que fallara: el hook ya avisó del error concreto y aquí
+    // solo queda ofrecer el reintento.
+    const error = !cargando && datos === null;
 
     if (cargando) {
         return (
@@ -93,12 +85,12 @@ export default function DashboardPage() {
             <Alert
                 severity="error"
                 action={
-                    <Button color="inherit" size="small" onClick={cargar}>
+                    <Button color="inherit" size="small" onClick={() => recargar()}>
                         Reintentar
                     </Button>
                 }
             >
-                {error}
+                No se pudieron cargar las métricas del panel.
             </Alert>
         );
     }
@@ -146,7 +138,7 @@ export default function DashboardPage() {
                 </Box>
 
                 <Stack direction="row" spacing={1}>
-                    <Button startIcon={<RefreshIcon />} onClick={cargar}>
+                    <Button startIcon={<RefreshIcon />} onClick={() => recargar()}>
                         Actualizar
                     </Button>
                     <Button

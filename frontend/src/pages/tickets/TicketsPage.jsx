@@ -1,4 +1,4 @@
-import { useState, useEffect, useContext, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Box, Button, Typography, Chip, Tooltip } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import StarBorderIcon from '@mui/icons-material/StarBorder';
@@ -7,9 +7,9 @@ import ConfirmationNumberIcon from '@mui/icons-material/ConfirmationNumber';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 import { ticketService } from '../../services/ticketService';
-import { AuthContext } from '../../context/AuthContext.jsx';
 import { useNotification } from '../../context/NotificationContext.jsx';
 import { useNetworkStatus } from '../../hooks/useNetworkStatus.jsx';
+import { useRol } from '../../hooks/useRol.jsx';
 import { useTablaPaginada } from '../../hooks/useTablaPaginada.jsx';
 import { formatearFechaHora, tiempoRelativo, truncar } from '../../util/formater';
 
@@ -45,7 +45,7 @@ import EncuestaDialog from '../../components/EncuestaDialog';
  * unificado, donde el título ya lo pone la página contenedora.
  */
 export default function TicketsPage({ sinCabecera = false }) {
-    const { user } = useContext(AuthContext);
+    const { esAdministrador } = useRol();
     const { notificar, notificarError, notificarInfo } = useNotification();
     const navigate = useNavigate();
     const location = useLocation();
@@ -61,10 +61,6 @@ export default function TicketsPage({ sinCabecera = false }) {
     // el ticket, que es cuando el servicio está fresco y la respuesta vale.
     const [ticketAEncuestar, setTicketAEncuestar] = useState(null);
     const [enviandoEncuesta, setEnviandoEncuesta] = useState(false);
-
-    const rolCrudo = user?.rol || user?.role || user?.rolNombre || '';
-    const rol = rolCrudo.replace('ROLE_', '').toUpperCase();
-    const esAdministrador = rol === 'ADMINISTRADOR';
 
     const cargar = useCallback((params) => ticketService.getMisTickets(params), []);
 

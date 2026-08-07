@@ -12,6 +12,7 @@ import { useWebSocket } from '../context/useWebSocket.js';
 import { avisoService } from '../services/avisoService';
 import { perfilService } from '../services/perfilService';
 import { useNetworkStatus } from '../hooks/useNetworkStatus.jsx';
+import { useRol } from '../hooks/useRol.jsx';
 
 import PieDePagina from './PieDePagina.jsx';
 
@@ -108,8 +109,7 @@ export default function MainLayout({ children }) {
     const estadoRed = useNetworkStatus();
     const sinConexion = Boolean(estadoRed.sinConexion ?? estadoRed);
 
-    const rolCrudo = user?.rol || user?.role || user?.rolNombre || '';
-    const rol = rolCrudo.replace('ROLE_', '').toUpperCase();
+    const { rol, esAdministrador } = useRol();
     const bloqueadoPorPassword = Boolean(user?.passwordTemporal);
 
     const vistas = useMemo(() => user?.vistasPermitidas ?? [], [user]);
@@ -174,7 +174,7 @@ export default function MainLayout({ children }) {
                     datos.filter((a) => {
                         const activo = a.activo === true;
                         const esParaMi =
-                            !a.areaId || a.areaId === user?.areaId || rol === 'ADMINISTRADOR';
+                            !a.areaId || a.areaId === user?.areaId || esAdministrador;
                         return activo && esParaMi;
                     })
                 );
@@ -187,7 +187,7 @@ export default function MainLayout({ children }) {
         buscarAvisos();
         const intervalo = setInterval(buscarAvisos, 30000);
         return () => clearInterval(intervalo);
-    }, [user, bloqueadoPorPassword, rol, sinConexion]);
+    }, [user, bloqueadoPorPassword, esAdministrador, sinConexion]);
 
     // Alertas de resguardo vencido por STOMP. Se añaden a la misma lista de
     // avisos, con un identificador que incluye la marca de tiempo para que dos

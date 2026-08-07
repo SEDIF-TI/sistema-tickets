@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import {
     Box, Typography, Button, Chip, Switch, Tooltip, Dialog, DialogTitle,
     DialogContent, DialogActions, Stack, useMediaQuery
@@ -14,6 +14,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { avisoService } from '../../services/avisoService';
 import { areaService } from '../../services/areaService';
 import { useNotification } from '../../context/NotificationContext.jsx';
+import { useCargarDatos } from '../../hooks/useCargarDatos.jsx';
 import { useNetworkStatus } from '../../hooks/useNetworkStatus.jsx';
 import { esquemaAviso } from '../../util/esquemas';
 import { truncar } from '../../util/formater';
@@ -48,10 +49,6 @@ export default function AdminAvisosPage() {
     const estadoRed = useNetworkStatus();
     const sinConexion = Boolean(estadoRed.sinConexion ?? estadoRed);
 
-    const [areas, setAreas] = useState([]);
-    const [avisos, setAvisos] = useState([]);
-    const [cargando, setCargando] = useState(true);
-
     const [avisoEditando, setAvisoEditando] = useState(null);
     const [modalAbierto, setModalAbierto] = useState(false);
     const [avisoABorrar, setAvisoABorrar] = useState(null);
@@ -72,44 +69,27 @@ export default function AdminAvisosPage() {
     // son pocos por definición, ya que todos se muestran a la vez en la barra
     // superior de cada usuario. De ahí que la tabla reciba el array completo en
     // lugar de apoyarse en useTablaPaginada.
-    //
-    // `mostrarCarga` permite recargar tras una acción sin vaciar la tabla: el
-    // esqueleto de carga en mitad de una edición produce un parpadeo molesto.
-    const cargarAvisos = useCallback(async (mostrarCarga = false) => {
-        if (mostrarCarga) setCargando(true);
-        try {
-            const respuesta = await avisoService.getAll();
-            setAvisos(Array.isArray(respuesta?.data) ? respuesta.data : []);
-        } catch (error) {
-            notificarError(error);
-            setAvisos([]);
-        } finally {
-            setCargando(false);
-        }
-    }, [notificarError]);
+    const cargarAvisos = useCallback(() => avisoService.getAll(), []);
 
-    useEffect(() => {
-        // La carga inicial no pasa `mostrarCarga`: `cargando` ya empieza en
-        // true, así que el esqueleto se pinta sin un cambio de estado extra.
-        cargarAvisos();
-    }, [cargarAvisos]);
+    const {
+        datos: avisos,
+        cargando,
+        recargar: recargarAvisos,
+    } = useCargarDatos({
+        cargar: cargarAvisos,
+        extraer: (respuesta) => (Array.isArray(respuesta?.data) ? respuesta.data : []),
+    });
 
-    useEffect(() => {
-        let cancelado = false;
+    // Un aviso dirigido a un área dada de baja no lo vería nadie, así que el
+    // selector solo ofrece las activas.
+    const cargarAreas = useCallback(() => areaService.getTodas(), []);
 
-        areaService.getTodas()
-            .then((respuesta) => {
-                if (cancelado) return;
-                const lista = Array.isArray(respuesta?.data) ? respuesta.data : [];
-                // Un aviso dirigido a un área dada de baja no lo vería nadie.
-                setAreas(lista.filter((a) => a.activo));
-            })
-            .catch(() => {
-                if (!cancelado) setAreas([]);
-            });
-
-        return () => { cancelado = true; };
-    }, []);
+    const { datos: areas } = useCargarDatos({
+        cargar: cargarAreas,
+        extraer: (respuesta) => (
+            Array.isArray(respuesta?.data) ? respuesta.data.filter((a) => a.activo) : []
+        ),
+    });
 
     const abrirAlta = () => {
         setAvisoEditando(null);
@@ -143,7 +123,7 @@ export default function AdminAvisosPage() {
             notificar(respuesta?.mensaje
                 || (avisoEditando ? 'Aviso actualizado correctamente.' : 'Aviso publicado correctamente.'));
             setModalAbierto(false);
-            cargarAvisos();
+            recargarAvisos(false);
         } catch (error) {
             notificarError(error);
         }
@@ -160,7 +140,7 @@ export default function AdminAvisosPage() {
             notificar(activo
                 ? 'El aviso vuelve a mostrarse en los paneles.'
                 : 'El aviso deja de mostrarse en los paneles.');
-            cargarAvisos();
+            recargarAvisos(false);
         } catch (error) {
             notificarError(error);
         }
@@ -172,7 +152,7 @@ export default function AdminAvisosPage() {
             const respuesta = await avisoService.delete(avisoABorrar.id);
             notificar(respuesta?.mensaje || 'Aviso eliminado correctamente.');
             setAvisoABorrar(null);
-            cargarAvisos();
+            recargarAvisos(false);
         } catch (error) {
             notificarError(error);
         } finally {
@@ -314,7 +294,7 @@ export default function AdminAvisosPage() {
                 filas={avisos}
                 cargando={cargando}
                 anchoMinimo={900}
-                onRecargar={() => cargarAvisos(true)}
+                onRecargar={() => recargarAvisos()}
                 vacio={{
                     icono: CampaignIcon,
                     titulo: 'No hay avisos publicados',
