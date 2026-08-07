@@ -11,15 +11,18 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
- * Canal de tiempo real que alimenta el panel de soporte.
+ * Canal STOMP sobre WebSocket que alimenta en tiempo real el panel de soporte.
  *
- * <p>El origen permitido estaba escrito a mano como
- * {@code http://localhost:5173}, asi que el handshake solo funcionaba en el
- * equipo del desarrollador: en cualquier despliegue real el navegador
- * rechazaba la conexion y el panel dejaba de recibir avisos sin mostrar error
- * alguno. Ahora se reutiliza {@code app.cors.allowed-origins}, la misma
- * propiedad que usa {@link WebConfig} para la API REST, de modo que ambos
- * canales no puedan quedar desincronizados.</p>
+ * <p>El cliente abre la conexion contra {@code /ws-tickets}, se suscribe a los
+ * destinos bajo {@code /topic} para recibir los avisos que emite el servidor y
+ * publica en {@code /app} los mensajes dirigidos a los metodos anotados con
+ * {@code @MessageMapping}. El broker es el simple en memoria de Spring, sin
+ * intermediario externo.</p>
+ *
+ * <p>Los origenes admitidos en el handshake se leen de
+ * {@code app.cors.allowed-origins}, la misma propiedad que usa
+ * {@link WebConfig} para la API REST, de modo que ambos canales no puedan
+ * quedar desincronizados al desplegar en otro dominio.</p>
  */
 @Configuration
 @EnableWebSocketMessageBroker
@@ -36,23 +39,25 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
-        // Punto de entrada del handshake. Se usa la lista explicita de origenes
-        // y no el comodin "*": con SockJS el navegador envia credenciales, y un
-        // comodin permitiria a cualquier sitio abrir el canal aprovechando la
-        // sesion activa del usuario.
+        // Punto de entrada del handshake. Se declara la lista explicita de
+        // origenes y no el comodin "*": con SockJS el navegador envia
+        // credenciales, y un comodin permitiria a cualquier sitio abrir el
+        // canal aprovechando la sesion activa del usuario.
         registry.addEndpoint("/ws-tickets")
                 .setAllowedOrigins(origenesPermitidos.toArray(String[]::new))
-                // Respaldo por HTTP cuando el WebSocket nativo esta bloqueado
-                // por un proxy corporativo.
+                // Respaldo por HTTP para las redes donde un proxy corporativo
+                // bloquea el WebSocket nativo.
                 .withSockJS();
     }
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry config) {
-        // Canales de salida (del servidor al frontend).
+        // Destinos de salida: el broker en memoria reparte a los suscriptores
+        // lo que el servidor publica bajo /topic.
         config.enableSimpleBroker("/topic");
 
-        // Canales de entrada (del frontend al servidor).
+        // Destinos de entrada: lo que el cliente envia bajo /app se encamina a
+        // los metodos @MessageMapping de la aplicacion.
         config.setApplicationDestinationPrefixes("/app");
     }
 }

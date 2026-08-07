@@ -14,20 +14,25 @@ import org.springframework.context.annotation.Configuration;
  * modifican muy de vez en cuando. Cachearlos evita ir a la base de datos una
  * y otra vez por los mismos registros.</p>
  *
- * <p>Se usa {@link ConcurrentMapCacheManager} por ser suficiente para un
- * despliegue de una sola instancia y no anadir dependencias. Si en el futuro
- * la aplicacion se replica en varias instancias, conviene sustituirlo por una
- * cache distribuida (Redis) para que todas compartan la misma copia.</p>
+ * <p>Se usa {@link ConcurrentMapCacheManager}: guarda las entradas en el
+ * espacio de memoria del proceso, sin caducidad por tiempo ni limite de tamano,
+ * lo que resulta suficiente para catalogos pequenos en un despliegue de una
+ * sola instancia y no anade dependencias. Una cache distribuida como Redis
+ * seria necesaria si la aplicacion se replicara en varias instancias, para que
+ * todas compartieran la misma copia.</p>
  *
- * <p><b>Nota:</b> las entradas se invalidan con {@code @CacheEvict} en los
- * servicios que modifican estos catalogos. Ningun dato de ticket ni de usuario
- * se cachea, para no servir informacion obsoleta ni retener datos personales
- * en memoria mas alla de la peticion.</p>
+ * <p>Al no haber caducidad, la frescura depende por completo de la
+ * invalidacion: los servicios que modifican estos catalogos lo hacen con
+ * {@code @CacheEvict}. Ningun dato de ticket ni de usuario se cachea, para no
+ * servir informacion obsoleta ni retener datos personales en memoria mas alla
+ * de la peticion.</p>
  */
 @Configuration
 @EnableCaching
 public class CacheConfig {
 
+    // Nombres de las regiones de cache. Los servicios los referencian desde
+    // aqui para que @Cacheable y @CacheEvict no puedan discrepar por una errata.
     public static final String CACHE_ROLES = "roles";
     public static final String CACHE_AREAS = "areas";
     public static final String CACHE_VISTAS = "vistas";

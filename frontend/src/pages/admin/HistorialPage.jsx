@@ -7,20 +7,16 @@ import HistorialResguardos from './HistorialResguardos.jsx';
 import TicketsPage from '../tickets/TicketsPage.jsx';
 
 /**
- * Historial unificado del área.
+ * Historial unificado del administrador.
  *
- * Antes eran dos entradas de menú separadas —«Bitácora» e «Historial de
- * resguardos»— y los dictámenes no tenían ninguna, porque ni siquiera se
- * guardaban. Aquí conviven las tres consultas en pestañas, igual que en el
- * generador de documentos.
+ * Reúne en pestañas las tres consultas de seguimiento de la institución
+ * —dictámenes técnicos, resguardos y tickets— bajo una sola entrada de menú y
+ * un solo encabezado, igual que el generador de documentos.
  *
- * Las rutas antiguas (`/admin/bitacora` y `/admin/resguardos`) siguen
- * declaradas en App.jsx a propósito: un enlace guardado debe seguir abriendo
- * algo. Lo que se retiró en la migración V10 es su entrada de menú, no su
- * acceso.
- *
- * Cada pestaña monta la pantalla con `sinCabecera`, para que el título salga
- * una sola vez.
+ * La página no consulta nada por sí misma: cada pestaña es la pantalla completa
+ * correspondiente, montada con `sinCabecera` para que el título lo ponga esta y
+ * no se repita. `/admin/bitacora` y `/admin/resguardos` siguen declaradas en
+ * App.jsx para que los enlaces guardados abran las pantallas sueltas.
  */
 const PESTANAS = [
     { id: 'dictamenes', etiqueta: 'Dictámenes técnicos' },
@@ -63,8 +59,9 @@ export default function HistorialPage() {
                 </Tabs>
             </Paper>
 
-            {/* Se monta solo la pestaña activa: mantener las tres vivas
-                dispararía tres consultas paginadas en cada visita. */}
+            {/* Se monta solo la pestaña activa, en lugar de ocultar las otras
+                con CSS: mantener las tres vivas dispararía sus tres consultas
+                paginadas en cada visita a la pantalla. */}
             {pestana === 0 && <HistorialDictamenes />}
             {pestana === 1 && <HistorialResguardos sinCabecera />}
             {pestana === 2 && <TicketsPage sinCabecera />}

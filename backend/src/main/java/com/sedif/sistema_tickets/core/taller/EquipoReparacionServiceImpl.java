@@ -12,6 +12,14 @@ import java.time.Year;
 import java.util.List;
 import java.util.stream.Collectors;
 
+/**
+ * Gestion del taller: ingreso de equipos, folio anual, actualizacion del
+ * diagnostico y avance de estado.
+ *
+ * <p>Todas las lecturas son {@code readOnly}, y la conversion a DTO ocurre
+ * dentro de la transaccion: es lo que permite leer el tecnico asignado, que la
+ * entidad carga de forma perezosa.</p>
+ */
 @Service
 @Slf4j
 public class EquipoReparacionServiceImpl implements EquipoReparacionService {
@@ -85,7 +93,8 @@ public class EquipoReparacionServiceImpl implements EquipoReparacionService {
         aplicarDatos(equipo, request);
 
         equipo.setFolio(generarFolio());
-        // Toda alta entra como RECIBIDO; los avances pasan por cambiarEstado.
+        // Toda alta entra como RECIBIDO: los avances pasan por cambiarEstado,
+        // que es donde se validan los valores admitidos.
         equipo.setEstadoTaller(EstadoTaller.RECIBIDO.name());
 
         if (tecnicoId != null) {
@@ -98,13 +107,16 @@ public class EquipoReparacionServiceImpl implements EquipoReparacionService {
     }
 
     /**
-     * Genera el folio del ano en curso.
+     * Genera el folio del ano en curso con el formato {@code REP-<ano>-<n>}.
      *
-     * <p>La version anterior usaba {@code count() + 1} sobre toda la tabla, lo
-     * que producia folios repetidos si dos tecnicos registraban a la vez, y
-     * ademas nunca reiniciaba la numeracion al cambiar de ano. Aqui se toma el
-     * maximo consecutivo del ano actual, y la restriccion UNIQUE de la columna
-     * es la garantia final frente a una colision.</p>
+     * <p>El consecutivo sale del maximo ya emitido ese ano, acotado por el
+     * prefijo, de modo que la numeracion arranca de nuevo en cada ejercicio y
+     * no depende del total de filas de la tabla. Si el ano no tiene folios
+     * todavia, empieza en 1.</p>
+     *
+     * <p>La restriccion UNIQUE de la columna es la garantia final: dos altas
+     * simultaneas pueden leer el mismo maximo, y en ese caso la base rechaza la
+     * segunda en lugar de admitir un folio repetido.</p>
      */
     private String generarFolio() {
         int anio = Year.now().getValue();
@@ -169,9 +181,8 @@ public class EquipoReparacionServiceImpl implements EquipoReparacionService {
                 .orElseThrow(() -> new IllegalArgumentException(
                         "No existe un registro de taller con ese identificador."));
 
-        // Se valida contra el enum: antes se guardaba cualquier texto en
-        // mayusculas, de modo que un error de escritura dejaba el equipo en un
-        // estado inexistente e invisible para los filtros del listado.
+        // El texto se resuelve contra el enum antes de guardarlo: solo asi el
+        // equipo queda en un estado que los filtros del listado reconocen.
         EstadoTaller estado = EstadoTaller.desde(nuevoEstado)
                 .orElseThrow(() -> new IllegalArgumentException(
                         "El estado '" + nuevoEstado + "' no es valido para un equipo en taller."));
@@ -180,7 +191,12 @@ public class EquipoReparacionServiceImpl implements EquipoReparacionService {
         return convertirADto(equipoRepository.save(existente));
     }
 
-    // Método utilitario para convertir Entidad a DTO y extraer los datos del Usuario
+    /**
+     * Vuelca la entidad al DTO que se expone hacia fuera.
+     *
+     * <p>Debe invocarse con la transaccion abierta: lee el tecnico asignado,
+     * que la entidad carga de forma perezosa.</p>
+     */
     private EquipoReparacionDTO convertirADto(EquipoReparacion equipo) {
         EquipoReparacionDTO dto = new EquipoReparacionDTO();
         dto.setId(equipo.getId());
@@ -204,10 +220,11 @@ public class EquipoReparacionServiceImpl implements EquipoReparacionService {
         dto.setSolucion(equipo.getSolucion());
         dto.setEstadoTaller(equipo.getEstadoTaller());
         
-        // Mapeo seguro del técnico (Lazy Loading friendly)
+        // El tecnico puede no estar asignado todavia, asi que se comprueba
+        // antes de tocar la relacion. Se aplana en id y nombre para que la
+        // respuesta no arrastre el usuario completo.
         if (equipo.getTecnicoAsignado() != null) {
             dto.setTecnicoAsignadoId(equipo.getTecnicoAsignado().getId());
-            // Ajusta el método 'getNombre' según cómo se llame en tu entidad Usuario
             dto.setTecnicoAsignadoNombre(equipo.getTecnicoAsignado().getNombre()); 
         }
         

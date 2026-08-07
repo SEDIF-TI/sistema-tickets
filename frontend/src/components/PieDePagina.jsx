@@ -3,12 +3,11 @@ import { Box, Typography } from '@mui/material';
 /**
  * Pie de página del sistema.
  *
- * El año se calcula en cada render en lugar de escribirse en el código: un
- * literal obliga a acordarse de cambiarlo cada 1 de enero, y en la práctica
- * nadie lo hace —el pie se queda anunciando un año que ya pasó.
+ * Lo monta `MainLayout`, así que aparece en todas las pantallas sin que cada
+ * una tenga que incluirlo.
  *
- * Vive dentro de `MainLayout`, así que aparece en todas las pantallas sin que
- * cada una tenga que montarlo.
+ * El año se calcula en cada render en lugar de escribirse como literal: así no
+ * depende de que alguien se acuerde de actualizarlo cada 1 de enero.
  */
 export default function PieDePagina() {
     const anio = new Date().getFullYear();
@@ -16,9 +15,9 @@ export default function PieDePagina() {
     return (
         <Box
             component="footer"
-            // `mt: auto` lo empuja abajo cuando el contenido es corto, sin
-            // recurrir a posición fija: así nunca tapa la última fila de una
-            // tabla ni se superpone al contenido al hacer scroll.
+            // `mt: auto` lo empuja al fondo de la columna que declara
+            // MainLayout cuando el contenido es corto. Al no usar posición
+            // fija, nunca tapa la última fila de una tabla.
             sx={{
                 mt: 'auto',
                 pt: 3,

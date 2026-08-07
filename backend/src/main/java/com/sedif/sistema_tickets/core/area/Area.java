@@ -9,8 +9,15 @@ import lombok.NoArgsConstructor;
 
 
 
+/**
+ * Area administrativa a la que se adscribe el personal.
+ *
+ * <p>Determina la visibilidad de los tickets de quienes pertenecen a ella y el
+ * reparto del trabajo de soporte: si el area tiene un tecnico fijo, sus
+ * tickets van directos a el en lugar de pasar por el balanceador de carga.</p>
+ */
 @Entity
-@Table(name = "area") // Tabla en singular, correctamente aplicada.
+@Table(name = "area")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -27,14 +34,16 @@ public class Area extends Auditable {
     @Column(name = "b_activo", nullable = false)
     private Boolean activo = true;
 
-    // Relación uno a uno: Un área puede tener asignado un único usuario de soporte fijo.
+    /**
+     * Tecnico asignado en exclusiva al area. Nulo deja sus tickets en manos del
+     * balanceador automatico.
+     */
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "fn_soporte_fijo_id")
     private Usuario soporteFijo;
-    
-    @Column(name = "b_prioritaria", nullable = false)
-    private Boolean prioritaria = false; // Por defecto, las áreas nuevas no tienen prioridad especial
 
-        // Se eliminaron los constructores y getters/setters manuales gracias a Lombok.
+    /** Un area prioritaria recibe atencion preferente sobre el resto. */
+    @Column(name = "b_prioritaria", nullable = false)
+    private Boolean prioritaria = false;
 
 }

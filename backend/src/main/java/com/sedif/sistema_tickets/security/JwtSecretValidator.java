@@ -13,13 +13,16 @@ import java.util.Set;
 /**
  * Valida la clave de firma JWT durante el arranque de la aplicacion.
  *
- * <p>Si la clave es debil, corta o una de las claves de ejemplo que circulan
- * en tutoriales, el contexto de Spring no levanta. Es deliberado: es
- * preferible que el despliegue falle de forma ruidosa a que arranque con una
- * clave que permita a cualquiera falsificar tokens de administrador.</p>
+ * <p>El metodo anotado con {@code @PostConstruct} somete el valor de
+ * {@code app.jwt.secret} a tres comprobaciones: que no sea una clave de ejemplo
+ * conocida, que aporte al menos 256 bits de material de clave y que tenga una
+ * variedad minima de caracteres. Cualquier fallo lanza
+ * {@link IllegalStateException} y el contexto de Spring no levanta.</p>
  *
- * <p>Esta clase existe porque el proyecto tenia la clave de ejemplo publica
- * {@code 404E63...5970} incrustada en el codigo fuente.</p>
+ * <p>Abortar el arranque es deliberado: una clave debil permite a cualquiera
+ * firmar tokens de administrador validos, y ese fallo es silencioso en marcha.
+ * Es preferible que el despliegue se detenga de forma ruidosa y con un mensaje
+ * que indique como generar una clave correcta.</p>
  */
 @Component
 public class JwtSecretValidator {
@@ -33,11 +36,11 @@ public class JwtSecretValidator {
     private static final int MINIMO_CARACTERES_DISTINTOS = 12;
 
     /**
-     * Claves conocidas que NUNCA deben usarse. Estan indexadas en buscadores
-     * y repositorios publicos, asi que equivalen a no tener clave.
+     * Claves que NUNCA deben usarse: circulan en tutoriales y estan indexadas
+     * en buscadores y repositorios publicos, de modo que usarlas equivale a no
+     * tener clave.
      */
     private static final Set<String> CLAVES_PROHIBIDAS = Set.of(
-            // La que estaba hardcodeada en este proyecto (JwtService.java:20)
             "404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970",
             "586E3272357538782F413F4428472B4B6250655368566D597133743677397A24",
             "413F4428472B4B6250655368566D5970337336763979244226452948404D6351",
@@ -63,7 +66,8 @@ public class JwtSecretValidator {
 
         final String limpia = secret.trim();
 
-        // 1. Claves de ejemplo conocidas (comparacion insensible a mayusculas).
+        // 1. Claves de ejemplo conocidas. La comparacion ignora mayusculas
+        //    porque las claves hexadecimales se copian en ambas formas.
         boolean prohibida = CLAVES_PROHIBIDAS.stream()
                 .anyMatch(c -> c.equalsIgnoreCase(limpia));
         if (prohibida) {
@@ -81,7 +85,8 @@ public class JwtSecretValidator {
                     bytesEfectivos, MINIMO_BYTES)));
         }
 
-        // 3. Entropia basica: descarta claves largas pero repetitivas.
+        // 3. Variedad de caracteres: la longitud por si sola no basta, porque
+        //    una cadena larga y repetitiva es trivial de adivinar.
         long distintos = limpia.chars().distinct().count();
         if (distintos < MINIMO_CARACTERES_DISTINTOS) {
             throw new IllegalStateException(mensaje(String.format(
@@ -90,7 +95,7 @@ public class JwtSecretValidator {
                     distintos, MINIMO_CARACTERES_DISTINTOS)));
         }
 
-        // Nunca se registra la clave ni fragmentos de ella.
+        // Se registra la longitud efectiva, nunca la clave ni fragmentos de ella.
         log.info("Clave JWT validada correctamente: {} bytes efectivos de entropia.", bytesEfectivos);
     }
 
@@ -107,7 +112,11 @@ public class JwtSecretValidator {
         }
     }
 
-    /** Construye un mensaje de arranque accionable, sin revelar la clave. */
+    /**
+     * Compone el mensaje del fallo de arranque: indica la causa concreta y los
+     * pasos para generar y configurar una clave valida, sin revelar el valor
+     * rechazado.
+     */
     private String mensaje(String causa) {
         return String.join(System.lineSeparator(), List.of(
                 "",

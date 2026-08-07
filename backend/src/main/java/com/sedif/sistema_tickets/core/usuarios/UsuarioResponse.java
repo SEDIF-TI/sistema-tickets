@@ -1,5 +1,13 @@
 package com.sedif.sistema_tickets.core.usuarios;
 
+/**
+ * Usuario tal como lo consume el frontend.
+ *
+ * <p>Resuelve en el servidor los nombres de rol y area, y omite los campos
+ * sensibles de la entidad. La contrasena temporal solo se rellena en el alta y
+ * en el restablecimiento, mediante {@link #desdeEntidadConPassword}, para que
+ * el administrador pueda comunicarsela a la persona.</p>
+ */
 public record UsuarioResponse(
         Long id,
         String nombre,
@@ -22,8 +30,8 @@ public record UsuarioResponse(
     /**
      * Une nombre y apellidos descartando los vacios.
      *
-     * <p>Antes cada pantalla los concatenaba por su cuenta, y las que solo
-     * leian {@code nombre} mostraban a la persona sin apellidos.</p>
+     * <p>Se calcula aqui para que todas las pantallas y documentos muestren la
+     * misma forma del nombre sin concatenarlo cada una por su cuenta.</p>
      */
     private static String nombreCompleto(Usuario usuario) {
         return java.util.stream.Stream.of(
@@ -35,7 +43,7 @@ public record UsuarioResponse(
                 .collect(java.util.stream.Collectors.joining(" "));
     }
 
-    // Método estándar para lectura normal
+    /** Mapeo de lectura: nunca expone contrasena en texto plano. */
     public static UsuarioResponse desdeEntidad(Usuario usuario) {
         return new UsuarioResponse(
                 usuario.getId(),
@@ -51,12 +59,17 @@ public record UsuarioResponse(
                 usuario.getDisponibleSoporte(),
                 usuario.getArea() != null ? usuario.getArea().getId() : null,
                 usuario.getArea() != null ? usuario.getArea().getNombre() : "Sin Área asignada",
-                usuario.getPasswordTemporal(), // El booleano del estado
-                null // Sin texto plano
+                usuario.getPasswordTemporal(),
+                null
         );
     }
 
-    // Método especial para la creación de usuarios
+    /**
+     * Mapeo del alta y del restablecimiento: acompana la clave recien generada.
+     *
+     * <p>Es la unica ocasion en que la contrasena viaja en claro, porque el
+     * servidor solo guarda su hash y no podra volver a mostrarla.</p>
+     */
     public static UsuarioResponse desdeEntidadConPassword(Usuario usuario, String passwordTemporal) {
         return new UsuarioResponse(
                 usuario.getId(),
@@ -72,8 +85,8 @@ public record UsuarioResponse(
                 usuario.getDisponibleSoporte(),
                 usuario.getArea() != null ? usuario.getArea().getId() : null,
                 usuario.getArea() != null ? usuario.getArea().getNombre() : "Sin Área asignada",
-                true, // Al crear, forzamos que sea true
-                passwordTemporal // Enviamos la contraseña aquí
+                true,
+                passwordTemporal
         );
     }
 }

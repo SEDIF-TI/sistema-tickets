@@ -3,15 +3,22 @@ import { useState } from 'react';
 import api from '../services/api';
 import { toUpper } from '../util/formater';
 
+/**
+ * Alta rápida de un ticket desde un diálogo.
+ *
+ * El formulario mantiene su propio estado en un único objeto y transforma a
+ * mayúsculas el título y la descripción al escribir, criterio del sistema para
+ * los textos que acaban en documentos. Tras crear el ticket avisa a la pantalla
+ * con `onTicketCreated` para que recargue su listado, y se cierra.
+ */
 export default function TicketModal({ open, handleClose, onTicketCreated }) {
     const [formData, setFormData] = useState({ titulo: '', descripcion: '', categoriaId: '', prioridad: 'BAJA' });
 
     const handleSubmit = async () => {
         try {
-            // Nota: Esta ruta es la que debe estar en tu Backend (TicketResource)
             await api.post('/v1/tickets', formData);
-            onTicketCreated(); // Refresca la lista de tickets
-            handleClose();     // Cierra el modal
+            onTicketCreated();
+            handleClose();
         } catch (error) {
             console.error("Error al crear ticket:", error);
         }

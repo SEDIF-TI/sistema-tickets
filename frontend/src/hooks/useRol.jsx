@@ -4,14 +4,12 @@ import { AuthContext } from '../context/AuthContext.jsx';
 /**
  * Rol del usuario de la sesión, normalizado.
  *
- * El backend envía el rol en `user.rol` como texto plano (ver `JwtResponse`),
- * pero cada pantalla lo deducía a su manera, encadenando alternativas que no
- * existen: `user?.role`, `user?.rolNombre`, `user?.rol === 'ADMIN'`… Ninguna de
- * esas variantes se ha enviado nunca, así que solo añadían ruido y ocultaban
- * el hecho de que la comprobación real es una sola.
+ * El backend lo envía en `user.rol` como texto plano (ver `JwtResponse`). Este
+ * hook es el único punto donde se lee ese campo, de modo que la comprobación
+ * vive en un solo sitio.
  *
- * Devuelve además los indicadores por rol, para no repetir la comparación de
- * cadenas en cada componente.
+ * Devuelve además los indicadores por rol —`esAdministrador`, `esSoporte`,
+ * `esEmpleado`—, para no repetir comparaciones de cadenas en cada componente.
  */
 export function useRol() {
     const { user } = useContext(AuthContext);

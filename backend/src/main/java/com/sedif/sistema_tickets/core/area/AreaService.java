@@ -14,13 +14,19 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Set;
 
+/**
+ * Gestion del catalogo de areas.
+ *
+ * <p>Mantiene dos invariantes. El nombre no se repite, porque identifica al
+ * area en todos los selectores; y un area con personal activo no puede darse
+ * de baja, ya que sus usuarios quedarian sin area valida.</p>
+ */
 @Service
 @Slf4j
 @RequiredArgsConstructor
 public class AreaService {
 
     private final AreaRepository areaRepository;
-    // Agregamos el repositorio de usuarios necesario para la nueva funcionalidad
     private final UsuarioRepository usuarioRepository;
 
     @Transactional
@@ -36,9 +42,6 @@ public class AreaService {
         Area nuevaArea = new Area();
         nuevaArea.setNombre(nombre);
         nuevaArea.setActivo(record.activo() != null ? record.activo() : true);
-        // La version anterior ignoraba este campo al crear: marcar un area como
-        // prioritaria en el alta no tenia ningun efecto y habia que volver a
-        // editarla para conseguirlo.
         nuevaArea.setPrioritaria(record.prioritaria() != null ? record.prioritaria() : false);
 
         return AreaResponse.desdeEntidad(areaRepository.save(nuevaArea));
@@ -58,8 +61,6 @@ public class AreaService {
     /**
      * Listado paginado del panel, con busqueda y filtro de estado resueltos en
      * la base de datos.
-     *
-     * <p>La pantalla traia el catalogo completo y filtraba en el navegador.</p>
      */
     @Transactional(readOnly = true)
     public PageResponse<AreaResponse> listarAreasPaginado(
@@ -119,12 +120,13 @@ public class AreaService {
         }
 
         areaExistente.setNombre(nombre);
-        
+
+        // Los dos indicadores solo cambian si vienen informados, de modo que
+        // una edicion parcial no los reinicie.
         if (record.activo() != null) {
             areaExistente.setActivo(record.activo());
         }
 
-        // Dentro de actualizarArea en AreaService.java
         if (record.prioritaria() != null) {
             areaExistente.setPrioritaria(record.prioritaria());
         }
@@ -138,9 +140,9 @@ public class AreaService {
         Area areaExistente = areaRepository.findById(id)
             .orElseThrow(() -> new IllegalArgumentException("El area indicada no existe."));
 
-        // Dar de baja un area con personal dentro deja a esas personas sin area
-        // valida, y con ella se rompe el filtro de visibilidad de sus tickets:
-        // la bandeja les aparece vacia sin explicacion. Antes se permitia.
+        // Dar de baja un area con personal dentro dejaria a esas personas sin
+        // area valida, y con ella se rompe el filtro de visibilidad de sus
+        // tickets: la bandeja les apareceria vacia sin explicacion.
         long personal = areaRepository.contarUsuariosActivos(id);
         if (personal > 0) {
             throw new IllegalArgumentException(
@@ -155,26 +157,30 @@ public class AreaService {
         areaRepository.save(areaExistente);
     }
 
-    // --- NUEVO MÉTODO INTEGRADO ---
+    /**
+     * Asigna o retira el tecnico de soporte fijo del area.
+     *
+     * <p>Con un tecnico asignado, los tickets del area van directos a el en
+     * lugar de pasar por el balanceador de carga. Un {@code soporteFijoId}
+     * nulo retira la asignacion y devuelve el area al reparto automatico.</p>
+     *
+     * <p>Solo admite personal con rol SOPORTE y en alta: un tecnico inactivo
+     * dejaria los tickets del area sin nadie que los atendiera.</p>
+     */
     @Transactional
     public AreaResponse asignarSoporteFijo(Long id, SoporteFijoRequestRecord request) {
         Area area = areaRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Área no encontrada."));
 
-        // Un id nulo retira la asignacion en lugar de ser un error. Antes solo
-        // se podia asignar: una vez puesto un tecnico fijo, no habia forma de
-        // devolver el area al balanceador automatico desde la interfaz.
         if (request == null || request.soporteFijoId() == null) {
             area.setSoporteFijo(null);
             log.debug("Soporte fijo retirado del area id={}", id);
             return AreaResponse.desdeEntidad(areaRepository.save(area));
         }
 
-        // 3. Validar existencia del usuario a asignar
         Usuario tecnico = usuarioRepository.findById(request.soporteFijoId())
                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
 
-        // 4. Reglas de negocio restrictivas
         if (tecnico.getRol() == null || !"SOPORTE".equals(tecnico.getRol().getNombre())) {
             throw new IllegalArgumentException("Violación de integridad: El usuario asignado debe tener el rol de SOPORTE.");
         }
@@ -184,11 +190,9 @@ public class AreaService {
             throw new IllegalArgumentException("Operación denegada: El técnico seleccionado se encuentra inactivo (baja lógica).");
         }
 
-        // 5. Persistencia
         area.setSoporteFijo(tecnico);
         Area areaActualizada = areaRepository.save(area);
 
-        // 6. Retorno utilizando el mapeo seguro de su compañero
         return AreaResponse.desdeEntidad(areaActualizada);
     }
 }

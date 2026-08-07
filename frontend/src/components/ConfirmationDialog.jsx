@@ -7,11 +7,12 @@ import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 /**
  * Diálogo de confirmación para acciones irreversibles.
  *
- * Sustituye a los `window.confirm()` nativos, que bloquean el hilo del
- * navegador, no se pueden estilizar y no respetan el idioma de la aplicación.
+ * Es la alternativa a `window.confirm()`, que bloquea el hilo del navegador, no
+ * admite estilos y no respeta el idioma de la aplicación.
  *
- * Jerarquía de botones según el estándar: la acción destructiva va a la
- * derecha y en rojo; cancelar queda a la izquierda y con menos peso visual.
+ * La acción destructiva va a la derecha y en rojo; cancelar queda a la
+ * izquierda y con menos peso visual. Mientras `cargando` está activo el diálogo
+ * no se puede cerrar: una operación a medias no debe perder su confirmación.
  *
  * @param {boolean}  abierto        Controla la visibilidad.
  * @param {string}   titulo         Pregunta en una línea.

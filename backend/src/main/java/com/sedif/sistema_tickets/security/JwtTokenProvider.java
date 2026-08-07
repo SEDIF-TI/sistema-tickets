@@ -24,17 +24,22 @@ import java.util.Map;
 /**
  * Emite y valida los JSON Web Tokens de la aplicacion.
  *
- * <p>Sustituye a la antigua clase {@code core.auth.JwtService}, que tenia la
- * clave de firma incrustada en el codigo. Aqui la clave llega desde
- * {@code app.jwt.secret} (variable de entorno) y {@link JwtSecretValidator}
- * garantiza su solidez antes de que la aplicacion acepte peticiones.</p>
+ * <p>Los tokens se firman con HMAC a partir de {@code app.jwt.secret}, y su
+ * vigencia la fija {@code app.jwt.expiration} (una hora por defecto). Ambas
+ * propiedades se resuelven en el constructor, de modo que la clave se deriva
+ * una sola vez y se reutiliza en cada firma y verificacion.
+ * {@link JwtSecretValidator} comprueba la solidez de esa clave durante el
+ * arranque.</p>
+ *
+ * <p>La validacion es autocontenida: no hay almacen de sesiones ni lista de
+ * tokens emitidos, asi que un token vale hasta que expira.</p>
  */
 @Component
 public class JwtTokenProvider {
 
     private static final Logger log = LoggerFactory.getLogger(JwtTokenProvider.class);
 
-    /** Claim con el rol del usuario; lo consume el filtro para autorizar. */
+    /** Claim con el nombre del rol, tal como figura en la tabla {@code rol}. */
     public static final String CLAIM_ROL = "rol";
     public static final String CLAIM_NOMBRE = "nombre";
     public static final String CLAIM_PASSWORD_TEMPORAL = "passwordTemporal";
@@ -52,8 +57,11 @@ public class JwtTokenProvider {
     /**
      * Genera el access token del usuario.
      *
-     * <p>Solo se incluyen los datos que el frontend necesita para pintar la
-     * interfaz. Nunca se incluye la contrasena ni su hash.</p>
+     * <p>El subject es el correo, que es el identificador con el que el filtro
+     * localiza despues la cuenta. Los claims llevan solo lo que el frontend
+     * necesita para pintar la interfaz (rol, nombre y si la contrasena es
+     * temporal), nunca la contrasena ni su hash: el contenido de un JWT viaja
+     * firmado, no cifrado, y cualquiera puede leerlo.</p>
      */
     public String generarToken(Usuario usuario) {
         Map<String, Object> claims = new HashMap<>();
@@ -91,12 +99,12 @@ public class JwtTokenProvider {
     }
 
     /**
-     * Verifica la firma y devuelve los claims.
+     * Verifica firma y vigencia del token y devuelve sus claims.
      *
-     * <p>A diferencia de la implementacion anterior, cada motivo de fallo se
-     * registra por separado. Un token con firma invalida indica un intento de
-     * falsificacion y no debe confundirse con una sesion simplemente
-     * caducada.</p>
+     * <p>Cada motivo de rechazo se registra por separado y con distinto nivel:
+     * una sesion caducada es un hecho rutinario, mientras que una firma que no
+     * cuadra con la clave del servidor apunta a un intento de falsificacion y
+     * merece atencion en los logs.</p>
      *
      * @return los claims, o {@code null} si el token no supera la validacion.
      */
@@ -109,10 +117,10 @@ public class JwtTokenProvider {
                     .getPayload();
 
         } catch (ExpiredJwtException e) {
-            // Caso normal: la sesion caduco. Nivel DEBUG para no llenar los logs.
+            // Caso rutinario: la sesion caduco. Nivel DEBUG para no llenar los logs.
             log.debug("Token expirado.");
         } catch (SignatureException e) {
-            // Firma que no cuadra con nuestra clave: posible intento de falsificacion.
+            // Firma que no cuadra con la clave del servidor: token ajeno o alterado.
             log.warn("Token con firma invalida: posible intento de falsificacion.");
         } catch (MalformedJwtException | UnsupportedJwtException e) {
             log.warn("Token mal formado o de un tipo no soportado.");
@@ -123,8 +131,9 @@ public class JwtTokenProvider {
     }
 
     /**
-     * Construye la clave HMAC. Acepta la clave en Base64 (lo recomendado) y,
-     * como alternativa, texto plano suficientemente largo.
+     * Deriva la clave HMAC del secreto configurado. Se intenta primero decodificar
+     * como Base64, que es el formato recomendado por aportar mas entropia por
+     * caracter; si el valor no lo es, se toman sus bytes UTF-8 en texto plano.
      */
     private SecretKey construirClave(String secret) {
         byte[] bytes;

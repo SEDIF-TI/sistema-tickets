@@ -6,9 +6,9 @@ import jakarta.validation.constraints.Size;
 /**
  * Datos de alta y edicion de un aviso.
  *
- * <p>Las reglas estaban escritas a mano dentro del servicio, y solo en el
- * alta: la edicion aceptaba un titulo o un mensaje vacios y dejaba el aviso
- * en blanco en la barra de todos los paneles.</p>
+ * <p>Las anotaciones de validacion cubren por igual el alta y la edicion: el
+ * titulo y el mensaje se dibujan en la barra de todos los paneles, asi que
+ * ninguno de los dos puede quedar vacio.</p>
  */
 public record AvisoRequestRecord(
 

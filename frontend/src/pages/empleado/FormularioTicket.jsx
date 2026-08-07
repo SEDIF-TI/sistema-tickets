@@ -19,25 +19,29 @@ import { esquemaTicket } from '../../util/esquemas';
 import CampoFormulario from '../../components/CampoFormulario';
 
 /**
- * Alta de un ticket de soporte.
+ * Levantamiento de un ticket de soporte.
  *
- * Cambios respecto a la versión anterior:
- *  - Cada campo tenía su `useState` y la validación era una cadena de `if` en
- *    el manejador de envío: el usuario veía un solo error genérico arriba, sin
- *    saber qué campo corregir. Ahora valida React Hook Form contra un esquema
- *    que espeja las anotaciones del DTO de Java, y el error sale bajo su campo.
- *  - No había protección contra el doble envío: pulsar dos veces con la red
- *    lenta creaba dos tickets.
- *  - El campo `prioridad` no se enviaba nunca, así que todos los tickets
- *    nacían en NORMAL y la gráfica de prioridades del panel era una sola barra.
- *  - El color guinda estaba escrito a mano y no coincidía con el del tema.
- *  - El rol se deducía probando `user.rol`, `user.role` y `'ADMIN'`; el backend
- *    solo envía `user.rol` (ver `JwtResponse`).
+ * El formulario lo gobierna React Hook Form con un esquema de Zod
+ * (`esquemaTicket`) que espeja las anotaciones de validación del DTO de Java,
+ * de modo que lo que aquí se da por bueno lo acepta también el backend. Los
+ * errores se muestran bajo su propio campo y se comprueban al salir de él.
+ * `isSubmitting` deshabilita el botón mientras la petición viaja, para que dos
+ * pulsaciones seguidas no creen dos tickets.
+ *
+ * La pantalla se adapta a quien la usa:
+ *  - El empleado solo describe la falla; su sede se toma de su ficha.
+ *  - Soporte y administración indican además la sede, porque levantan tickets
+ *    de ubicaciones que no son la suya.
+ *  - La administración puede designar al técnico; si no lo hace, el backend
+ *    asigna al de menor carga de trabajo.
+ *
+ * Las prioridades y la lista de técnicos se piden al backend al montar. Tras
+ * crear el ticket se navega a la pantalla donde el usuario lo verá listado,
+ * pasando el mensaje de éxito por `state` para que lo anuncie ella.
  */
 export default function FormularioTicket() {
     const navigate = useNavigate();
-    // El aviso de éxito lo muestra la pantalla de destino, que recibe el
-    // mensaje por `state` al navegar.
+    // Solo se notifican fallos: el aviso de éxito lo da la pantalla de destino.
     const { notificarError } = useNotification();
     const { esAdministrador, esSoporte, esTecnico } = useRol();
 
@@ -48,7 +52,7 @@ export default function FormularioTicket() {
     const [tecnicos, setTecnicos] = useState([]);
     const [cargandoCatalogos, setCargandoCatalogos] = useState(true);
 
-    // La sede solo se pide a quien levanta tickets de sedes ajenas.
+    // El esquema exige la sede solo a quien levanta tickets de sedes ajenas.
     const esquema = useMemo(() => esquemaTicket(esTecnico), [esTecnico]);
 
     const {
@@ -70,7 +74,8 @@ export default function FormularioTicket() {
         },
     });
 
-    // --- Catálogos --------------------------------------------------------
+    // Prioridades para el desplegable y, solo si quien levanta el ticket es
+    // administrador, el personal de soporte al que puede asignarlo.
     useEffect(() => {
         let cancelado = false;
 
@@ -97,7 +102,6 @@ export default function FormularioTicket() {
         return () => { cancelado = true; };
     }, [esAdministrador, notificarError]);
 
-    // --- Envío ------------------------------------------------------------
     const enviar = async (datos) => {
         if (sinConexion) {
             notificarError('No hay conexión con el servidor. Inténtalo de nuevo cuando se restablezca.');
@@ -279,8 +283,8 @@ export default function FormularioTicket() {
                             variant="contained"
                             size="large"
                             startIcon={!isSubmitting && <SendIcon />}
-                            // isSubmitting bloquea el doble envío: antes, dos
-                            // pulsaciones seguidas creaban dos tickets.
+                            // `isSubmitting` bloquea el doble envío mientras la
+                            // petición está en curso.
                             disabled={isSubmitting || sinConexion}
                             sx={{ width: { xs: '100%', sm: 'auto' } }}
                         >

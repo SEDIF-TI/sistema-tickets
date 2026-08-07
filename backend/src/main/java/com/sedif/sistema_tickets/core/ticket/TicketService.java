@@ -20,7 +20,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-// ---> IMPORTACIÓN NECESARIA PARA WEBSOCKETS
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import java.time.LocalDateTime;
@@ -29,6 +28,17 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Ciclo de vida del ticket: alta, asignacion, atencion, resolucion, cierre y
+ * encuesta de satisfaccion.
+ *
+ * <p>La visibilidad del listado no se resuelve aqui sino en las estrategias de
+ * {@code core.ticket.filtros}, inyectadas en {@code estrategiasFiltro} y
+ * seleccionadas por el nivel de vision del rol: GLOBAL, AREA o PERSONAL.</p>
+ *
+ * <p>Cada cambio de estado deja constancia en la bitacora y se difunde por
+ * WebSocket, de modo que las pantallas abiertas se actualizan sin recargar.</p>
+ */
 @Service
 @Slf4j
 @RequiredArgsConstructor
@@ -37,12 +47,32 @@ public class TicketService {
     private final SedifTelegramBot telegramBot;
     private final TicketRepository ticketRepository;
     private final UsuarioRepository usuarioRepository;
+
+    /** Estrategias de visibilidad indexadas por nivel de vision del rol. */
     private final Map<String, TicketFiltroStrategy> estrategiasFiltro;
+
     private final BitacoraRepository bitacoraRepository;
-    
-    // ---> INYECTAMOS LA HERRAMIENTA DE EMISIÓN DE WEBSOCKETS
+
+    /** Canal STOMP hacia los clientes suscritos. */
     private final SimpMessagingTemplate messagingTemplate;
 
+    /**
+     * Da de alta un ticket y le asigna tecnico.
+     *
+     * <p>La asignacion sigue tres vias excluyentes, en este orden:</p>
+     * <ol>
+     *   <li><b>Directa</b>: el alta trae {@code usuarioSoporteId}, que es lo que
+     *       envia el administrador cuando elige tecnico a mano.</li>
+     *   <li><b>Auto-asignacion</b>: quien crea el ticket tiene rol SOPORTE, de
+     *       modo que se queda con el suyo.</li>
+     *   <li><b>Reparto automatico</b>: el resto de casos pasan por
+     *       {@link #resolverAsignacion(Usuario)}.</li>
+     * </ol>
+     *
+     * <p>Si ninguna via da resultado el ticket se guarda sin tecnico: queda
+     * visible en la bandeja para que soporte lo tome, en lugar de rechazar el
+     * alta y perder el reporte.</p>
+     */
     @Transactional
     public TicketResponse crearTicket(TicketRequestRecord request, String correoUsuario) {
         Usuario usuario = usuarioRepository.findByCorreo(correoUsuario)
@@ -52,40 +82,38 @@ public class TicketService {
         nuevoTicket.setTitulo(request.titulo());
         nuevoTicket.setDescripcion(request.descripcion());
         nuevoTicket.setSede(request.sede());
-        
-        // Guardamos el nombre de quien reporta / tiene el resguardo
+
+        // Persona afectada por la falla, que no siempre coincide con quien
+        // levanta el ticket: soporte puede reportar en nombre de un tercero.
         if (request.solicitante() != null && !request.solicitante().isBlank()) {
             nuevoTicket.setSolicitanteNombre(request.solicitante());
         }
 
         nuevoTicket.setUsuarioArea(usuario);
-        // El alta ya no depende de que exista una fila en un catalogo: el
-        // estado inicial es una constante del enum.
         nuevoTicket.setEstado(EstadoTicket.ABIERTO);
         nuevoTicket.setFechaCreacion(LocalDateTime.now());
         nuevoTicket.setCreadoPor(usuario.getCorreo());
-        
-        // Una prioridad no reconocida cae en NORMAL en lugar de rechazar el
-        // alta: el ticket es lo importante, y la prioridad puede corregirse
-        // despues.
+
+        // Una prioridad no reconocida cae en NORMAL en vez de rechazar el alta:
+        // registrar el ticket importa mas que el matiz de prioridad, que puede
+        // corregirse despues desde la bandeja.
         nuevoTicket.setPrioridad(
                 Prioridad.desde(request.prioridad()).orElseGet(Prioridad::porDefecto));
 
-        // ---> NUEVA LÓGICA DE ASIGNACIÓN <---
         if (request.usuarioSoporteId() != null) {
-            // 1. Asignación directa (Manual por Administrador)
+            // Via 1: el administrador indico tecnico en el alta.
             Usuario soporteElegido = usuarioRepository.findById(request.usuarioSoporteId())
                     .orElseThrow(() -> new IllegalArgumentException("Usuario de soporte no encontrado"));
             nuevoTicket.setUsuarioSoporte(soporteElegido);
             log.debug("Ticket asignado manualmente al tecnico id={}", soporteElegido.getId());
-            
+
         } else if (usuario.getRol() != null && "SOPORTE".equals(usuario.getRol().getNombre())) {
-            // 2. Auto-asignación (Si un soporte crea el ticket)
+            // Via 2: lo levanta un tecnico, que se queda con el ticket.
             nuevoTicket.setUsuarioSoporte(usuario);
             log.debug("Ticket auto-asignado al tecnico que lo creo.");
-            
+
         } else {
-            // 3. Balanceador automático (Si un usuario normal lo crea)
+            // Via 3: reparto automatico por soporte fijo del area o por carga.
             Usuario soporteAsignado = resolverAsignacion(usuario);
             if (soporteAsignado != null) {
                 nuevoTicket.setUsuarioSoporte(soporteAsignado);
@@ -97,17 +125,20 @@ public class TicketService {
 
         Ticket ticketGuardado = ticketRepository.save(nuevoTicket);
 
-        // Notificación automática por Telegram
-        if (ticketGuardado.getUsuarioSoporte() != null && 
+        // Aviso por Telegram al tecnico asignado. Requiere que haya vinculado su
+        // cuenta desde el perfil: sin chat id no hay destinatario al que enviar.
+        if (ticketGuardado.getUsuarioSoporte() != null &&
             ticketGuardado.getUsuarioSoporte().getTelegramChatId() != null) {
-            
-            // Extraemos el nombre de quien reporta (Dependiendo de si tu front lo manda en "sede" o "solicitanteNombre")
-            String afectado = ticketGuardado.getSede(); 
+
+            // La sede identifica al afectado cuando el ticket se levanta en
+            // nombre de otra persona; si viene vacia se usa quien lo creo.
+            String afectado = ticketGuardado.getSede();
             if (afectado == null || afectado.isBlank()) {
-                afectado = ticketGuardado.getUsuarioArea().getNombre(); // Fallback al usuario de la sesión
+                afectado = ticketGuardado.getUsuarioArea().getNombre();
             }
 
-            // Armamos la plantilla completa con formato Markdown
+            // El bot envia con parse mode Markdown: los asteriscos aplican
+            // negrita y el guion bajo cursiva.
             String mensaje = "🚨 *NUEVO TICKET ASIGNADO* 🚨\n\n" +
                              "🆔 *Folio:* #" + ticketGuardado.getId() + "\n" +
                              "👤 *Usuario afectado:* " + afectado + "\n" +
@@ -124,12 +155,26 @@ public class TicketService {
             log.debug("Telegram omitido: el tecnico asignado no tiene ChatID vinculado.");
         }
 
-        // ---> NUEVO: EMITIR EL EVENTO WEBSOCKET HACIA REACT
         emitirEventoTicket(ticketGuardado);
 
         return mapearATicketResponse(ticketGuardado);
     }
 
+    /**
+     * Elige tecnico para un ticket que no trae asignacion explicita.
+     *
+     * <p>Primero manda el soporte fijo del area, si esa area tiene uno y sigue
+     * activo y disponible: es la persona que ya conoce el equipo y a la gente
+     * de ese departamento.</p>
+     *
+     * <p>Cuando no hay soporte fijo aplicable, se reparte por carga de trabajo.
+     * La consulta del repositorio devuelve a los tecnicos disponibles ya
+     * ordenados por numero de tickets abiertos ascendente, de modo que basta
+     * tomar el primero; resolverlo en la base evita recorrer usuarios y contar
+     * tickets uno a uno en el camino critico del alta.</p>
+     *
+     * @return el tecnico elegido, o {@code null} si no hay ninguno disponible.
+     */
     private Usuario resolverAsignacion(Usuario usuarioArea) {
         if (usuarioArea.getArea() != null && usuarioArea.getArea().getSoporteFijo() != null) {
             Usuario fijo = usuarioArea.getArea().getSoporteFijo();
@@ -138,13 +183,6 @@ public class TicketService {
             }
         }
 
-        // Balanceo por carga resuelto en una sola consulta.
-        //
-        // La version anterior hacia findAll() de TODOS los usuarios y despues,
-        // dentro del comparador, una consulta COUNT por cada tecnico y en cada
-        // comparacion: un problema N+1 en el camino critico de creacion de
-        // tickets. La consulta del repositorio ya devuelve a los tecnicos
-        // disponibles ordenados por carga ascendente.
         List<Usuario> disponibles = usuarioRepository
                 .buscarTecnicosDisponiblesOrdenadosPorCarga("SOPORTE", EstadoTicket.ABIERTO);
 
@@ -303,14 +341,13 @@ public class TicketService {
     }
 
     /**
-     * Marca que el tecnico va en camino a atender el reporte.
+     * Marca que el tecnico va en camino a atender el reporte y pasa el ticket a
+     * EN_PROCESO.
      *
-     * <p><b>Correccion de control de acceso.</b> La version anterior recibia
-     * solo el id del ticket y no comprobaba nada mas: cualquier usuario con rol
-     * SOPORTE podia mover el estado de un ticket asignado a otro tecnico
-     * cambiando el numero de la URL, y la bitacora registraba el cambio sin
-     * dejar constancia de quien lo habia hecho. Ahora se exige que el ticket
-     * sea suyo, salvo que quien actue sea ADMINISTRADOR.</p>
+     * <p>Solo puede hacerlo el tecnico al que esta asignado, o un
+     * ADMINISTRADOR: la pertenencia se comprueba con el correo de la sesion, no
+     * con lo que llegue en la peticion. Sobre un ticket ya cerrado la operacion
+     * se rechaza, porque su estado es final.</p>
      */
     @Transactional
     public TicketResponse atenderTicket(Long ticketId, String correoUsuario) {
@@ -376,15 +413,15 @@ public class TicketService {
     }
 
     /**
-     * Cierra el ticket con la constancia del trabajo realizado.
+     * Cierra el ticket dejando constancia del trabajo realizado.
      *
-     * <p>Comparte con {@link #atenderTicket} la comprobacion de pertenencia:
-     * antes cualquier tecnico podia cerrar el ticket de otro, firmando ademas
-     * la bitacora en su nombre.</p>
+     * <p>Comparte con {@link #atenderTicket} la comprobacion de pertenencia: el
+     * cierre lo firma en la bitacora quien lo ejecuta, de modo que solo puede
+     * hacerlo el tecnico asignado o un ADMINISTRADOR.</p>
      *
-     * <p>La clave del plan de trabajo se valida contra el catalogo: hasta ahora
-     * se guardaba cualquier entero que llegase, de modo que un valor fuera de
-     * catalogo corrompia silenciosamente el conteo de metas del ano.</p>
+     * <p>La clave del plan de trabajo se valida contra el catalogo antes de
+     * guardarla. Es la que agrupa los tickets por meta anual, y un valor fuera
+     * de catalogo falsearia ese conteo sin producir ningun error visible.</p>
      */
     @Transactional
     public TicketResponse resolverTicket(Long ticketId, String justificacion,
@@ -421,20 +458,18 @@ public class TicketService {
     }
 
     /**
-     * Bandeja de tickets del usuario, paginada y filtrada segun su rol.
+     * Bandeja de tickets del usuario, paginada y acotada segun su rol.
      *
-     * <p><b>Correccion de seguridad.</b> La version anterior solo distinguia
-     * entre SOPORTE y "todo lo demas": cualquier EMPLEADO caia en
-     * {@code obtenerTodosLosTickets()} y recibia titulos, descripciones,
-     * solicitantes y areas de TODA la institucion. Fuga de datos entre areas
-     * (control de acceso a nivel de objeto, OWASP A01).</p>
-     *
-     * <p>Ahora la visibilidad se decide por {@code Rol.nivelVision}:</p>
+     * <p>El alcance lo determina {@code Rol.nivelVision}, y el recorte se aplica
+     * en la consulta a la base, no sobre la pagina ya recuperada:</p>
      * <ul>
      *   <li>{@code GLOBAL} (ADMINISTRADOR): todos los tickets.</li>
      *   <li>{@code PERSONAL} (SOPORTE): los asignados a el y los que creo.</li>
      *   <li>{@code AREA} (EMPLEADO): solo los de su area.</li>
      * </ul>
+     *
+     * <p>Al ser un limite de visibilidad entre areas, se resuelve a partir del
+     * usuario autenticado y no de ningun parametro de la peticion.</p>
      */
     @Transactional(readOnly = true)
     public PageResponse<TicketResponse> obtenerTicketsParaBandeja(
@@ -519,10 +554,10 @@ public class TicketService {
     /**
      * Catalogo de metas del plan anual de trabajo.
      *
-     * <p>Lo consume el desplegable de resolucion del panel de soporte, que
-     * antes llevaba las doce metas escritas a mano en el JSX. Al servirlo desde
-     * el enum, el catalogo deja de estar duplicado y una meta nueva no obliga a
-     * recompilar el frontend.</p>
+     * <p>Lo consume el desplegable de resolucion del panel de soporte. Se sirve
+     * desde el enum {@link PlanTrabajo}, que es la misma fuente contra la que se
+     * valida la clave al cerrar un ticket: asi el catalogo existe una sola vez y
+     * anadir una meta no obliga a tocar el frontend.</p>
      */
     public List<PlanTrabajoResponse> obtenerCatalogoPlanTrabajo() {
         return Arrays.stream(PlanTrabajo.values())
@@ -653,16 +688,13 @@ public class TicketService {
     }
 
     /**
-     * Publica el estado del ticket en el canal de soporte.
+     * Publica el estado del ticket en {@code /topic/tickets-soporte}, que es el
+     * canal al que se suscribe el panel para refrescarse sin recargar.
      *
-     * <p>Antes cada emision estaba envuelta en un {@code catch (Exception e) {}}
-     * vacio: si el canal fallaba, el panel de soporte dejaba de actualizarse en
-     * tiempo real y no quedaba ni rastro del problema. Ahora el fallo se
-     * registra con su causa y se avisa por el canal de errores.</p>
-     *
-     * <p>No se propaga la excepcion a proposito: la notificacion es accesoria y
-     * el ticket ya se guardo correctamente. Perder el aviso en vivo no debe
-     * deshacer la operacion de negocio.</p>
+     * <p>La excepcion no se propaga: la difusion es accesoria y el ticket ya
+     * quedo guardado, de modo que un fallo del canal no debe deshacer la
+     * operacion. Si falla, se registra con su causa y se avisa por el canal de
+     * errores, para que la perdida del tiempo real no pase inadvertida.</p>
      */
     private void emitirEventoTicket(Ticket ticket) {
         try {

@@ -15,14 +15,12 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * Operaciones que un usuario realiza sobre su propia cuenta.
  *
- * <p>Existe para separar lo personal de lo administrativo. El cambio de
- * contrasena estaba en {@code /api/v1/admin/usuarios/password}: una ruta del
- * area de administracion que, sin embargo, cualquier empleado debia poder
- * invocar. Eso obligaba a abrir una excepcion dentro del bloque protegido de
- * {@code SecurityConfig}, justo el tipo de regla que acaba concediendo mas
- * acceso del previsto.</p>
+ * <p>Separa lo personal de lo administrativo: al colgar de
+ * {@code /api/v1/perfil} y no del bloque de administracion, no hace falta
+ * abrir excepciones dentro de las reglas protegidas de
+ * {@code SecurityConfig}.</p>
  *
- * <p>Aqui basta con estar autenticado, y el usuario solo puede actuar sobre su
+ * <p>Basta con estar autenticado, y el usuario solo puede actuar sobre su
  * propia cuenta: la identidad se toma del token, nunca de un parametro de la
  * peticion.</p>
  */
@@ -38,10 +36,10 @@ public class PerfilResource {
     /**
      * Vistas del menu vigentes para el usuario de la sesion.
      *
-     * <p>El frontend guarda el menu al iniciar sesion, asi que sin esto una
-     * vista retirada seguia dibujandose hasta cerrar sesion —y un permiso
-     * recien concedido no aparecia—. La pantalla lo consulta al montarse y
-     * actualiza lo que tenga guardado.</p>
+     * <p>El frontend guarda el menu al iniciar sesion y lo refresca contra
+     * este endpoint cada vez que monta el panel. Asi un permiso concedido o
+     * retirado sobre {@code rol_vista} surte efecto sin esperar a que la
+     * persona vuelva a entrar.</p>
      */
     @GetMapping("/vistas")
     public ResponseEntity<ApiResponse<java.util.List<VistaDTO>>> obtenerVistas(

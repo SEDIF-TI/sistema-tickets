@@ -9,7 +9,11 @@ public record AreaResponse(
         Boolean prioritaria
 ) {
     /**
-     * Transforma una Entidad Area en un Record de respuesta de forma segura.
+     * Mapea el area resolviendo el soporte fijo.
+     *
+     * <p>Comprueba el nulo antes de leerlo porque la relacion es opcional y
+     * perezosa: un area sin tecnico asignado se describe con una etiqueta en
+     * lugar de dejar el campo vacio.</p>
      */
     public static AreaResponse desdeEntidad(Area area) {
         return new AreaResponse(

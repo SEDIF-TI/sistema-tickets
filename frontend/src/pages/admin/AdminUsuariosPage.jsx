@@ -46,20 +46,22 @@ const VALORES_INICIALES = {
 };
 
 /**
- * Administración de usuarios.
+ * Administración de usuarios, dentro del panel del administrador.
  *
- * Cambios respecto a la versión anterior:
- *  - Los roles estaban escritos a mano con los ids 4, 5 y 6, que no son los de
- *    la base de datos (1, 2 y 3): crear un usuario fallaba siempre. Ahora el
- *    catálogo se pide al backend.
- *  - Los apellidos se capturaban pero el DTO del backend no los aceptaba, así
- *    que se descartaban en silencio.
- *  - La tabla traía todos los usuarios y filtraba en el navegador; ahora la
- *    paginación, la búsqueda y los filtros los resuelve la base de datos.
- *  - Usaba `alert()` y `window.confirm()` nativos, bloqueantes y sin estilo.
- *  - "Reset Clave" se ejecutaba sin confirmar y descartaba la contraseña
- *    generada: el administrador no llegaba a verla nunca.
- *  - Las tres acciones eran botones de texto que ensanchaban la tabla.
+ * Reúne el alta, la edición, la baja lógica y el restablecimiento de la
+ * contraseña de todo el personal del sistema. Las filas llegan paginadas de
+ * `userService.getAll()` a través de `useTablaPaginada`: la búsqueda por
+ * nombre, correo o usuario y los filtros de rol y estado se envían al backend
+ * como parámetros de la consulta.
+ *
+ * El rol determina qué pantallas ve la persona y se toma del catálogo que
+ * publica `rolService`, nunca de ids escritos aquí. Del rol depende también si
+ * el área es obligatoria, por eso el esquema de validación se construye con el
+ * mapa `rolesPorId` en lugar de ser una constante.
+ *
+ * Tanto el alta como el restablecimiento devuelven una contraseña temporal que
+ * el backend solo entrega en esa respuesta, así que ambas terminan abriendo
+ * `ModalCredenciales` con los datos recibidos.
  */
 export default function AdminUsuariosPage() {
     const { notificar, notificarError } = useNotification();
@@ -120,11 +122,13 @@ export default function AdminUsuariosPage() {
     });
 
     // useWatch en lugar de watch(): se suscribe solo a este campo, sin
-    // repintar el formulario entero en cada tecla de los demas.
+    // repintar el formulario entero en cada tecla de los demás. El rol elegido
+    // decide si el área es obligatoria y qué texto de ayuda se muestra.
     const rolIdElegido = useWatch({ control, name: 'rolId' });
     const rolElegido = rolesPorId[rolIdElegido];
 
-    // --- Catálogos --------------------------------------------------------
+    // Roles y áreas para los selectores del formulario. Las áreas se ordenan
+    // aquí porque el endpoint las devuelve sin criterio de presentación.
     useEffect(() => {
         let cancelado = false;
 
@@ -150,7 +154,6 @@ export default function AdminUsuariosPage() {
         return () => { cancelado = true; };
     }, [notificarError]);
 
-    // --- Modal ------------------------------------------------------------
     const abrirAlta = () => {
         setUsuarioEditando(null);
         reset(VALORES_INICIALES);
@@ -219,7 +222,6 @@ export default function AdminUsuariosPage() {
         }
     };
 
-    // --- Acciones de fila -------------------------------------------------
     const confirmarBaja = async () => {
         setProcesando(true);
         try {
@@ -240,8 +242,8 @@ export default function AdminUsuariosPage() {
             const respuesta = await userService.resetPassword(usuarioAResetear.id);
             const datos = respuesta?.data;
 
-            // La versión anterior descartaba la respuesta, así que la clave
-            // recién generada no se mostraba en ninguna parte.
+            // Misma regla que en el alta: la clave generada viaja solo en esta
+            // respuesta, así que se muestra de inmediato.
             setCredenciales({
                 nombre: datos?.nombreCompleto || usuarioAResetear.nombreCompleto,
                 correo: datos?.correo,
@@ -273,7 +275,8 @@ export default function AdminUsuariosPage() {
         }
     };
 
-    // --- Columnas ---------------------------------------------------------
+    // Contrato de DynamicTable: cada columna aporta `id`, `etiqueta` y, cuando
+    // la celda no es el campo tal cual, un `render` que recibe la fila.
     const columnas = [
         {
             id: 'nombre',
@@ -507,7 +510,6 @@ export default function AdminUsuariosPage() {
                 }}
             />
 
-            {/* ------------------------------------------ alta y edición ---- */}
             <Dialog
                 open={modalAbierto}
                 onClose={cerrarModal}
@@ -634,7 +636,6 @@ export default function AdminUsuariosPage() {
                 </form>
             </Dialog>
 
-            {/* ------------------------------------------------ baja ------- */}
             <ConfirmationDialog
                 abierto={Boolean(usuarioABaja)}
                 titulo={usuarioABaja?.activo ? '¿Dar de baja a este usuario?' : '¿Reactivar a este usuario?'}
@@ -648,7 +649,6 @@ export default function AdminUsuariosPage() {
                 onCancelar={() => setUsuarioABaja(null)}
             />
 
-            {/* ---------------------------------- restablecer contraseña --- */}
             <ConfirmationDialog
                 abierto={Boolean(usuarioAResetear)}
                 titulo="¿Restablecer la contraseña?"

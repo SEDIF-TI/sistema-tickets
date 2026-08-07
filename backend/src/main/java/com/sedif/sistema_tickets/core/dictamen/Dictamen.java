@@ -10,14 +10,13 @@ import lombok.Setter;
 /**
  * Dictamen tecnico emitido por el area de TI.
  *
- * <p>Hasta la migracion V10 este documento no se guardaba: el controlador
- * recibia el formulario, componia el PDF y lo devolvia, de modo que el unico
- * rastro de un dictamen era el archivo que el tecnico descargaba. Esta entidad
- * existe para que el historial pueda consultarse y el documento reimprimirse.</p>
+ * <p>Conserva todo lo que el formato oficial imprime, de modo que el historial
+ * pueda consultarse y el documento reimprimirse sin volver a capturar nada.</p>
  *
  * <p>Las firmas se guardan como texto y no como referencia al usuario: el
  * documento debe conservar el nombre que llevaba impreso el dia que se emitio,
- * aunque despues esa persona cambie de puesto o cause baja.</p>
+ * aunque despues esa persona cambie de puesto o cause baja. La relacion con el
+ * tecnico existe aparte, solo para poder filtrar por responsable.</p>
  */
 @Entity
 @Table(name = "dictamen")
@@ -74,8 +73,8 @@ public class Dictamen extends Auditable {
     private String tipoReporte;
 
     // -------------------------------------------------- analisis tecnico
-    // Solo falla y diagnostico: los apartados de hallazgos y conclusion se
-    // retiraron del formato oficial.
+    // Los dos apartados que el formato oficial contempla: lo que el usuario
+    // reporto y lo que el tecnico concluyo tras revisar el equipo.
     @Column(name = "s_falla_reportada", length = 1000)
     private String fallaReportada;
 
@@ -83,6 +82,8 @@ public class Dictamen extends Auditable {
     private String diagnostico;
 
     // ------------------------------------------------------------ firmas
+    // Nombres tal como se imprimieron: son constancia del documento emitido y
+    // no deben seguir los cambios posteriores del directorio de usuarios.
     @Column(name = "s_realizado_por", length = 200)
     private String realizadoPor;
 

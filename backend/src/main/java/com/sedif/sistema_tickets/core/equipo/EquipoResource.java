@@ -24,18 +24,10 @@ import java.util.List;
 /**
  * Catalogo de equipos para los dictamenes tecnicos.
  *
- * <p>Correcciones respecto a la version anterior:</p>
- * <ul>
- *   <li>No exigia ningun rol y su ruta quedaba fuera de todo patron protegido:
- *       bastaba estar autenticado para modificar y borrar el catalogo.</li>
- *   <li>El controlador manipulaba {@code EquipoRepository} directamente, sin
- *       transacciones y con la logica de negocio dentro de la capa web. Ahora
- *       delega en {@link EquipoService}.</li>
- *   <li>{@code /upsert} devolvia {@code 200 OK} con cuerpo {@code null} cuando
- *       la descripcion venia vacia: un exito aparente que ocultaba que no se
- *       habia guardado nada. Ahora responde 400 con el motivo.</li>
- *   <li>El listado devolvia el catalogo completo sin paginar.</li>
- * </ul>
+ * <p>Consultar el catalogo y alimentarlo desde el formulario de dictamen esta
+ * al alcance de ADMINISTRADOR y SOPORTE; editar y borrar entradas queda
+ * reservado al administrador. Toda la logica vive en {@link EquipoService},
+ * que la ejecuta dentro de una transaccion.</p>
  */
 @RestController
 @RequestMapping("/api/v1/equipos")

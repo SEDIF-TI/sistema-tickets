@@ -18,21 +18,22 @@ import DynamicTable from '../../components/DynamicTable';
 import AccionesTabla from '../../components/AccionesTabla';
 
 /**
- * Historial de resguardos para administración: consulta y reimpresión.
+ * Historial de resguardos: consulta y reimpresión del documento.
  *
- * A diferencia de `GestionResguardos`, aquí no se dan de alta ni se registran
- * devoluciones: es la vista de seguimiento.
+ * El alta de préstamos y el registro de devoluciones viven en
+ * /soporte/resguardos; esta pantalla es solo de seguimiento. Los datos llegan
+ * paginados desde el backend a través de useTablaPaginada, de modo que la
+ * búsqueda y el filtro de estado se resuelven en la base y no sobre la página
+ * ya descargada.
  *
- * Cambios respecto a la versión anterior:
- *  - Abría su propia conexión SockJS a `http://localhost:8080/ws`, con la URL
- *    escrita a mano y apuntando a un endpoint que no existe (el real es
- *    `/ws-tickets`), además de duplicar la conexión que ya mantiene
- *    `WebSocketContext`. Las alertas de vencimiento las muestra ahora
- *    `MainLayout`, que sí está suscrito al canal correcto.
- *  - Comparaba `usuarioCreadorId` con `user.id`, campo que el backend no envía
- *    (es `usuarioId`), así que la comprobación siempre fallaba.
- *  - Leía `response.data` como array, pero el endpoint devuelve una página.
- *  - Montaba su propio Snackbar en lugar de usar el del sistema.
+ * La columna de vencimiento resalta en rojo los préstamos vigentes a los que
+ * les quedan siete días o menos; los ya devueltos no se marcan aunque su fecha
+ * haya pasado. Las alertas de vencimiento en pantalla las emite `MainLayout`
+ * desde la conexión que mantiene `WebSocketContext`, así que aquí no se abre
+ * ninguna suscripción propia.
+ *
+ * Admite la prop `sinCabecera` para montarse dentro de una pestaña del
+ * historial unificado, donde el título lo pone la página contenedora.
  */
 export default function HistorialResguardos({ sinCabecera = false }) {
     const location = useLocation();
@@ -51,7 +52,9 @@ export default function HistorialResguardos({ sinCabecera = false }) {
         filtros: { estado: filtroEstado || undefined },
     });
 
-    // Mensaje traído desde la pantalla de alta.
+    // La pantalla de alta redirige aquí con el mensaje de éxito en el estado de
+    // navegación. Se limpia con replaceState para que no reaparezca al recargar
+    // o al volver atrás.
     useEffect(() => {
         if (location.state?.mensajeExito) {
             notificarInfo(location.state.mensajeExito);
@@ -59,6 +62,10 @@ export default function HistorialResguardos({ sinCabecera = false }) {
         }
     }, [location, notificarInfo]);
 
+    // El PDF lo compone el backend a partir del resguardo enviado y vuelve como
+    // blob, así que se envuelve en un object URL y se abre en otra pestaña. El
+    // URL se revoca al minuto: antes de eso el visor del navegador todavía puede
+    // estar leyéndolo.
     const imprimir = async (resguardo) => {
         try {
             const respuesta = await api.post('/v1/documentos/resguardos', resguardo, {
@@ -215,9 +222,6 @@ export default function HistorialResguardos({ sinCabecera = false }) {
 
     return (
         <Box>
-            {/* Dentro de una pestaña del historial unificado el título ya lo
-                pone la página contenedora: repetirlo dejaba dos encabezados
-                seguidos. */}
             {!sinCabecera && (
             <Box sx={{ mb: 3 }}>
                 <Typography

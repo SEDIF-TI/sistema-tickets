@@ -4,9 +4,9 @@ import api from './api';
  * Avisos del sistema. Espeja AvisoResource del backend.
  *
  * Solo `getActivos` está abierto a cualquier usuario autenticado: es el que
- * alimenta la barra de avisos de todos los paneles. El resto exige rol
- * ADMINISTRADOR (antes cualquier empleado podía crear y borrar avisos
- * globales).
+ * alimenta la barra de avisos de todos los paneles. El resto de operaciones
+ * exige rol ADMINISTRADOR, porque un aviso es visible para toda la
+ * institución.
  */
 export const avisoService = {
     /** Avisos vigentes para el panel del usuario. */

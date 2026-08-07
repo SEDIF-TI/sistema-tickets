@@ -11,6 +11,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Year;
 
+/**
+ * Registro y consulta de dictamenes tecnicos.
+ *
+ * <p>El alta la dispara la generacion del PDF, no un endpoint propio: emitir el
+ * documento y dejar constancia de el son la misma operacion. La consulta del
+ * historial vive en {@link DictamenResource}.</p>
+ */
 @Service
 @Slf4j
 @RequiredArgsConstructor
@@ -20,13 +27,12 @@ public class DictamenService {
     private final UsuarioRepository usuarioRepository;
 
     /**
-     * Guarda el dictamen que se acaba de emitir.
+     * Guarda el dictamen que se acaba de emitir y le asigna folio.
      *
-     * <p>Se invoca desde la generacion del PDF: hasta la V10 el documento se
-     * componia y se devolvia sin dejar rastro, de modo que no habia historial
-     * posible. El guardado no debe impedir la entrega del PDF —el tecnico
-     * necesita su documento aunque el registro falle—, asi que el llamador
-     * decide como tratar el error.</p>
+     * <p>Se invoca desde la generacion del PDF, que es lo que hace posible el
+     * historial y la reimpresion. El registro no debe impedir la entrega del
+     * documento —el tecnico lo necesita aunque el guardado falle—, asi que las
+     * excepciones suben y es el llamador quien decide como tratarlas.</p>
      */
     @Transactional
     public Dictamen registrar(DictamenRequest request, String correoTecnico) {
@@ -85,12 +91,14 @@ public class DictamenService {
     }
 
     /**
-     * Genera el folio del ano en curso, con el mismo criterio que el taller.
+     * Genera el folio del ano en curso con el formato {@code DIC-<ano>-<n>},
+     * mismo criterio que el taller.
      *
-     * <p>Se toma el maximo consecutivo del ano en lugar de {@code count() + 1}:
-     * eso ultimo duplicaria folios si dos tecnicos emiten a la vez y nunca
-     * reiniciaria la numeracion al cambiar de ano. La restriccion UNIQUE de la
-     * columna es la garantia final.</p>
+     * <p>El consecutivo sale del maximo ya emitido ese ano, de modo que la
+     * numeracion arranca de nuevo en cada ejercicio y no depende del total de
+     * filas. La restriccion UNIQUE de la columna es la garantia final: si dos
+     * tecnicos emiten a la vez y leen el mismo maximo, la base rechaza el
+     * segundo folio en lugar de admitirlo repetido.</p>
      */
     private String generarFolio() {
         String prefijo = "DIC-" + Year.now().getValue() + "-";

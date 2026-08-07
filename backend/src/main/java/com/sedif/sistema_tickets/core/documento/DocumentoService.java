@@ -1,6 +1,6 @@
 package com.sedif.sistema_tickets.core.documento;
 
-// Importaciones de iText (PDF)
+// OpenPDF, para la composicion de los documentos en PDF
 import com.lowagie.text.Chunk;
 import com.lowagie.text.Document;
 import com.lowagie.text.DocumentException;
@@ -16,7 +16,6 @@ import com.lowagie.text.pdf.PdfPTable;
 import com.lowagie.text.pdf.PdfWriter;
 import com.sedif.sistema_tickets.core.resguardo.ResguardoRequest;
 
-// Importaciones de Spring y utilidades de Java
 import org.springframework.beans.factory.annotation.Autowired;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -26,7 +25,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
-// Importaciones de Apache POI (Excel)
+// Apache POI, para el reporte en hoja de calculo
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Row;
@@ -39,19 +38,30 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 import com.sedif.sistema_tickets.core.usuarios.UsuarioRepository;
 
+/**
+ * Composicion de los documentos oficiales del area de soporte.
+ *
+ * <p>Los formatos en PDF se arman con OpenPDF sobre un mismo esquema: se abre
+ * un {@link Document} contra un {@link ByteArrayOutputStream}, se van anadiendo
+ * tablas ({@link PdfPTable}) que reproducen la maquetacion del formato impreso
+ * y, al cerrarlo, el flujo se devuelve como arreglo de bytes. Nada se escribe
+ * en disco.</p>
+ *
+ * <p>El reporte de actividades se ofrece ademas en hoja de calculo, generada
+ * con Apache POI a partir de los mismos datos.</p>
+ */
 @Service
 @Slf4j
 public class DocumentoService {
 
-    // Fuentes globales
     private final Font fuenteTitulo = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 16, Color.BLACK);
     private final Font fuenteNegrita = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12, Color.BLACK);
     private final Font fuenteNormal = FontFactory.getFont(FontFactory.HELVETICA, 12, Color.BLACK);
-    
-    // CORRECCIÓN: Se quitó 'final' y se agregó @Autowired para inyectar correctamente la BD
+
     @Autowired
     private UsuarioRepository usuarioRepository;
 
+    /** Membrete comun: nombre de la institucion y titulo del documento, centrados. */
     private void agregarEncabezadoInstitucional(Document document, String titulo) throws DocumentException {
         Font fontInstitucion = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12, Color.BLACK);
         Font fontTituloDoc = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 14, Color.BLACK);
@@ -67,9 +77,18 @@ public class DocumentoService {
         document.add(pTitulo);
     }
 
-    // =========================================================================================
-    // 1. GENERACIÓN DE DICTAMEN TÉCNICO
-    // =========================================================================================
+    /**
+     * Compone el dictamen tecnico en PDF.
+     *
+     * <p>Sigue el formato oficial en tamano carta: logotipo, encabezado del
+     * departamento, recuadros de fecha y folio, los datos del usuario que
+     * reporto, una fila con la identificacion del equipo y el bloque de
+     * analisis con la falla y el diagnostico. Cierra con los tres espacios de
+     * firma, donde quien recibe es siempre el usuario del reporte.</p>
+     *
+     * <p>El bloque de textos reserva una altura minima para que el documento
+     * conserve su proporcion aunque el diagnostico sea breve.</p>
+     */
     public byte[] generarDictamenTecnicoPdf(DictamenRequest request) {
         try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
             Document document = new Document(PageSize.LETTER, 36, 36, 36, 36);
@@ -92,11 +111,14 @@ public class DocumentoService {
                 logo.setAlignment(Element.ALIGN_CENTER);
                 cellLogo.addElement(logo);
             } catch (Exception e) {
+                // La falta del logotipo no invalida el documento: se emite sin el.
                 log.warn("No se pudo cargar el logotipo institucional en el documento.", e);
             }
             tableLogo.addCell(cellLogo);
             document.add(tableLogo);
 
+            // El encabezado ocupa la mitad derecha: la primera celda queda
+            // vacia para empujarlo hacia ese lado.
             PdfPTable tableTextos = new PdfPTable(2);
             tableTextos.setWidthPercentage(100);
             tableTextos.setWidths(new float[]{1.5f, 1f}); 
@@ -108,11 +130,11 @@ public class DocumentoService {
             PdfPCell cellTexto = new PdfPCell();
             cellTexto.setBorder(Rectangle.NO_BORDER);
             cellTexto.setHorizontalAlignment(Element.ALIGN_RIGHT);
-            
+
             Paragraph textos = new Paragraph();
             textos.setAlignment(Element.ALIGN_RIGHT);
             textos.setLeading(9f); 
-            
+
             textos.add(new Chunk("UNIDAD DE PLANEACIÓN, ADMINISTRACIÓN Y FINANZAS\n", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 8)));
             textos.add(new Chunk("DIRECCIÓN DE RECURSOS MATERIALES, SERVICIOS GENERALES, ARCHIVO Y SOPORTE TÉCNICO\n", FontFactory.getFont(FontFactory.HELVETICA, 7)));
             textos.add(new Chunk("DEPARTAMENTO DE SOPORTE TÉCNICO\n", FontFactory.getFont(FontFactory.HELVETICA, 7)));
@@ -214,13 +236,25 @@ public class DocumentoService {
         table.addCell(cellValue);
     }
 
+    /** Nombre de firma en mayusculas; sin dato, deja la linea para rellenar a mano. */
     private String formatearNombreFirma(String nombre) {
         return (nombre != null && !nombre.isEmpty()) ? nombre.toUpperCase() : "___________________________";
     }
 
-    // =========================================================================================
-    // 2. GENERACIÓN DE REPORTE DE ACTIVIDADES PDF
-    // =========================================================================================
+    /**
+     * Compone el reporte de actividades del periodo en PDF.
+     *
+     * <p>Vuelca en una sola tabla las dos fuentes de trabajo del area: los
+     * tickets cerrados y las actividades registradas a mano. Ambas se
+     * proyectan sobre las mismas ocho columnas del formato oficial; en los
+     * tickets el numero de oficio es el folio, y en las actividades sueltas no
+     * aplica.</p>
+     *
+     * <p>La pagina va apaisada porque de otro modo esas ocho columnas no
+     * caben con un ancho legible. El metodo recorre relaciones perezosas del
+     * ticket (el area del usuario, el tecnico asignado), de modo que quien lo
+     * invoca debe mantener abierta la sesion de Hibernate.</p>
+     */
     public byte[] generarReporteActividadesPdf(LocalDate fechaInicio, LocalDate fechaFin, 
         List<com.sedif.sistema_tickets.core.ticket.Ticket> tickets, 
         List<com.sedif.sistema_tickets.core.actividad.ActividadExtra> actividades) {
@@ -317,6 +351,7 @@ public class DocumentoService {
         }
     }
 
+    /** Celda del reporte: centrada en vertical y tolerante a valores nulos. */
     private PdfPCell crearCeldaAuxiliar(String texto, Font fuente, int alineacion) {
         PdfPCell cell = new PdfPCell(new Phrase(texto != null ? texto : "", fuente));
         cell.setHorizontalAlignment(alineacion);
@@ -325,9 +360,17 @@ public class DocumentoService {
         return cell;
     }
 
-    // =========================================================================================
-    // 3. GENERACIÓN DE REPORTE DE ACTIVIDADES EXCEL
-    // =========================================================================================
+    /**
+     * Genera el reporte de actividades como libro de Excel.
+     *
+     * <p>Reproduce las mismas ocho columnas que la version en PDF, volcando
+     * primero los tickets cerrados y despues las actividades sueltas. A
+     * diferencia del PDF, aqui el destinatario puede filtrar y sumar por su
+     * cuenta.</p>
+     *
+     * <p>Recorre las mismas relaciones perezosas, de modo que tambien exige la
+     * sesion de Hibernate abierta.</p>
+     */
     public byte[] generarReporteActividadesExcel(List<com.sedif.sistema_tickets.core.ticket.Ticket> tickets, 
         List<com.sedif.sistema_tickets.core.actividad.ActividadExtra> actividades) {
         try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
@@ -401,17 +444,26 @@ public class DocumentoService {
             workbook.write(out);
             return out.toByteArray();
         } catch (Exception e) {
-            // La causa se registra antes de envolverla: el handler global solo
-            // devuelve el mensaje, asi que sin esta traza el fallo real de POI
-            // quedaba invisible tanto en el log como en la respuesta.
+            // La causa se registra al envolverla: el handler global solo
+            // traslada el mensaje, de modo que sin esta traza el fallo real de
+            // POI no constaria en ninguna parte.
             log.error("Fallo al generar el reporte de actividades en Excel.", e);
             throw new IllegalStateException("No se pudo generar el archivo de Excel.", e);
         }
     }
     
-    // =========================================================================================
-    // 4. GENERACIÓN DE RESGUARDO (MÉTODO COMPLETO DEFINITIVO CON NOMBRE DE PERFIL REAL)
-    // =========================================================================================
+    /**
+     * Compone la responsiva de resguardo en PDF.
+     *
+     * <p>Deja constancia de que un equipo queda bajo la custodia de una
+     * persona: identificacion del usuario, caracteristicas y vigencia del
+     * equipo, y la declaratoria de responsabilidad que se firma.</p>
+     *
+     * <p>El apartado de firmas se resuelve solo. Quien entrega es el usuario
+     * de la sesion, cuyo nombre completo se recupera de la base de datos a
+     * partir del correo del token; quien recibe es el solicitante indicado en
+     * la peticion.</p>
+     */
     public byte[] generarResguardo(ResguardoRequest request) {
         try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
             Document document = new Document(PageSize.LETTER, 36, 36, 36, 36);
@@ -422,7 +474,6 @@ public class DocumentoService {
             Font fontBoldItalic = FontFactory.getFont(FontFactory.HELVETICA_BOLDOBLIQUE, 7, Color.BLACK);
             Font fontNorm = FontFactory.getFont(FontFactory.HELVETICA, 7, Color.BLACK);
 
-            // 1. SECCIÓN: LOGO OFICIAL
             PdfPTable tableLogo = new PdfPTable(1);
             tableLogo.setWidthPercentage(100);
             PdfPCell cellLogo = new PdfPCell();
@@ -440,7 +491,6 @@ public class DocumentoService {
             tableLogo.addCell(cellLogo);
             document.add(tableLogo);
 
-            // 2. SECCIÓN: ENCABEZADO DERECHO (ÁREA E INSTITUCIÓN)
             PdfPTable tableTextos = new PdfPTable(2);
             tableTextos.setWidthPercentage(100);
             tableTextos.setWidths(new float[]{1.5f, 1f}); 
@@ -469,13 +519,11 @@ public class DocumentoService {
             document.add(tableTextos);
             document.add(new Paragraph("\n"));
             
-            // TÍTULO CENTRAL
             Paragraph titulo = new Paragraph("RESGUARDO DE EQUIPO", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12, Color.BLACK));
             titulo.setAlignment(Element.ALIGN_CENTER);
             titulo.setSpacingAfter(15);
             document.add(titulo);
 
-            // 3. SECCIÓN: FECHA Y NO. DE EMPLEADO
             PdfPTable tFechaFolio = new PdfPTable(2);
             tFechaFolio.setWidthPercentage(100);
             PdfPCell cFecha = new PdfPCell(new Phrase("FECHA: " + fechaActual, fontBold));
@@ -490,7 +538,6 @@ public class DocumentoService {
             document.add(tFechaFolio);
             document.add(new Paragraph("\n"));
 
-            // 4. SECCIÓN: DATOS DEL USUARIO (CON PREFIJO "C. ")
             document.add(new Phrase("DATOS DEL USUARIO\n", fontBold));
             PdfPTable tUsuario = new PdfPTable(new float[]{3f, 7f});
             tUsuario.setWidthPercentage(100);
@@ -507,7 +554,6 @@ public class DocumentoService {
             document.add(tUsuario);
             document.add(new Paragraph("\n"));
 
-            // 5. SECCIÓN: TABLA DE CARACTERÍSTICAS DEL EQUIPO
             PdfPTable tEquipo = new PdfPTable(new float[]{2f, 2f, 2f, 1.5f, 1.5f, 1.5f});
             tEquipo.setWidthPercentage(100);
             String[] cabecerasEquipo = {"EQUIPO", "No. SERIE", "No. INVENTARIO", "CONDICIONES", "TIPO VIG.", "CANTIDAD"};
@@ -528,7 +574,6 @@ public class DocumentoService {
             }
             document.add(tEquipo);
 
-            // 6. SECCIÓN: OBSERVACIONES Y DECLARATORIA
             PdfPTable tTextos = new PdfPTable(1);
             tTextos.setWidthPercentage(100);
             Paragraph cuerpoTextos = new Paragraph();
@@ -545,14 +590,11 @@ public class DocumentoService {
             document.add(tTextos);
             document.add(new Paragraph("\n")); 
 
-            // =====================================================================
-            // 7. SECCIÓN DEL APARTADO DE FIRMAS DINÁMICO
-            // =====================================================================
             PdfPTable tFirmas = new PdfPTable(2);
             tFirmas.setWidthPercentage(100);
             tFirmas.setSpacingBefore(15f);
             
-            // --- COLUMNA IZQUIERDA: ENTREGA (Nombre real completo recuperado desde la BD) ---
+            // Columna izquierda: quien entrega, tomado del perfil de la sesion.
             PdfPCell cEntrega = new PdfPCell();
             cEntrega.setBorder(Rectangle.NO_BORDER);
             cEntrega.setHorizontalAlignment(Element.ALIGN_CENTER);
@@ -570,13 +612,13 @@ public class DocumentoService {
                 
                 if (auth != null && auth.getName() != null && !auth.getName().equals("anonymousUser")) {
                     String correoLogueado = auth.getName();
-                    
-                    // Buscamos al usuario en la BD usando el correo de la sesión
+
                     var usuarioOpt = usuarioRepository.findByCorreo(correoLogueado);
                     if (usuarioOpt.isPresent()) {
                         com.sedif.sistema_tickets.core.usuarios.Usuario u = usuarioOpt.get();
-                        
-                        // Concatenamos el Nombre Completo tal cual aparece al lado de tu perfil
+
+                        // Los apellidos se anaden solo si constan, para no
+                        // dejar espacios sueltos en la linea de firma.
                         StringBuilder nombreCompleto = new StringBuilder(u.getNombre());
                         if (u.getApellidoPaterno() != null && !u.getApellidoPaterno().trim().isEmpty()) {
                             nombreCompleto.append(" ").append(u.getApellidoPaterno());
@@ -588,6 +630,8 @@ public class DocumentoService {
                     }
                 }
             } catch (Exception e) {
+                // Sin perfil resuelto, la firma queda con la denominacion
+                // generica del area en lugar de impedir la emision.
                 log.warn("No se pudo determinar el perfil del usuario para el documento.", e);
             }
 
@@ -595,7 +639,7 @@ public class DocumentoService {
             cEntrega.addElement(pEntrega);
             tFirmas.addCell(cEntrega);
             
-            // --- COLUMNA DERECHA: RECIBE (El Servidor Público / Usuario) ---
+            // Columna derecha: quien recibe el equipo bajo su resguardo.
             PdfPCell cRecibe = new PdfPCell();
             cRecibe.setBorder(Rectangle.NO_BORDER);
             cRecibe.setHorizontalAlignment(Element.ALIGN_CENTER);
@@ -619,15 +663,23 @@ public class DocumentoService {
         }
     }
 
+    /**
+     * Antepone el tratamiento "C." al nombre, en mayusculas, sin duplicarlo si
+     * ya viene puesto.
+     */
     private String formatearNombre(String nombre) {
         if (nombre == null || nombre.trim().isEmpty()) return "N/A";
         String n = nombre.trim();
         return n.toUpperCase().startsWith("C. ") ? n.toUpperCase() : "C. " + n.toUpperCase();
     }
 
-    // =========================================================================================
-    // 5. GENERACIÓN DE ENTRADA DE EQUIPO
-    // =========================================================================================
+    /**
+     * Compone el vale de entrada de equipo en PDF.
+     *
+     * <p>Documenta el traslado: fecha y folio, ubicacion de origen y destino,
+     * y una tabla con todos los equipos que ampara el mismo formato. Cierra
+     * con las firmas de entrega y recepcion.</p>
+     */
     public byte[] generarEntradaEquipoPdf(EntradaEquipoRequest request) {
         try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
             Document document = new Document(PageSize.LETTER, 36, 36, 36, 36);
@@ -676,9 +728,7 @@ public class DocumentoService {
     }
 
 
-    // =========================================================================================
-    // MÉTODOS AUXILIARES GLOBALES
-    // =========================================================================================
+    /** Celda de encabezado de tabla: negrita sobre fondo gris. */
     private PdfPCell crearCeldaCabecera(String texto) {
         PdfPCell cell = new PdfPCell(new Phrase(texto, FontFactory.getFont(FontFactory.HELVETICA_BOLD, 8)));
         cell.setBackgroundColor(Color.LIGHT_GRAY);
@@ -686,12 +736,14 @@ public class DocumentoService {
         return cell;
     }
 
+    /** Celda de dato centrada, con borde. */
     private PdfPCell crearCeldaNormal(String texto) {
         PdfPCell cell = new PdfPCell(new Phrase(texto, FontFactory.getFont(FontFactory.HELVETICA, 8)));
         cell.setHorizontalAlignment(Element.ALIGN_CENTER);
         return cell;
     }
 
+    /** Celda sin borde, para los bloques que solo maquetan texto. */
     private PdfPCell crearCeldaSimple(String texto, int align) {
         PdfPCell cell = new PdfPCell(new Phrase(texto, FontFactory.getFont(FontFactory.HELVETICA, 9)));
         cell.setBorder(Rectangle.NO_BORDER);
@@ -699,6 +751,7 @@ public class DocumentoService {
         return cell;
     }
 
+    /** Bloque de dos firmas al pie: quien entrega y quien recibe. */
     private void agregarFirmas(Document doc, String nombre1, String nombre2) throws Exception {
         PdfPTable tFirmas = new PdfPTable(2);
         tFirmas.setWidthPercentage(80);

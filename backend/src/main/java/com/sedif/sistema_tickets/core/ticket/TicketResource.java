@@ -23,22 +23,21 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 /**
- * Endpoints de gestion de tickets.
+ * Endpoints de gestion de tickets: alta, bandeja, transiciones de estado,
+ * encuesta y catalogos auxiliares del formulario.
  *
- * <p>Cambios de seguridad respecto a la version anterior:</p>
- * <ul>
- *   <li>{@code atender} y {@code resolver} exigen rol SOPORTE o ADMINISTRADOR.
- *       Antes bastaba con encajar en el patron {@code /api/v1/tickets/**} de
- *       SecurityConfig, que incluye a EMPLEADO: cualquier empleado podia
- *       marcar como resueltos los tickets de otras personas.</li>
- *   <li>{@code resolver} recibe un DTO validado en lugar de un
- *       {@code Map<String, Object>} sin tipo, que aceptaba cualquier cosa y
- *       obligaba a parsear a mano.</li>
- *   <li>Las respuestas van envueltas en {@link ApiResponse} y los listados
- *       estan paginados en la base de datos.</li>
- *   <li>Se elimino el volcado por {@code System.out} del usuario autenticado
- *       en cada creacion de ticket.</li>
- * </ul>
+ * <p>El patron {@code /api/v1/tickets/**} de SecurityConfig solo exige sesion,
+ * e incluye a EMPLEADO. Por eso las operaciones que mueven el ticket
+ * ({@code atender}, {@code resolver}) llevan su propio {@code @PreAuthorize}
+ * con SOPORTE o ADMINISTRADOR: sin el, cualquier empleado podria cerrar
+ * tickets ajenos.</p>
+ *
+ * <p>Las reglas que dependen del ticket concreto y no del rol —quien puede
+ * calificarlo o finalizarlo— no caben en {@code @PreAuthorize} y las aplica
+ * {@link TicketService}.</p>
+ *
+ * <p>Todas las respuestas viajan envueltas en {@link ApiResponse}, y los
+ * listados como {@link PageResponse} ya paginado en la base de datos.</p>
  */
 @RestController
 @RequestMapping("/api/v1/tickets")
@@ -155,7 +154,8 @@ public class TicketResource {
      * ADMINISTRADOR.
      *
      * <p>El servicio recibe ademas la identidad autenticada: el rol por si solo
-     * no basta, porque no impedia que un tecnico moviera el ticket de otro.</p>
+     * no distingue entre tecnicos, asi que la comprobacion de que el ticket
+     * corresponde a quien lo mueve se hace alli.</p>
      */
     @PutMapping("/{id}/atender")
     @PreAuthorize("hasAnyRole('SOPORTE', 'ADMINISTRADOR')")

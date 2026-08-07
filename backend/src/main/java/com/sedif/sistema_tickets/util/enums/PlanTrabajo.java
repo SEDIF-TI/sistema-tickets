@@ -9,15 +9,14 @@ import java.util.Optional;
  * <p>Cada actividad extra y cada resolucion de ticket puede imputarse a una
  * meta, para poder medir el avance al cierre del ano.</p>
  *
- * <p>Las claves numericas coinciden con las ya registradas en las tablas
- * {@code actividad_extra} y {@code ticket}. Las descripciones se recuperaron
- * del catalogo que el panel de soporte tenia escrito a mano en el desplegable
- * de resolucion de tickets: el listado vivia duplicado en el frontend y no
- * existia en el backend, asi que cualquier cambio de meta obligaba a tocar el
- * JSX. Ahora el catalogo se sirve desde aqui.</p>
+ * <p>Lo que se guarda en las tablas {@code actividad_extra} y {@code ticket} es
+ * la clave numerica, no el nombre de la constante; la descripcion acompana a
+ * cada meta para poblar el desplegable de resolucion de tickets desde una unica
+ * fuente, en lugar de mantener el listado duplicado en el frontend.</p>
  *
- * <p><b>No cambiar las claves numericas</b>: son las que ya estan guardadas en
- * los registros historicos.</p>
+ * <p><b>Las claves numericas no deben cambiar</b>: son las que quedan
+ * almacenadas en los registros, y alterarlas reasignaria las actividades ya
+ * imputadas a metas distintas.</p>
  */
 public enum PlanTrabajo {
 
@@ -51,11 +50,12 @@ public enum PlanTrabajo {
     }
 
     /**
-     * Busca la meta por su clave numerica.
+     * Busca la meta por la clave numerica que se guarda en los registros.
      *
-     * <p>Devuelve {@link Optional#empty()} en lugar de lanzar excepcion: los
-     * registros historicos pueden contener claves que ya no existan, y eso no
-     * debe romper la consulta de un listado.</p>
+     * <p>Devuelve {@link Optional#empty()} en lugar de lanzar excepcion, tanto
+     * ante una clave nula como ante una que no corresponda a ninguna meta: un
+     * registro con un valor no reconocido no debe romper la consulta de un
+     * listado completo.</p>
      */
     public static Optional<PlanTrabajo> porClave(Integer clave) {
         if (clave == null) {

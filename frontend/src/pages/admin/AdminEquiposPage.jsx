@@ -26,21 +26,18 @@ import CampoFormulario from '../../components/CampoFormulario';
 const VALORES_INICIALES = { descripcion: '', marca: '', modelo: '' };
 
 /**
- * Catálogo de equipos.
+ * Catálogo de equipos, dentro del panel del administrador.
  *
  * Alimenta el autocompletado de los dictámenes técnicos: registrar aquí un
- * equipo evita volver a teclear marca y modelo en cada reporte.
+ * equipo evita volver a teclear marca y modelo en cada reporte. La pantalla
+ * ofrece alta, edición y borrado; el borrado solo retira la sugerencia, los
+ * dictámenes ya emitidos conservan los datos que se capturaron en su momento.
  *
- * Cambios respecto a la versión anterior:
- *  - Editar llamaba a `/api/v1/equipos/{id}` con el `baseURL` que ya incluye
- *    `/api`, así que la URL final era `/api/api/v1/…`: siempre 404. La edición
- *    nunca llegó a funcionar.
- *  - La tabla traía el catálogo completo y filtraba en el navegador, y el
- *    endpoint ya devuelve una página: el `.filter()` habría fallado.
- *  - Los errores se mostraban con `alert()` incluyendo el volcado del backend
- *    ("El servidor rechazó la petición. Motivo real: …"), que expone detalles
- *    internos al usuario.
- *  - `window.confirm()` para borrar, sin decir qué equipo.
+ * Las filas llegan paginadas de `equipoService.getAll()` mediante
+ * `useTablaPaginada`, de modo que la búsqueda por descripción, marca o modelo
+ * y el orden se resuelven en la base. Marca y modelo son opcionales y se
+ * envían como `null` cuando quedan vacíos, porque la sugerencia útil puede ser
+ * solo la descripción.
  */
 export default function AdminEquiposPage() {
     const { notificar, notificarError } = useNotification();

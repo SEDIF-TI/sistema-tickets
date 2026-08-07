@@ -20,9 +20,9 @@ public record ResguardoRequest(
         String solicitanteNombre,
 
         /**
-         * Opcional desde la V11: soporte rellena la responsiva en el momento de
-         * la entrega y no siempre tiene a mano el numero de empleado. Exigirlo
-         * llevaba a inventar un valor de relleno, peor que dejarlo vacio.
+         * Opcional: soporte rellena la responsiva en el momento de la entrega y
+         * no siempre tiene a mano el numero de empleado. Exigirlo solo llevaria
+         * a inventar un valor de relleno, peor que dejarlo vacio.
          */
         @Size(max = 30, message = "El numero de empleado no puede exceder 30 caracteres.")
         String solicitanteNumero,
@@ -39,8 +39,9 @@ public record ResguardoRequest(
         String accesorios,
 
         /**
-         * Duracion del prestamo. Junto con duracionTipo determina la fecha de
-         * vencimiento; si se omite, el resguardo queda sin plazo.
+         * Duracion del prestamo, expresada en las unidades que indica
+         * {@code duracionTipo}. Ambos campos se combinan para calcular la fecha
+         * de vencimiento; si falta cualquiera, el resguardo queda sin plazo.
          */
         @Min(value = 1, message = "La duracion debe ser de al menos 1.")
         @Max(value = 365, message = "La duracion no puede superar 365 unidades.")

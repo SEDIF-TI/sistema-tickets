@@ -17,19 +17,19 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
     // CONSULTAS PAGINADAS
     // ---------------------------------------------------------------------
     // Devuelven Page<Ticket> para que el troceado ocurra en la base de datos
-    // (LIMIT/OFFSET) y no en memoria. Antes se usaba findAll() y el servidor
-    // cargaba la tabla completa en cada peticion.
+    // (LIMIT/OFFSET) y no en memoria: el servidor nunca carga la tabla entera.
     //
-    // Se usa @EntityGraph y no "JOIN FETCH": con JOIN FETCH sobre una consulta
-    // paginada, Hibernate advierte que aplicara la paginacion EN MEMORIA, que
-    // es justo lo que se quiere evitar. El EntityGraph resuelve las relaciones
-    // sin romper el LIMIT.
+    // Las relaciones se resuelven con @EntityGraph y no con "JOIN FETCH":
+    // sobre una consulta paginada, JOIN FETCH obliga a Hibernate a aplicar la
+    // paginacion EN MEMORIA, que es justo lo que se quiere evitar. El
+    // EntityGraph trae usuarioArea, su area y usuarioSoporte en la misma
+    // consulta sin romper el LIMIT, de modo que el mapeo a DTO no dispara una
+    // consulta extra por fila.
     // =====================================================================
 
     // Los tres metodos aceptan ademas un texto libre y un estado, ambos
-    // opcionales (null = sin filtrar). Antes la busqueda se hacia en el
-    // navegador sobre la pagina ya descargada, de modo que "buscar" solo
-    // miraba 10 de los miles de tickets existentes.
+    // opcionales (null = sin filtrar), de modo que la busqueda recorre la
+    // tabla completa y no solo la pagina que el cliente tiene descargada.
     //
     // El parametro :busqueda llega YA en minusculas y con los comodines '%'
     // puestos por el servicio (ver TicketService.normalizarBusqueda). Se hace
@@ -41,6 +41,10 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
     //      texto de busqueda. El CAST explicito fija el tipo.
     //   2. Aplicar LOWER solo al lado de la columna permite aprovechar un
     //      indice funcional si en el futuro hiciera falta.
+    //
+    // El ESCAPE '!' respeta el escapado que hace el servicio sobre '%', '_' y
+    // el propio '!', para que esos caracteres se busquen como literales y no
+    // como comodines.
 
     /** Vision GLOBAL: todos los tickets. Exclusivo de ADMINISTRADOR. */
     @EntityGraph(attributePaths = {"usuarioArea", "usuarioArea.area", "usuarioSoporte"})
@@ -75,8 +79,8 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
 
     /**
      * Vision PERSONAL: tickets asignados al tecnico MAS los que el mismo
-     * levanto. La version anterior solo miraba la asignacion, asi que un
-     * tecnico no veia sus propios reportes.
+     * levanto, de modo que un tecnico ve tanto su carga de trabajo como sus
+     * propios reportes.
      */
     @EntityGraph(attributePaths = {"usuarioArea", "usuarioArea.area", "usuarioSoporte"})
     @Query("""
@@ -96,7 +100,8 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
 
     // =====================================================================
     // CONSULTAS SIN PAGINAR
-    // Se conservan para el motor de asignacion y los eventos WebSocket.
+    // Las usan el motor de asignacion y los eventos WebSocket, que trabajan
+    // sobre conjuntos acotados y necesitan la lista completa.
     // =====================================================================
 
     List<Ticket> findByUsuarioAreaAreaId(Long areaId);
@@ -115,6 +120,9 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
 
     // =====================================================================
     // METRICAS DEL DASHBOARD
+    // Agregados que se calculan en la base con GROUP BY: cada uno devuelve
+    // Object[] con la clave de agrupacion en la posicion 0 y el conteo en la
+    // 1, que es lo que el servicio traduce a los datos de cada grafica.
     // =====================================================================
 
     long countByEstado(EstadoTicket estado);
@@ -127,6 +135,7 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
     @Query("SELECT t.estado, COUNT(t) FROM Ticket t GROUP BY t.estado")
     List<Object[]> contarPorEstatus();
 
+    /** Carga por tecnico. Los tickets sin asignar quedan fuera del agrupado. */
     @Query("SELECT t.usuarioSoporte.nombre, COUNT(t) FROM Ticket t WHERE t.usuarioSoporte IS NOT NULL GROUP BY t.usuarioSoporte.nombre")
     List<Object[]> contarPorIngeniero();
 
@@ -162,6 +171,12 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
             """)
     List<Object[]> contarPorCalificacion();
 
+    /**
+     * Altas por dia, en orden cronologico, para la grafica de tendencia.
+     *
+     * <p>El CAST a {@code date} descarta la hora: sin el, cada ticket formaria
+     * su propio grupo por diferir en segundos.</p>
+     */
     @Query("SELECT CAST(t.fechaCreacion AS date), COUNT(t) FROM Ticket t GROUP BY CAST(t.fechaCreacion AS date) ORDER BY CAST(t.fechaCreacion AS date) ASC")
     List<Object[]> contarPorFecha();
 

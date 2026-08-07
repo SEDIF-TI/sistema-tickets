@@ -17,7 +17,7 @@ import org.springframework.boot.test.context.SpringBootTest;
  * <pre>
  *   docker compose -f docker-compose.yml -f docker-compose.local.yml up -d postgres-db
  *   set -a &amp;&amp; . ./.env &amp;&amp; set +a
- *   ./mvnw test
+ *   sh mvnw test
  * </pre>
  *
  * <p>Las pruebas que no requieren infraestructura (validacion del secreto JWT

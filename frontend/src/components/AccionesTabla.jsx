@@ -4,13 +4,13 @@ import { useTheme } from '@mui/material/styles';
 /**
  * Botonera de acciones de una fila.
  *
- * Sustituye a los botones de texto ("Editar", "Baja", "Reset Clave") que
- * ocupaban media tabla y obligaban a ensancharla. Cada acción es un icono con
- * su tooltip al pasar el cursor.
+ * Cada acción es un icono con su tooltip, de modo que la columna ocupe lo
+ * mínimo: con botones de texto la tabla se ensancha hasta forzar scroll
+ * horizontal.
  *
- * Accesibilidad: el tooltip **no** aporta nombre accesible, así que cada botón
- * lleva su propio `aria-label`. Sin él, un lector de pantalla anuncia
- * "botón" y nada más, y la tabla se vuelve inutilizable con teclado.
+ * El tooltip no aporta nombre accesible, así que cada botón lleva su propio
+ * `aria-label`. Sin él un lector de pantalla anuncia "botón" y nada más, y la
+ * columna deja de ser utilizable con teclado.
  *
  * Uso:
  *
@@ -26,8 +26,9 @@ import { useTheme } from '@mui/material/styles';
  * @param {Array} acciones Lista de acciones. Cada una admite:
  *   - `id`        identificador estable, usado como clave de React. Importa
  *                 cuando el título cambia durante la operación ("Voy en
- *                 camino" → "Avisando…"): con el título como clave, React
- *                 desmontaría y volvería a montar el botón a media pulsación.
+ *                 camino" → "Avisando…"): sin él la clave sale de la posición,
+ *                 y con el título como clave React desmontaría y volvería a
+ *                 montar el botón a media pulsación.
  *   - `icono`     (obligatorio) elemento de icono.
  *   - `titulo`    (obligatorio) texto del tooltip.
  *   - `onClick`   (obligatorio) manejador.
@@ -93,8 +94,8 @@ export default function AccionesTabla({ acciones = [], justificar = 'center' }) 
 
                 const boton = (
                     <IconButton
-                        // En móvil no se encoge: 34px queda por debajo del
-                        // objetivo táctil mínimo y se falla el toque.
+                        // En móvil no se usa el tamaño reducido: 34px
+                        // queda por debajo del objetivo táctil mínimo.
                         size={esMovil ? 'medium' : 'small'}
                         color={accion.color || 'default'}
                         onClick={accion.onClick}

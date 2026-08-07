@@ -6,6 +6,7 @@ import java.util.List;
 
 
 public interface BitacoraRepository extends JpaRepository<Bitacora, Long> {
-    // Método preparado para cuando necesitemos ver la línea de tiempo de un ticket
+
+    /** Linea de tiempo de un ticket: del movimiento mas reciente al primero. */
     List<Bitacora> findByTicketIdOrderByFechaCreacionDesc(Long ticketId);
 }

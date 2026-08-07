@@ -7,11 +7,15 @@ import com.fasterxml.jackson.annotation.JsonInclude;
  *
  * <p>Formato: <code>{ success, message, data }</code>.</p>
  *
- * <p>Antes cada controlador devolvia una forma distinta: unas veces un texto
- * plano, otras la entidad JPA desnuda y otras un DTO. Eso obligaba al frontend
- * a tratar cada endpoint como un caso especial. Con este envoltorio el cliente
- * siempre puede leer {@code success} para saber si hubo error y {@code data}
- * para el contenido.</p>
+ * <p>Con este envoltorio el cliente lee siempre {@code success} para saber si
+ * la operacion prospero, {@code message} para el texto que puede mostrar al
+ * usuario y {@code data} para el contenido, sin tratar cada endpoint como un
+ * caso especial. Lo emplean tanto los controladores como
+ * {@link GlobalExceptionHandler}, de modo que exito y error comparten
+ * forma.</p>
+ *
+ * <p>La inclusion es {@code ALWAYS}: los tres campos viajan aunque valgan
+ * {@code null}, para que el cliente pueda contar con su presencia.</p>
  *
  * @param <T> tipo del contenido devuelto.
  */
@@ -46,8 +50,8 @@ public record ApiResponse<T>(
     }
 
     /**
-     * Respuesta de error con contenido adicional, como el mapa de campos que
-     * fallaron una validacion.
+     * Respuesta de error con contenido adicional, como el mapa de campo a
+     * mensaje que acompana a un fallo de validacion.
      */
     public static <T> ApiResponse<T> error(String message, T data) {
         return new ApiResponse<>(false, message, data);

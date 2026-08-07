@@ -16,7 +16,12 @@ public interface EquipoReparacionRepository extends JpaRepository<EquipoReparaci
      *
      * <p>El texto llega ya en minusculas y con comodines desde el servicio, y
      * el CAST fija su tipo: PostgreSQL no puede inferirlo cuando el parametro
-     * es nulo dentro de LOWER(...).</p>
+     * es nulo dentro de LOWER(...) y la consulta falla con
+     * {@code function lower(bytea) does not exist}. El ESCAPE '!' respeta el
+     * escapado que el servicio aplica a '%', '_' y '!'.</p>
+     *
+     * <p>El EntityGraph trae al tecnico asignado en la misma consulta, de modo
+     * que convertir la pagina a DTO no dispare una consulta por fila.</p>
      */
     @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"tecnicoAsignado"})
     @org.springframework.data.jpa.repository.Query("""
@@ -56,10 +61,12 @@ public interface EquipoReparacionRepository extends JpaRepository<EquipoReparaci
     /**
      * Mayor consecutivo de folio del ano indicado.
      *
-     * <p>Extrae la parte numerica que sigue al ultimo guion de folios con el
-     * formato {@code REP-2026-N}. Sustituye al {@code count() + 1} anterior,
-     * que producia folios duplicados cuando dos tecnicos registraban a la vez
-     * y nunca reiniciaba la numeracion al cambiar de ano.</p>
+     * <p>Extrae con SUBSTRING la parte numerica que sigue al prefijo en folios
+     * con formato {@code REP-2026-N} y toma su maximo, acotando la busqueda a
+     * los folios de ese ano. Asi la numeracion arranca de nuevo en cada
+     * ejercicio y el consecutivo no depende del total de filas.</p>
+     *
+     * <p>Devuelve vacio cuando el ano no tiene folios todavia.</p>
      *
      * @param patron prefijo con comodin, por ejemplo {@code "REP-2026-%"}.
      */

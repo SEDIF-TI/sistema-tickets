@@ -22,7 +22,8 @@ export const ticketService = {
 
     /**
      * Catálogo de metas del plan anual de trabajo, para el desplegable de
-     * resolución. Antes estaba escrito a mano dentro del panel de soporte.
+     * resolución. Se sirve desde el enum `PlanTrabajo`, que es la misma fuente
+     * contra la que el backend valida la clave al cerrar el ticket.
      */
     getPlanTrabajo: () => api.get('/v1/tickets/plan-trabajo'),
 

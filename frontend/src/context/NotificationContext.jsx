@@ -4,15 +4,16 @@ import { Snackbar, Alert } from '@mui/material';
 /**
  * Notificaciones globales (toasts).
  *
- * Evita que cada pantalla monte su propio Snackbar y su propio estado. Envuelve
- * la aplicación en <NotificationProvider> y desde cualquier componente:
+ * Un solo Snackbar para toda la aplicación, montado por el proveedor: las
+ * pantallas solo piden el mensaje.
  *
  *   const { notificar, notificarError } = useNotification();
  *   notificar('Ticket creado correctamente.');
  *
- * En los catch conviene usar `notificarError(error)`: lee el mensaje que el
- * backend envía en el envoltorio { success, message, data } y, si no hay,
- * muestra un texto genérico.
+ * Hay una función por severidad —éxito, información, advertencia y error—, y
+ * solo se muestra un aviso a la vez: el siguiente sustituye al anterior. Los
+ * errores permanecen el doble de tiempo en pantalla, porque suelen exigir una
+ * decisión y no solo confirmar algo que ya se sabía.
  */
 const NotificationContext = createContext(null);
 
@@ -32,8 +33,9 @@ export const NotificationProvider = ({ children }) => {
     const notificarAdvertencia = useCallback((mensaje) => mostrar(mensaje, 'warning'), [mostrar]);
 
     /**
-     * Muestra un error. Acepta el objeto de error de axios (el interceptor de
-     * api.js le añade `mensaje`) o directamente una cadena.
+     * Muestra un error. Es lo que va en cada `catch`: acepta el error de axios
+     * tal cual —el interceptor de api.js ya le dejó el texto legible en
+     * `mensaje`— o directamente una cadena.
      */
     const notificarError = useCallback((error) => {
         const mensaje =

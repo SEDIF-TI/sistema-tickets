@@ -4,13 +4,12 @@ import axios from 'axios';
  * Instancia central de axios.
  *
  * Toda llamada al backend pasa por aquí: ni las páginas ni los componentes
- * deben importar axios directamente.
+ * importan axios directamente, porque los dos interceptores de abajo son los
+ * que aportan la sesión y la traducción de errores.
  *
  * La URL base se lee de VITE_API_URL, que Vite resuelve al construir:
  *   - desarrollo: http://localhost:8080/api
  *   - producción: /api  (mismo origen, el reverse proxy enruta al backend)
- * Antes estaba escrita a mano, lo que obligaba a editar el código para
- * desplegar en otro entorno.
  */
 const api = axios.create({
     baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8080/api',
@@ -19,7 +18,12 @@ const api = axios.create({
     }
 });
 
-/** Lee el token guardado en la sesión del navegador. */
+/**
+ * Token JWT de la sesión guardada.
+ *
+ * La sesión completa vive en localStorage bajo la clave `user`, tal como la
+ * dejó el login, y el token es uno de sus campos.
+ */
 const obtenerToken = () => {
     const usuarioGuardado = localStorage.getItem('user');
     if (!usuarioGuardado) return null;
@@ -34,7 +38,14 @@ const obtenerToken = () => {
     }
 };
 
-// --- Petición: adjunta el token en cada llamada ---------------------------
+/*
+ * Petición: adjunta la credencial.
+ *
+ * El token se lee en cada llamada y no al crear la instancia, de modo que
+ * iniciar o cerrar sesión surte efecto de inmediato sin recargar la página.
+ * Sin token la petición sale igual: los endpoints públicos, como el propio
+ * login, no necesitan cabecera.
+ */
 api.interceptors.request.use(
     (config) => {
         const token = obtenerToken();
@@ -42,25 +53,22 @@ api.interceptors.request.use(
             config.headers['Authorization'] = `Bearer ${token}`;
         }
 
-        // Se eliminaron los console.log que imprimían cada petición y si el
-        // token viajaba: cualquiera con la consola abierta veía el mapa de la
-        // API y el estado de la sesión. En producción, además, ensucian la
-        // consola del usuario.
-
         return config;
     },
     (error) => Promise.reject(error)
 );
 
-// --- Respuesta ------------------------------------------------------------
+/*
+ * Respuesta: desempaqueta el cuerpo y normaliza los errores.
+ */
 api.interceptors.response.use(
     (response) => {
-        // El backend envuelve todo en { success, message, data }. Aquí se
-        // desempaqueta para que las pantallas sigan leyendo `response.data`
-        // como antes y no haya que tocarlas una por una.
+        // El backend envuelve sus respuestas en { success, message, data }. Se
+        // desempaqueta aquí para que las pantallas lean el dato directamente en
+        // `response.data`, y el texto que acompaña queda en `response.mensaje`.
         //
-        // Los PDF y los Excel se descargan como blob y no llevan envoltorio:
-        // se dejan intactos.
+        // Los PDF y los Excel llegan como blob y no llevan envoltorio: se
+        // detectan por la ausencia de esos campos y se dejan intactos.
         const cuerpo = response.data;
         const esEnvoltorio =
             cuerpo &&
@@ -79,23 +87,25 @@ api.interceptors.response.use(
     (error) => {
         const status = error.response?.status;
 
-        // Mensaje legible para la interfaz. El backend ya se encarga de que
-        // nunca contenga trazas ni detalles internos.
+        // Todo error sale de aquí con un `mensaje` listo para mostrar, que es
+        // el que lee `notificarError`. El backend garantiza que su `message`
+        // nunca contiene trazas ni detalles internos.
         error.mensaje =
             error.response?.data?.message ||
             'No se pudo completar la operación. Intenta de nuevo.';
 
         if (status === 401) {
-            // 401 = sin sesión o sesión caducada: hay que volver a entrar.
+            // Sin sesión o sesión caducada: se descarta la guardada y se manda
+            // al login. La comprobación de ruta evita el bucle de redirección
+            // cuando el propio login responde 401 por credenciales erróneas.
             localStorage.removeItem('user');
             if (window.location.pathname !== '/login') {
                 window.location.href = '/login';
             }
         } else if (status === 403) {
-            // 403 NO cierra la sesión: el usuario está identificado pero no
-            // tiene permiso para esa acción concreta. La versión anterior
-            // trataba ambos códigos igual y expulsaba al usuario cada vez que
-            // tocaba algo fuera de su rol.
+            // Un 403 no cierra la sesión: el usuario está identificado, pero esa
+            // acción concreta no le corresponde por rol. Expulsarlo lo dejaría
+            // fuera cada vez que toca algo ajeno a su perfil.
             error.mensaje =
                 error.response?.data?.message ||
                 'No tienes permisos para realizar esta acción.';

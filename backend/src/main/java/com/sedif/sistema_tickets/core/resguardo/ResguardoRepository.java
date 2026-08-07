@@ -12,7 +12,13 @@ public interface ResguardoRepository extends JpaRepository<Resguardo, Long> {
      *
      * <p>El texto llega ya en minusculas y con comodines desde el servicio, y
      * el CAST fija su tipo: PostgreSQL no puede inferirlo cuando el parametro
-     * es nulo dentro de LOWER(...).</p>
+     * es nulo dentro de LOWER(...) y la consulta falla con
+     * {@code function lower(bytea) does not exist}. El ESCAPE '!' respeta el
+     * escapado que el servicio aplica a '%', '_' y '!'.</p>
+     *
+     * <p>El estado no necesita CAST porque llega tipado como enum. El
+     * EntityGraph trae al usuario creador en la misma consulta, de modo que
+     * convertir la pagina a DTO no dispare una consulta por fila.</p>
      */
     @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"usuarioCreador"})
     @org.springframework.data.jpa.repository.Query("""
@@ -32,14 +38,17 @@ public interface ResguardoRepository extends JpaRepository<Resguardo, Long> {
 
     List<Resguardo> findAllByOrderByFechaCreacionDesc();
 
-    /** Resguardos cuya fecha de vencimiento ya paso y siguen sin devolverse. */
+    /**
+     * Resguardos cuya fecha de vencimiento ya paso y siguen sin devolverse.
+     * Es la consulta que alimenta la revision programada de vencimientos.
+     */
     List<Resguardo> findByFechaVencimientoBeforeAndEstado(LocalDateTime fecha, EstadoResguardo estado);
 
     /**
      * Resguardos que venceran dentro de una ventana de tiempo.
      *
-     * <p>Permite avisar al personal ANTES de que el prestamo caduque, en lugar
-     * de reclamarlo cuando ya esta vencido.</p>
+     * <p>Acotada a los que siguen ENTREGADO, permite avisar al personal antes
+     * de que el prestamo caduque en lugar de reclamarlo cuando ya vencio.</p>
      */
     List<Resguardo> findByEstadoAndFechaVencimientoBetween(
             EstadoResguardo estado, LocalDateTime desde, LocalDateTime hasta);

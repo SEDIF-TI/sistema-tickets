@@ -46,18 +46,17 @@ const ANCHO_MENU_MOVIL = 268;
 const ALTO_BARRA = { xs: 56, sm: 68 };
 
 /**
- * Alto del logotipo: deliberadamente cercano al de la barra.
- *
- * Los 4px que restan por lado son el respiro minimo para que no parezca
- * recortado; con la barra mas delgada, un logotipo pequeno dejaba franjas
- * vacias arriba y abajo.
+ * Alto del logotipo: deliberadamente cercano al de la barra, con 4px de margen
+ * por lado. Es el respiro mínimo para que no se lea como recortado sin dejar
+ * franjas vacías arriba y abajo.
  */
 const ALTO_LOGO = { xs: 48, sm: 60 };
 
 /**
  * Traduce el nombre de icono guardado en la tabla `vista` a su componente.
  * El menú se construye desde la base de datos, así que este mapa es el punto
- * de unión entre esa configuración y la interfaz.
+ * de unión entre esa configuración y la interfaz. Una vista con un icono que no
+ * figure aquí se dibuja con el genérico.
  */
 const ICONOS = {
     DashboardIcon,
@@ -75,27 +74,25 @@ const ICONOS = {
 };
 
 /**
- * Estructura principal de la aplicación: barra superior, menú lateral y área
- * de contenido.
+ * Estructura principal de la aplicación: barra superior con el logotipo y la
+ * identidad del usuario, menú lateral y área de contenido.
  *
- * Correcciones respecto a la versión anterior:
- *  - El contenido combinaba `width: 100%` con `marginLeft: 72px`, lo que
- *    garantizaba desbordamiento horizontal en cualquier resolución.
- *  - El menú era `variant="permanent"` sin alternativa móvil: robaba 72px de
- *    ancho en pantallas de 375px, donde no sobra ni uno.
- *  - Los avisos flotaban sobre el contenido en posición fija, tapándolo, y con
- *    `variant="filled"` de severidad warning quedaban en 3.19:1 de contraste,
- *    por debajo del mínimo legible.
- *  - Los botones del menú solo tenían icono, sin nombre accesible: un lector
- *    de pantalla anunciaba "botón" en cada opción.
- *  - El aviso de desconexión solo se mostraba al rol EMPLEADO, cuando afecta
- *    igual a todos.
+ * El menú no está escrito aquí: se construye con las vistas que el servidor
+ * autoriza al usuario, y se refresca al montar para no arrastrar el que quedó
+ * guardado al iniciar sesión. Solo se dibuja si hay sesión, la contraseña ya no
+ * es temporal y hay al menos una vista: mientras el cambio de contraseña sigue
+ * pendiente no hay navegación posible a ningún sitio.
+ *
+ * En escritorio el menú es un cajón permanente y estrecho, de solo iconos; en
+ * móvil pasa a ser temporal y se superpone al contenido, para no robarle ancho
+ * a una pantalla que no lo tiene.
+ *
+ * Sobre el contenido se apilan dos clases de aviso: el estado de la conexión,
+ * que sale de `useNetworkStatus`, y los avisos institucionales, que combinan un
+ * sondeo periódico con las alertas de resguardo vencido que llegan por STOMP.
  */
 export default function MainLayout({ children }) {
     const { user, logout, actualizarVistas } = useContext(AuthContext);
-    // El contexto expone `isConnected`. Antes se desestructuraba `connected`,
-    // que no existe: valía siempre `undefined` y la suscripción de avisos de
-    // más abajo nunca llegaba a activarse.
     const { stompClient, isConnected } = useWebSocket();
     const navigate = useNavigate();
     const location = useLocation();
@@ -118,7 +115,9 @@ export default function MainLayout({ children }) {
     const vistas = useMemo(() => user?.vistasPermitidas ?? [], [user]);
     const mostrarMenu = Boolean(user) && !bloqueadoPorPassword && vistas.length > 0;
 
-    // --- Recuperación de conexión -----------------------------------------
+    // El aviso de "conexión restablecida" solo tiene sentido si antes se perdió,
+    // de ahí el rastro en `estuvoSinConexion`. Se retira solo a los 5 segundos:
+    // es una confirmación, no un estado que haya que atender.
     useEffect(() => {
         if (sinConexion) {
             setEstuvoSinConexion(true);
@@ -131,10 +130,9 @@ export default function MainLayout({ children }) {
         }
     }, [sinConexion, estuvoSinConexion]);
 
-    // --- Menú vigente ------------------------------------------------------
-    // El menú viaja en la respuesta del login y queda guardado en el
-    // navegador. Se refresca al entrar para que una vista retirada deje de
-    // dibujarse sin necesidad de cerrar sesión.
+    // El menú viaja en la respuesta del login y queda guardado en el navegador.
+    // Se vuelve a pedir al montar para que una vista retirada deje de dibujarse
+    // y una recién concedida aparezca, sin necesidad de cerrar sesión.
     useEffect(() => {
         if (!user || bloqueadoPorPassword) return;
 
@@ -152,12 +150,15 @@ export default function MainLayout({ children }) {
             });
 
         return () => { cancelado = true; };
-        // Solo al montar y al cambiar de sesión: `actualizarVistas` cambia el
-        // usuario, y depender de ella dispararía el efecto en bucle.
+        // Se depende del identificador del usuario y no del objeto: la propia
+        // `actualizarVistas` lo sustituye, así que incluirla —o incluir `user`—
+        // encadenaría el efecto consigo mismo.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user?.usuarioId, bloqueadoPorPassword]);
 
-    // --- Avisos institucionales -------------------------------------------
+    // Avisos institucionales: se consultan al entrar y cada 30 segundos. Se
+    // filtran a los activos dirigidos al área del usuario o a toda la
+    // institución; administración los ve todos.
     useEffect(() => {
         if (!user || bloqueadoPorPassword) return;
 
@@ -188,7 +189,9 @@ export default function MainLayout({ children }) {
         return () => clearInterval(intervalo);
     }, [user, bloqueadoPorPassword, rol, sinConexion]);
 
-    // --- Alertas de resguardos vencidos en tiempo real ---------------------
+    // Alertas de resguardo vencido por STOMP. Se añaden a la misma lista de
+    // avisos, con un identificador que incluye la marca de tiempo para que dos
+    // alertas del mismo resguardo no compartan clave de React.
     useEffect(() => {
         if (!stompClient || !isConnected || !user || bloqueadoPorPassword) return;
 
@@ -214,20 +217,22 @@ export default function MainLayout({ children }) {
 
     const avisosVisibles = avisos.filter((a) => !avisosOcultos.includes(a.id));
 
-    // --- Acciones ----------------------------------------------------------
     const cerrarSesion = () => {
         logout();
         navigate('/login');
     };
 
+    // En móvil el cajón se cierra al navegar; en escritorio es permanente y no
+    // hay nada que cerrar.
     const irA = (ruta) => {
         navigate(ruta);
         if (!esEscritorio) setMenuAbierto(false);
     };
 
-    // --- Menú lateral ------------------------------------------------------
     const contenidoMenu = (
         <>
+            {/* Toolbar vacía que reserva el alto de la barra superior: sin ella
+                la primera opción del menú quedaría oculta debajo. */}
             <Toolbar sx={{ minHeight: ALTO_BARRA }} />
             <List component="nav" aria-label="Navegación principal" sx={{ px: 1, pt: 2 }}>
                 {vistas.map((vista) => {
@@ -240,8 +245,10 @@ export default function MainLayout({ children }) {
                                 <ListItemButton
                                     onClick={() => irA(vista.ruta)}
                                     selected={activa}
-                                    // El tooltip no aporta nombre accesible: sin
-                                    // esto el lector de pantalla solo diría "botón".
+                                    // El tooltip no aporta nombre accesible, y
+                                    // en escritorio el botón es solo un icono:
+                                    // sin esto un lector de pantalla anunciaría
+                                    // "botón" en cada opción del menú.
                                     aria-label={vista.nombre}
                                     aria-current={activa ? 'page' : undefined}
                                     sx={{
@@ -285,7 +292,8 @@ export default function MainLayout({ children }) {
                 Saltar al contenido principal
             </a>
 
-            {/* --- Barra superior --- */}
+            {/* La barra se sitúa por encima del cajón en el eje z para que el
+                logotipo no quede partido por el borde del menú. */}
             <AppBar
                 position="fixed"
                 sx={{ bgcolor: 'primary.main', zIndex: (t) => t.zIndex.drawer + 1 }}
@@ -304,14 +312,15 @@ export default function MainLayout({ children }) {
 
                     {/* Logotipo institucional.
 
-                        En escritorio se centra respecto a la BARRA, no respecto
-                        al espacio libre: colocado en el flujo, los bloques de
-                        los lados tienen anchos distintos —el de la izquierda
-                        aparece solo en movil— y el logo quedaba desplazado. Con
-                        posicion absoluta el centro es siempre el de la pantalla.
+                        En escritorio se centra respecto a la BARRA y no
+                        respecto al espacio libre, de ahí la posición absoluta:
+                        dentro del flujo, los bloques de los lados tienen anchos
+                        distintos —el botón de la izquierda solo existe en
+                        móvil— y el centro se desplazaría con ellos.
 
-                        `pointerEvents: none` evita que la caja invisible tape
-                        los botones que quedan debajo. */}
+                        `pointerEvents: none` deja pasar el clic a los botones
+                        que quedan bajo esta caja, que ocupa el ancho completo
+                        sin ser interactiva. */}
                     <Box
                         sx={{
                             position: { xs: 'static', md: 'absolute' },
@@ -339,11 +348,14 @@ export default function MainLayout({ children }) {
                         />
                     </Box>
 
-                    {/* Empuja la identidad del usuario al extremo derecho, ya
-                        que el logotipo salio del flujo en escritorio. */}
+                    {/* Relleno que empuja la identidad del usuario al extremo
+                        derecho, ya que en escritorio el logotipo no ocupa
+                        sitio en el flujo. */}
                     <Box sx={{ flex: 1, display: { xs: 'none', md: 'block' } }} />
 
-                    {/* Identidad del usuario y acciones. */}
+                    {/* Identidad del usuario y acciones. Salir aparece como
+                        botón con texto donde cabe y como icono en pantallas
+                        estrechas. */}
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 0.5, sm: 1 } }}>
                         <Box sx={{ display: { xs: 'none', md: 'block' }, textAlign: 'right', mr: 1 }}>
                             <Typography variant="body2" sx={{ lineHeight: 1.3, fontWeight: 500 }}>
@@ -389,9 +401,10 @@ export default function MainLayout({ children }) {
                 </Toolbar>
             </AppBar>
 
-            {/* --- Menú lateral ---
-                Escritorio: fijo y estrecho. Móvil: cajón temporal sobre el
-                contenido, para no robarle ancho a la pantalla. */}
+            {/* Escritorio: cajón permanente y estrecho, que sí reserva su ancho
+                en el flujo. Móvil: cajón temporal superpuesto, que no lo
+                reserva. `keepMounted` conserva el contenido montado para que
+                abrirlo en móvil sea inmediato. */}
             {mostrarMenu && (
                 <Box component="nav" sx={{ width: { md: ANCHO_MENU }, flexShrink: { md: 0 } }}>
                     <Drawer
@@ -414,28 +427,26 @@ export default function MainLayout({ children }) {
                 </Box>
             )}
 
-            {/* --- Contenido ---
-                `minWidth: 0` permite que una tabla ancha genere su propio
-                scroll interno en lugar de estirar toda la página. */}
+            {/* `minWidth: 0` permite que una tabla ancha genere su propio scroll
+                interno en lugar de estirar toda la página: sin él, un hijo
+                flexible se niega a encogerse por debajo de su contenido. */}
             <Box
                 component="main"
                 id="contenido-principal"
                 sx={{
                     flexGrow: 1,
                     minWidth: 0,
-                    // Columna con alto minimo de pantalla: deja que el pie use
-                    // `mt: auto` para bajar al fondo cuando el contenido es
-                    // corto, sin fijarlo con `position`.
+                    // Columna con alto mínimo de pantalla: es lo que permite al
+                    // pie bajar al fondo con `mt: auto` cuando el contenido es
+                    // corto, sin recurrir a `position`.
                     display: 'flex',
                     flexDirection: 'column',
                     minHeight: '100vh',
                     p: { xs: 2, sm: 3 },
-                    // En píxeles, no con el valor suelto de ALTO_BARRA: `mt`
-                    // interpreta los números como múltiplos del espaciado del
-                    // tema (8px), de modo que `mt: {xs: 72, sm: 88}` reservaba
-                    // 576px y 704px en lugar de 72 y 88. Ese era el bloque en
-                    // blanco que aparecía sobre el contenido en todas las
-                    // pantallas, empujándolo por debajo del pliegue.
+                    // El hueco de la barra fija se reserva en píxeles y no con
+                    // el número suelto: `mt` interpreta los números como
+                    // múltiplos del espaciado del tema (8px), de modo que un
+                    // `mt: 72` reservaría 576px en lugar de 72.
                     mt: { xs: `${ALTO_BARRA.xs}px`, sm: `${ALTO_BARRA.sm}px` },
                 }}
             >
@@ -462,9 +473,10 @@ export default function MainLayout({ children }) {
                     </Collapse>
                 </Box>
 
-                {/* Avisos institucionales, en línea y no flotando sobre el
-                    contenido. Severidad estándar, no `filled`, para respetar el
-                    contraste mínimo. */}
+                {/* Los avisos van en línea y no flotando sobre el contenido,
+                    que quedaría tapado. La severidad se usa en su variante
+                    estándar y no `filled`, cuyo fondo en warning no alcanza el
+                    contraste mínimo legible. */}
                 {avisosVisibles.length > 0 && (
                     <Box
                         aria-live="polite"

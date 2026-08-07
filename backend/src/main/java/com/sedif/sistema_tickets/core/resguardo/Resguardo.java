@@ -9,6 +9,14 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
+/**
+ * Prestamo temporal de un equipo a un servidor publico.
+ *
+ * <p>Guarda a quien se entrega, que equipo con que accesorios y en que
+ * condiciones, y hasta cuando. La fecha de vencimiento es la que consulta la
+ * revision programada para pasar a VENCIDO los prestamos que ya expiraron; si
+ * queda nula, el prestamo es indefinido y nunca vence.</p>
+ */
 @Entity
 @Table(name = "resguardo")
 @Getter @Setter @NoArgsConstructor
@@ -22,8 +30,8 @@ public class Resguardo extends Auditable {
     @Column(name = "s_solicitante_nombre", length = 100, nullable = false)
     private String solicitanteNombre;
 
-    // Opcional desde la V11: soporte rellena la responsiva al entregar el
-    // equipo y no siempre tiene a mano el numero de empleado.
+    // Opcional: soporte rellena la responsiva en el momento de la entrega y no
+    // siempre tiene a mano el numero de empleado.
     @Column(name = "s_solicitante_numero", length = 30)
     private String solicitanteNumero;
 
@@ -43,7 +51,8 @@ public class Resguardo extends Auditable {
     @Column(name = "s_estado_resguardo", length = 20, nullable = false)
     private EstadoResguardo estado;
 
-    // === NUEVOS CAMPOS SINCRONIZADOS CON LA BASE DE DATOS ===
+    // Datos complementarios de la responsiva impresa: localizan al solicitante
+    // y dejan constancia del estado en que se entrego el equipo.
     @Column(name = "s_telefono", length = 50)
     private String telefono;
 

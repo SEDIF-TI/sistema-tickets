@@ -6,16 +6,16 @@ import jakarta.validation.constraints.Size;
 /**
  * Datos de entrada del taller de reparaciones.
  *
- * <p>Sustituye al {@code @RequestBody EquipoReparacion} que recibia antes el
- * controlador. Aceptar la entidad JPA directamente es un problema de
- * <i>mass assignment</i>: el cliente podia enviar campos que no le
- * corresponden —{@code id}, {@code folio}, {@code tecnicoAsignado}, las
- * columnas de auditoria— y sobrescribir registros ajenos o falsear quien
- * atendio una reparacion.</p>
+ * <p>El controlador recibe este record y no la entidad JPA para cerrar la via
+ * de <i>mass assignment</i>: si el cuerpo se vinculara a la entidad, el cliente
+ * podria enviar {@code id}, {@code folio}, {@code tecnicoAsignado} o las
+ * columnas de auditoria y con ello sobrescribir registros ajenos o falsear
+ * quien atendio una reparacion.</p>
  *
- * <p>El {@code folio} no esta aqui a proposito: lo genera el servidor. El
- * {@code estadoTaller} tampoco: toda alta entra como RECIBIDO y los cambios
- * pasan por el endpoint de estado.</p>
+ * <p>Por eso quedan fuera los campos que no le corresponden decidir: el
+ * {@code folio} lo genera el servidor, y el {@code estadoTaller} arranca en
+ * RECIBIDO y solo avanza por el endpoint de cambio de estado, que valida el
+ * valor contra el enum.</p>
  */
 public record EquipoReparacionRequest(
 

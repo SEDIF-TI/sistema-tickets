@@ -24,20 +24,19 @@ const FORMATOS_TECNICOS = [
 /**
  * Generador de los documentos oficiales del área.
  *
- * Cambios respecto a la versión anterior:
- *  - Recibía el usuario como prop `user`, pero App.jsx monta el componente sin
- *    pasársela: llegaba `undefined`, así que el mantenimiento preventivo se
- *    firmaba siempre como "SOPORTE TÉCNICO" en lugar del técnico real. Ahora
- *    sale del contexto de sesión.
- *  - `solicitarPdf` limpiaba la ruta a mano por si los formatos enviaban el
- *    prefijo repetido, y dejaba un `console.log` con la URL en cada llamada.
- *    La normalización se conserva —los formatos siguen enviando el prefijo—
- *    pero sin volcarla a consola.
- *  - Los errores se mostraban con `alert("… Revisa la consola.")`, que manda al
- *    usuario a un sitio donde no puede hacer nada.
- *  - El PDF solo podía verse en el visor: no había forma de descargarlo.
- *  - El objeto del blob se liberaba solo al cerrar con el botón; si el usuario
- *    generaba otro documento antes, el anterior quedaba en memoria.
+ * Reúne los formatos en pestañas y les presta el mecanismo común de generación:
+ * cada formato mantiene su propio estado y, al pulsar su botón, llama a
+ * `solicitarPdf(endpoint, carga, nombreArchivo)`. Este componente no conoce el
+ * contenido de esa carga —cada documento tiene los campos que exige su DTO—,
+ * solo la envía por POST a `/v1/documentos/<endpoint>` y trata la respuesta.
+ *
+ * El backend responde con el PDF ya compuesto, que se pide como blob para que
+ * el interceptor de api.js lo deje pasar sin desempaquetar. De ese blob se
+ * deriva una URL de objeto que alimenta el visor y el botón de descarga.
+ *
+ * Esas URL se liberan de forma explícita —al sustituir un documento por otro y
+ * al cerrar el visor—, porque el navegador retiene el blob mientras exista la
+ * referencia, aunque nadie la use.
  */
 export default function GeneradorDocumentos() {
     const { notificarError } = useNotification();
@@ -53,8 +52,9 @@ export default function GeneradorDocumentos() {
     const [generando, setGenerando] = useState(false);
 
     const solicitarPdf = useCallback(async (endpoint, carga, nombreArchivo) => {
-        // Los formatos envían a veces la ruta completa y a veces solo el
-        // nombre; se normaliza para no acabar con /v1/documentos duplicado.
+        // Unos formatos envían la ruta completa y otros solo el nombre del
+        // documento; se recorta el prefijo para no componer una URL con
+        // /v1/documentos duplicado.
         const limpio = String(endpoint)
             .replace('/v1/documentos/', '')
             .replace(/^\/+/, '');
@@ -65,8 +65,8 @@ export default function GeneradorDocumentos() {
                 responseType: 'blob',
             });
 
-            // Se libera el documento anterior antes de sustituirlo: sin esto,
-            // cada PDF generado se quedaba retenido en memoria.
+            // Se libera el documento anterior antes de sustituirlo: cada URL de
+            // objeto retiene su blob en memoria hasta que se revoca.
             setPdfUrl((anterior) => {
                 if (anterior) window.URL.revokeObjectURL(anterior);
                 return window.URL.createObjectURL(
@@ -157,7 +157,7 @@ export default function GeneradorDocumentos() {
                 )}
             </Box>
 
-            {/* -------------------------------------------- visor del PDF -- */}
+            {/* Visor del PDF: se abre solo cuando hay documento generado. */}
             <Dialog
                 open={Boolean(pdfUrl)}
                 onClose={cerrarVisor}

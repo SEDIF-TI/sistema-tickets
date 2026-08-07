@@ -11,12 +11,15 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
- * Configuracion web transversal: CORS.
+ * Configuracion CORS de la API REST.
  *
- * <p>Antes esta configuracion vivia dentro de {@code SecurityConfig} con los
- * origenes {@code localhost:5173} y {@code localhost:5174} escritos a mano, lo
- * que obligaba a recompilar para desplegar en otro dominio. Ahora se leen de
- * {@code app.cors.allowed-origins} (variable de entorno), separados por coma.</p>
+ * <p>Publica el {@link CorsConfigurationSource} que consume
+ * {@code SecurityConfig}, aplicado a todas las rutas. Los origenes permitidos
+ * se leen de {@code app.cors.allowed-origins} separados por coma, de modo que
+ * cambiar de dominio es cuestion de configuracion y no exige recompilar.</p>
+ *
+ * <p>{@code WebSocketConfig} lee esa misma propiedad para el handshake, con lo
+ * que ambos canales no pueden quedar desincronizados.</p>
  */
 @Configuration
 public class WebConfig {
@@ -39,21 +42,22 @@ public class WebConfig {
         // llamara a la API desde el navegador de un usuario con sesion activa.
         config.setAllowedOrigins(origenesPermitidos);
 
-        // HEAD va en la lista porque el sondeo de conectividad del frontend lo
-        // usa: pide solo las cabeceras, sin descargar cuerpo, cada treinta
-        // segundos. Al faltar aqui, el preflight se rechazaba con 403 y el
-        // navegador lo reportaba como error de CORS, de modo que la aplicacion
-        // se declaraba sin conexion con el servidor perfectamente en pie.
+        // HEAD figura en la lista porque el sondeo de conectividad del frontend
+        // lo usa cada treinta segundos: pide solo las cabeceras, sin descargar
+        // cuerpo. Un metodo ausente aqui hace que el navegador rechace el
+        // preflight y lo reporte como error de CORS.
         config.setAllowedMethods(List.of("GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept", "X-Requested-With"));
 
-        // Necesario para que el navegador pueda leer el encabezado en descargas
-        // de PDF (memorandums y requisiciones).
+        // Sin exponerlo, el navegador oculta este encabezado al codigo del
+        // frontend y las descargas de PDF (memorandums y requisiciones) pierden
+        // el nombre del archivo.
         config.setExposedHeaders(List.of("Content-Disposition"));
 
         config.setAllowCredentials(true);
 
-        // Cachea la respuesta preflight una hora y reduce peticiones OPTIONS.
+        // El navegador cachea la respuesta preflight una hora, lo que evita una
+        // peticion OPTIONS por cada llamada a la API.
         config.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

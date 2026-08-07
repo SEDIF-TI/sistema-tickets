@@ -4,18 +4,18 @@ import { TextField, MenuItem } from '@mui/material';
 /**
  * Campo de formulario: une React Hook Form con el `TextField` de MUI.
  *
- * MUI aporta el componente visual pero no gestiona el estado ni la validación
- * del formulario; es su límite declarado. Sin esta unión, cada pantalla
- * declaraba un `useState` por campo y comprobaba las reglas a mano dentro del
- * manejador de envío.
+ * MUI aporta el componente visual pero no gestiona el estado ni la validación;
+ * el `Controller` es quien conecta ambas partes, de modo que la pantalla no
+ * declara un `useState` por campo ni comprueba reglas dentro del manejador de
+ * envío. Las reglas viven en los esquemas de `util/esquemas.js`.
  *
- * Este componente resuelve de forma uniforme lo que antes se repetía:
+ * Lo que el componente resuelve en cada campo:
  *
- *  - Muestra el error del campo debajo, y el texto de ayuda cuando no lo hay,
- *    en lugar de un `Alert` genérico arriba que no señalaba qué corregir.
+ *  - Muestra el error justo debajo, en el sitio donde hay que corregir, y el
+ *    texto de ayuda mientras no lo hay.
  *  - Marca `aria-invalid` para que un lector de pantalla anuncie el fallo.
- *  - Cuenta los caracteres cuando el campo tiene límite: el usuario ve cuánto
- *    le queda antes de que el servidor lo rechace.
+ *  - Cuenta los caracteres cuando el campo tiene límite, de manera que se vea
+ *    cuánto queda antes de que el servidor lo rechace.
  *  - Con `opciones`, se convierte en desplegable.
  *  - Con `mayusculas`, transforma la entrada al escribir, criterio que el
  *    sistema aplica a los textos que acaban en documentos oficiales.
@@ -47,8 +47,9 @@ export default function CampoFormulario({
                 const valor = field.value ?? '';
                 const hayError = Boolean(fieldState.error);
 
-                // El contador solo aparece si el campo tiene límite. Se cuenta
-                // el texto tal cual se ve, no el recortado.
+                // El contador solo aparece si el campo declara límite, y cuenta
+                // el texto tal como se ve, sin recortar los espacios que el
+                // esquema sí descarta al validar.
                 const contador = maximo ? `${valor.length}/${maximo}` : '';
 
                 let textoAyuda = fieldState.error?.message || ayuda || '';
@@ -71,8 +72,9 @@ export default function CampoFormulario({
                         error={hayError}
                         helperText={textoAyuda}
                         fullWidth
-                        // El límite se aplica al escribir, además de validarse:
-                        // es preferible impedir el exceso a avisar después.
+                        // El límite se impone también en el propio input, no
+                        // solo en la validación: impedir el exceso ahorra
+                        // escribir un texto que luego habría que recortar.
                         slotProps={{
                             htmlInput: {
                                 maxLength: maximo,

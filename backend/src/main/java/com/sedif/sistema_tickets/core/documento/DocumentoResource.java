@@ -27,9 +27,18 @@ import java.util.Map;
 import java.util.List;
 import java.util.stream.Collectors;
 
+/**
+ * Emision de los documentos oficiales del area de soporte.
+ *
+ * <p>Cada endpoint compone un PDF (o una hoja de Excel) y lo devuelve como
+ * flujo de bytes con la cabecera {@code Content-Disposition} adecuada: los
+ * formatos se muestran en el navegador y el reporte de Excel se descarga.</p>
+ *
+ * <p>Todos llevan membrete institucional, de modo que su emision queda
+ * restringida al personal del area de TI.</p>
+ */
 @RestController
 @RequestMapping("/api/v1/documentos")
-// Documentos con membrete institucional: solo el area de TI los emite.
 @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'SOPORTE')")
 @RequiredArgsConstructor
 @Slf4j
@@ -40,12 +49,16 @@ public class DocumentoResource {
     private final ActividadExtraRepository actividadExtraRepository;
     private final DictamenService dictamenService;
 
-    // ==========================================================
-    // 1. GENERACIÓN DE DICTAMEN
-    // ==========================================================
-    // Desde la V10 el dictamen queda registrado al emitirse: antes se componia
-    // el PDF y se devolvia sin dejar rastro, de modo que no habia historial que
-    // consultar.
+    /**
+     * Emite el dictamen tecnico: compone el PDF y lo registra en el historial.
+     *
+     * <p>Ambas cosas ocurren en la misma llamada, de modo que el historial
+     * contiene exactamente los documentos entregados. El archivo se nombra con
+     * el folio asignado en el registro.</p>
+     *
+     * <p>El fallo del registro no cancela la respuesta: se deja constancia en el
+     * log y el PDF se entrega igualmente, nombrado con el folio del ticket.</p>
+     */
     @PostMapping(value = "/dictamen", produces = MediaType.APPLICATION_PDF_VALUE)
     public ResponseEntity<byte[]> generarDictamen(@Valid @RequestBody DictamenRequest request,
                                                   Authentication authentication) {
@@ -68,9 +81,7 @@ public class DocumentoResource {
         return construirRespuestaPdf(pdfGenerado, nombre);
     }
 
-    // ==========================================================
-    // 3. GENERACIÓN DE ENTRADA DE EQUIPO
-    // ==========================================================
+    /** Vale de entrada del equipo que se recibe en el taller. */
     @PostMapping(value = "/entrada-equipo", produces = MediaType.APPLICATION_PDF_VALUE)
     public ResponseEntity<byte[]> generarEntradaEquipo(@Valid @RequestBody EntradaEquipoRequest request) {
         byte[] pdfGenerado = documentoService.generarEntradaEquipoPdf(request);
@@ -78,25 +89,33 @@ public class DocumentoResource {
         return construirRespuestaPdf(pdfGenerado, "Entrada_Equipo_" + folio + ".pdf");
     }
 
-    // ==========================================================
-    // 4. GENERACIÓN DE RESGUARDO (SOLO PDF)
-    // ==========================================================
+    /**
+     * Responsiva de resguardo lista para firma.
+     *
+     * <p>Solo compone el documento. El alta del prestamo la registra
+     * {@code ResguardoResource}, que la pantalla invoca antes de pedir el PDF:
+     * emitir una responsiva de un resguardo que no llego a guardarse dejaria un
+     * papel firmado sin respaldo.</p>
+     */
     @PostMapping(value = "/resguardos", produces = MediaType.APPLICATION_PDF_VALUE)
     public ResponseEntity<byte[]> generarResguardo(@Valid @RequestBody ResguardoRequest request) {
-        // Este método usa tu lógica existente en DocumentoService para crear el PDF
         byte[] pdfGenerado = documentoService.generarResguardo(request);
         return construirRespuestaPdf(pdfGenerado, "Resguardo_" + request.solicitanteNombre() + ".pdf");
     }
 
-    // ==========================================================
-    // 5. GENERACIÓN DEL REPORTE DE ACTIVIDADES (PDF)
-    // ==========================================================
-    // La sesion de Hibernate debe seguir abierta mientras se compone el
-    // documento: el generador recorre `ticket.usuarioArea.area` y
-    // `actividad.usuario.area`, que son proxies perezosos. Sin transaccion, la
-    // sesion se cerraba al volver del repositorio y el primer acceso a esas
-    // relaciones lanzaba LazyInitializationException, de modo que el reporte
-    // fallaba siempre.
+    /**
+     * Reporte de actividades de un periodo, en PDF.
+     *
+     * <p>Reune los tickets cerrados dentro del rango y las actividades
+     * registradas a mano. El alcance depende del rol que llega en el cuerpo: un
+     * ADMINISTRADOR obtiene los de toda la institucion y cualquier otro los
+     * suyos.</p>
+     *
+     * <p>Va en transaccion de solo lectura porque el generador atraviesa
+     * relaciones perezosas —{@code ticket.usuarioArea.area} y
+     * {@code actividad.usuario.area}— mientras compone el documento, y necesita
+     * la sesion de Hibernate abierta hasta el final.</p>
+     */
     @Transactional(readOnly = true)
     @PostMapping(value = "/reporte-actividades", produces = MediaType.APPLICATION_PDF_VALUE)
     public ResponseEntity<byte[]> generarReporteActividades(@RequestBody Map<String, Object> payload) {
@@ -131,11 +150,13 @@ public class DocumentoResource {
         return construirRespuestaPdf(pdfBytes, "Reporte_Actividades_" + fechaInicio + "_al_" + fechaFin + ".pdf");
     }
 
-    // ==========================================================
-    // 6. GENERACIÓN DEL REPORTE DE ACTIVIDADES (EXCEL)
-    // ==========================================================
-    // Mismo motivo que en el reporte en PDF: sin la transaccion abierta, leer
-    // el area del usuario sobre un proxy ya desconectado rompia la generacion.
+    /**
+     * El mismo reporte de actividades en formato de hoja de calculo.
+     *
+     * <p>Comparte criterio de seleccion con la version en PDF, y tambien la
+     * transaccion de solo lectura: el volcado a Excel lee el area del usuario
+     * sobre relaciones perezosas.</p>
+     */
     @Transactional(readOnly = true)
     @PostMapping("/reporte-actividades/excel")
     public ResponseEntity<byte[]> generarReporteExcel(@RequestBody Map<String, Object> payload) {
@@ -170,9 +191,10 @@ public class DocumentoResource {
         return construirRespuestaExcel(excelBytes, "Reporte_Actividades_" + fechaInicio + "_al_" + fechaFin + ".xlsx");
     }
 
-    // ==========================================================
-    // MÉTODOS AUXILIARES PARA RESPUESTAS HTTP
-    // ==========================================================
+    /**
+     * Respuesta con el PDF en linea, para que el navegador lo muestre en su
+     * visor en lugar de descargarlo directamente.
+     */
     private ResponseEntity<byte[]> construirRespuestaPdf(byte[] documento, String nombreArchivo) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_PDF); 
@@ -180,6 +202,10 @@ public class DocumentoResource {
         return ResponseEntity.ok().headers(headers).body(documento);
     }
 
+    /**
+     * Respuesta con la hoja de calculo como adjunto: el navegador no dispone de
+     * visor propio, de modo que se descarga.
+     */
     private ResponseEntity<byte[]> construirRespuestaExcel(byte[] documento, String nombreArchivo) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));

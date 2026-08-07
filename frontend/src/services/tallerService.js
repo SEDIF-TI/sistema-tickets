@@ -7,12 +7,10 @@ const RUTA = '/taller';
  *
  * Exige rol SOPORTE o ADMINISTRADOR.
  *
- * La versión anterior envolvía cada error en `new Error(...)` leyendo
- * `error.response.data.mensaje`, campo que el backend no usa (envía `message`).
- * El resultado era que todos los fallos mostraban el texto genérico de
- * respaldo, ocultando el motivo real. Ahora los errores se propagan tal cual y
- * los traduce el interceptor de api.js, que ya deja el mensaje en
- * `error.mensaje`.
+ * Los errores se propagan sin envolver: el interceptor de `api.js` ya deja el
+ * texto del backend en `error.mensaje`, que es de donde lo toma
+ * `notificarError`. Envolverlos aquí sustituiría el motivo real por un mensaje
+ * genérico.
  */
 export const tallerService = {
     /** Listado paginado, con búsqueda y filtro de estado resueltos en la base. */

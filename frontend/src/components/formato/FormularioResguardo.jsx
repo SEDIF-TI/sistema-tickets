@@ -82,8 +82,8 @@ export default function FormularioResguardo({ solicitarPdf, generando = false })
 
             notificar('Resguardo registrado y documento generado.');
         } catch (error) {
-            // El detalle real lo trae el backend: antes se sustituia por un
-            // texto generico que no decia que campo estaba mal.
+            // El error se propaga tal cual: el backend indica qué campo falló y
+            // notificarError lo toma de `error.mensaje`.
             notificarError(error);
         }
     };
@@ -112,17 +112,15 @@ export default function FormularioResguardo({ solicitarPdf, generando = false })
                                     <Grid container spacing={2}>
                                         {/* Los datos son del servidor público que recibe el
                                             equipo, no de quien rellena el formulario: los
-                                            captura soporte a mano. Por eso van con el mismo
-                                            borde que el resto del formulario y no con
-                                            `variant="filled"`, cuyo fondo gris se leia como
-                                            campo automatico o de solo lectura. */}
+                                            captura soporte a mano, así que se presentan como
+                                            campos editables normales. */}
                                         <Grid size={{ xs: 12, md: 6 }}>
                                             <TextField fullWidth label="Nombre Completo" name="solicitanteNombre" value={formData.solicitanteNombre} onChange={handleChange} required />
                                         </Grid>
                                         <Grid size={{ xs: 12, md: 3 }}>
-                                            {/* `slotProps.input` sustituye a `InputProps`, retirado
-                                                en MUI 9: React no reconocia la prop y la reenviaba
-                                                al DOM, avisando por consola en cada render. */}
+                                            {/* Los adornos del campo van en `slotProps.input`, que
+                                                es la vía de MUI 9 para llegar al componente
+                                                interno del input. */}
                                             <TextField fullWidth label="No. Empleado" name="solicitanteNumero" value={formData.solicitanteNumero} onChange={handleChange} slotProps={{ input: { startAdornment: <InputAdornment position="start"><BadgeIcon fontSize="small"/></InputAdornment> } }} />
                                         </Grid>
                                         <Grid size={{ xs: 12, md: 3 }}>

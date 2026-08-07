@@ -24,16 +24,17 @@ import java.util.Optional;
 /**
  * Autentica cada peticion a partir del JWT del encabezado {@code Authorization}.
  *
- * <p>Reemplaza a {@code core.auth.JwtAuthenticationFilter}. Cambios respecto a
- * aquella version:</p>
- * <ul>
- *   <li>La firma del token se verifica ANTES de consultar la base de datos.
- *       Antes se hacia al reves, de modo que un atacante enviando tokens
- *       basura provocaba consultas a la BD en cada peticion.</li>
- *   <li>Se elimino el volcado por {@code System.out} de correo, nombre y rol
- *       en cada peticion, que filtraba datos personales a los logs.</li>
- *   <li>La autoridad se normaliza a {@code ROLE_<ROL>} en un unico punto.</li>
- * </ul>
+ * <p>Extiende {@link OncePerRequestFilter}, de modo que se ejecuta una sola vez
+ * por peticion aunque haya reenvios internos. Espera un encabezado con el
+ * formato {@code Bearer <token>}; el token se valida criptograficamente y solo
+ * entonces se resuelve el usuario contra la base de datos. La identidad
+ * resultante queda en el {@link SecurityContextHolder} con una unica autoridad
+ * con formato {@code ROLE_<ROL>}, que es la que evaluan los
+ * {@code @PreAuthorize} de los controladores.</p>
+ *
+ * <p>Una peticion sin token, con token invalido o de una cuenta desactivada
+ * continua la cadena sin autenticar: quien decide si eso basta para la ruta
+ * solicitada es {@code SecurityConfig}, que respondera 401 si la exige.</p>
  */
 @Component
 @RequiredArgsConstructor
@@ -55,14 +56,15 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
         final String encabezado = request.getHeader(ENCABEZADO);
 
-        // Sin token: la peticion sigue sin autenticar. Si la ruta esta
-        // protegida, SecurityConfig la rechazara mas adelante con un 401.
+        // Sin encabezado o sin el prefijo Bearer no hay nada que resolver: la
+        // peticion sigue sin autenticar y SecurityConfig decide si la admite.
         if (encabezado == null || !encabezado.startsWith(PREFIJO)) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        // Si ya hay una autenticacion en el contexto, no se vuelve a resolver.
+        // Una autenticacion ya presente en el contexto tiene prioridad: no se
+        // sobrescribe con la del token.
         if (SecurityContextHolder.getContext().getAuthentication() != null) {
             filterChain.doFilter(request, response);
             return;
@@ -70,16 +72,18 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
         final String token = encabezado.substring(PREFIJO.length()).trim();
 
-        // PASO 1 — Verificar la firma y la expiracion. Es una operacion en
-        // memoria: descarta los tokens invalidos sin tocar la base de datos.
+        // Verificacion de firma y vigencia. Es una operacion en memoria y va
+        // primero: descarta los tokens invalidos sin tocar la base de datos, de
+        // forma que enviar tokens basura no genera carga de consultas.
         final String identificador = tokenProvider.extraerIdentificador(token);
         if (identificador == null) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        // PASO 2 — Solo con un token criptograficamente valido se consulta la BD,
-        // para confirmar que la cuenta sigue existiendo y activa.
+        // Con un token criptograficamente valido se consulta la cuenta, porque
+        // el token pudo emitirse antes de que se desactivara o se le retirara
+        // el rol: la firma acredita el origen, no el estado actual del usuario.
         buscarUsuario(identificador).ifPresent(usuario -> {
             if (!Boolean.TRUE.equals(usuario.getActivo())) {
                 log.debug("Se rechazo un token de una cuenta desactivada.");
@@ -92,7 +96,8 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
             String autoridad = "ROLE_" + usuario.getRol().getNombre().toUpperCase();
 
-            // El principal es el correo; se recurre al username solo si falta.
+            // El principal es el correo, que es lo que SecurityUtil y la
+            // auditoria esperan encontrar; el username es solo el respaldo.
             String principal = (usuario.getCorreo() != null && !usuario.getCorreo().isBlank())
                     ? usuario.getCorreo()
                     : usuario.getUsername();
@@ -108,8 +113,9 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     }
 
     /**
-     * Busca por correo o username. Se reintenta en minusculas para tolerar
-     * diferencias de mayusculas en los datos historicos.
+     * Busca al usuario por correo o por nombre de usuario, con un segundo
+     * intento en minusculas y sin espacios para tolerar diferencias de
+     * mayusculas entre lo firmado en el token y lo almacenado.
      */
     private Optional<Usuario> buscarUsuario(String identificador) {
         Optional<Usuario> usuario =
@@ -122,8 +128,10 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     }
 
     /**
-     * El filtro no se ejecuta en rutas publicas: no hay token que procesar y
-     * asi se evita trabajo innecesario en login y handshake de WebSocket.
+     * Excluye del filtro las rutas publicas: login, handshake de WebSocket,
+     * sondeo de salud y preflight CORS. En ninguna de ellas hay token que
+     * procesar, y las peticiones OPTIONS las emite el navegador sin
+     * credenciales.
      */
     @Override
     protected boolean shouldNotFilter(@NonNull HttpServletRequest request) {

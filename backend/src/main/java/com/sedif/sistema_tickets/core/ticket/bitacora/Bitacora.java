@@ -7,6 +7,17 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.NoArgsConstructor;
 
+/**
+ * Movimiento registrado en la historia de un ticket.
+ *
+ * <p>Cada transicion de estado deja una fila con el estado al que se paso y el
+ * texto que lo justifica. Son registros de solo insercion: el ticket guarda su
+ * situacion actual, y la bitacora, como se llego hasta ella.</p>
+ *
+ * <p>El estado se guarda como texto y no como enum porque es una constancia
+ * historica: debe seguir leyendose tal cual quedo aunque el catalogo de estados
+ * cambie.</p>
+ */
 @Entity
 @Table(name = "bitacora")
 @Getter @Setter @NoArgsConstructor

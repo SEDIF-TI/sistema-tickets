@@ -6,9 +6,11 @@ import jakarta.validation.constraints.Size;
 /**
  * Credenciales enviadas al iniciar sesion.
  *
- * <p>Las restricciones se aplican antes de que la peticion llegue al servicio,
- * lo que evita consultas a la base de datos con entradas vacias o absurdas.
- * Los limites de tamano tambien acotan el coste de procesar cuerpos enormes.</p>
+ * <p>El identificador admite tanto el correo como el nombre de usuario. Las
+ * restricciones las aplica Bean Validation por el {@code @Valid} del
+ * controlador, antes de que la peticion llegue al servicio, lo que evita
+ * consultas a la base de datos con entradas vacias o absurdas. Los limites de
+ * tamano tambien acotan el coste de procesar cuerpos enormes.</p>
  *
  * <p>El limite superior de {@code password} no restringe la contrasena real
  * del usuario: BCrypt solo considera los primeros 72 bytes, asi que 100

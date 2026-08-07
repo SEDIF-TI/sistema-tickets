@@ -50,18 +50,23 @@ const VALORES_INICIALES = {
 };
 
 /**
- * Resguardos de equipo: préstamos temporales al personal.
+ * Resguardos: equipo entregado en préstamo al personal.
  *
- * Cambios respecto a la versión anterior:
- *  - Leía `res.data` esperando un array, pero el endpoint devuelve una página:
- *    la tabla habría quedado vacía.
- *  - Filtraba en el navegador sobre lo ya descargado, así que buscar un número
- *    de serie solo miraba los diez resguardos de la página visible.
- *  - El formulario no validaba nada antes de enviar y usaba `alert()` para los
- *    errores.
- *  - La devolución se ejecutaba sin confirmar, pese a cerrar el préstamo.
- *  - No se distinguía visualmente un resguardo vencido de uno vigente más allá
- *    del texto del estado.
+ * El alta registra a quién se entrega el equipo, cómo se identifica (serie e
+ * inventario), en qué condiciones sale y qué accesorios lo acompañan. La
+ * vigencia se expresa como cantidad más unidad —días, semanas o meses— y el
+ * backend calcula con ella la fecha de vencimiento; con "sin plazo definido"
+ * el resguardo queda abierto y la cantidad no se pide.
+ *
+ * Un resguardo vigente permanece así hasta que se registra la devolución, que
+ * se confirma antes de ejecutarse porque cierra el préstamo. La columna
+ * "Vence" resalta en rojo los que caducan en siete días o menos, y omite el
+ * aviso en los ya devueltos aunque su fecha haya pasado.
+ *
+ * La responsiva se genera en `POST /v1/documentos/resguardos`: el servidor
+ * devuelve el PDF como blob y se abre en una pestaña nueva para firmarlo.
+ *
+ * El listado se pagina, ordena, busca y filtra en el servidor.
  */
 export default function GestionResguardos() {
     const { notificar, notificarError } = useNotification();
@@ -146,6 +151,8 @@ export default function GestionResguardos() {
         }
     };
 
+    // Responsiva del resguardo: el servidor arma el PDF a partir del registro
+    // y se abre en una pestaña para imprimirlo y recabar la firma.
     const imprimir = async (resguardo) => {
         try {
             const respuesta = await api.post('/v1/documentos/resguardos', resguardo, {
@@ -171,7 +178,6 @@ export default function GestionResguardos() {
         }
     };
 
-    // --- Columnas ---------------------------------------------------------
     const columnas = [
         {
             id: 'solicitanteNombre',
@@ -386,7 +392,6 @@ export default function GestionResguardos() {
                 }}
             />
 
-            {/* --------------------------------------------------- alta ---- */}
             <Dialog
                 open={modalAbierto}
                 onClose={() => !isSubmitting && setModalAbierto(false)}

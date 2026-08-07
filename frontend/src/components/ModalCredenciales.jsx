@@ -13,18 +13,15 @@ import { useNotification } from '../context/NotificationContext.jsx';
 /**
  * Credenciales recién generadas de un usuario.
  *
- * La contraseña temporal solo viaja en la respuesta que la crea: si no se
- * copia o se imprime ahora, se pierde y hay que restablecerla.
+ * La contraseña temporal solo viaja en la respuesta que crea la cuenta: el
+ * backend la guarda cifrada y no puede volver a mostrarla, así que si no se
+ * copia o se imprime ahora hay que restablecerla. De ahí que el diálogo insista
+ * en ello y ofrezca las dos salidas.
  *
- * Cambios respecto a la versión anterior:
- *  - La impresión construía una plantilla HTML concatenando los datos del
- *    usuario y la volcaba con `document.write()`. Un nombre o un área que
- *    contuvieran `<script>` —o cualquier etiqueta— se ejecutaban en la ventana
- *    nueva. Ahora se imprime el nodo ya renderizado por React, que escapa el
- *    texto por construcción, y no se genera HTML por concatenación.
- *  - Si el navegador bloqueaba la ventana emergente, `printWindow` era `null` y
- *    la función reventaba con un error en consola sin decir nada al usuario.
- *  - No había forma de copiar la contraseña: había que teclearla a la vista.
+ * La impresión se hace clonando el nodo que React ya pintó, y la ventana nueva
+ * se compone con `createElement` y `textContent`. En ningún punto se arma HTML
+ * concatenando los datos del usuario: un nombre o un área con etiquetas dentro
+ * se ejecutarían como marcado en esa ventana.
  */
 export default function ModalCredenciales({ open, onClose, usuarioData }) {
     const { notificar, notificarError } = useNotification();
@@ -52,9 +49,9 @@ export default function ModalCredenciales({ open, onClose, usuarioData }) {
             return;
         }
 
-        // Se clona el nodo ya renderizado en lugar de rearmar la tarjeta con
-        // cadenas: React escapó el contenido al pintarlo, así que el texto del
-        // usuario no puede convertirse en marcado.
+        // Se clona el nodo ya pintado en lugar de rearmar la tarjeta con
+        // cadenas: React escapó el contenido al renderizarlo, de modo que el
+        // texto del usuario no puede convertirse en marcado.
         const contenido = areaImprimible.current?.cloneNode(true);
 
         const doc = ventana.document;
@@ -83,7 +80,8 @@ export default function ModalCredenciales({ open, onClose, usuarioData }) {
 
         doc.body.appendChild(tarjeta);
 
-        // Se imprime tras el repintado para que el contenido esté maquetado.
+        // La impresión espera un instante: lanzarla antes de que la ventana
+        // haya maquetado su contenido produce una hoja en blanco.
         ventana.focus();
         setTimeout(() => {
             ventana.print();
@@ -163,9 +161,10 @@ export default function ModalCredenciales({ open, onClose, usuarioData }) {
                                 variant="h5"
                                 component="p"
                                 sx={{
-                                    // Monoespaciada y con separación: se dicta y
-                                    // se teclea a mano, y hay que distinguir
-                                    // caracteres parecidos.
+                                    // Monoespaciada y con separación entre
+                                    // caracteres: la contraseña se dicta y se
+                                    // teclea a mano, y hay que poder distinguir
+                                    // un cero de una O, o un uno de una ele.
                                     fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
                                     letterSpacing: 1.5,
                                     wordBreak: 'break-all',

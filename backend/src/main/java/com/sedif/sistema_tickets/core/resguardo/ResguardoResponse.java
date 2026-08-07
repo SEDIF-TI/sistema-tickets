@@ -5,10 +5,14 @@ import java.time.LocalDateTime;
 /**
  * Resguardo tal como lo consume el frontend.
  *
- * <p>Antes se quedaban fuera cinco campos que la entidad si guarda —telefono,
- * departamento, numero de inventario, condiciones de entrega y fecha de
- * creacion—, asi que la pantalla los capturaba en el alta pero no podia
- * mostrarlos despues ni imprimirlos en el formato de resguardo.</p>
+ * <p>Lleva todos los campos que el formato impreso necesita —incluidos
+ * telefono, departamento, numero de inventario y condiciones de entrega—, de
+ * modo que la pantalla puede mostrar y reimprimir la responsiva sin volver a
+ * pedir nada.</p>
+ *
+ * <p>El estado viaja dos veces: {@code estado} es la constante del enum, valor
+ * estable con el que la interfaz decide que acciones ofrece, y
+ * {@code estadoEtiqueta} es el texto legible que se pinta.</p>
  */
 public record ResguardoResponse(
         Long id,

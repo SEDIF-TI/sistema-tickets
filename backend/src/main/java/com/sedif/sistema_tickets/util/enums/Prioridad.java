@@ -7,8 +7,12 @@ import java.util.Optional;
  * Prioridad de atencion de un ticket.
  *
  * <p>En la base de datos la columna {@code s_prioridad} es un texto libre con
- * NORMAL por defecto. Este enum acota los valores admisibles y da un orden
- * explicito para las metricas del panel.</p>
+ * NORMAL por defecto. Este enum acota los valores admisibles y anade a cada uno
+ * una etiqueta legible para la interfaz y un peso numerico.</p>
+ *
+ * <p>El peso da un orden explicito que el nombre por si solo no proporciona:
+ * es lo que permite ordenar la bandeja por urgencia y comparar prioridades en
+ * las metricas del panel.</p>
  */
 public enum Prioridad {
 
@@ -19,7 +23,7 @@ public enum Prioridad {
 
     private final String etiqueta;
 
-    /** Peso para ordenar: a mayor numero, antes se atiende. */
+    /** Peso de ordenacion: a mayor numero, antes se atiende. */
     private final int peso;
 
     Prioridad(String etiqueta, int peso) {
@@ -35,11 +39,19 @@ public enum Prioridad {
         return peso;
     }
 
-    /** Valor por defecto cuando el ticket no especifica prioridad. */
+    /**
+     * Valor aplicado cuando el ticket no especifica prioridad. Coincide con el
+     * predeterminado de la columna {@code s_prioridad}.
+     */
     public static Prioridad porDefecto() {
         return NORMAL;
     }
 
+    /**
+     * Convierte el texto almacenado al enum, normalizando mayusculas y espacios
+     * sobrantes. Un valor desconocido devuelve {@link Optional#empty()}, para
+     * que no rompa la consulta de un listado completo.
+     */
     public static Optional<Prioridad> desde(String valor) {
         if (valor == null || valor.isBlank()) {
             return Optional.empty();

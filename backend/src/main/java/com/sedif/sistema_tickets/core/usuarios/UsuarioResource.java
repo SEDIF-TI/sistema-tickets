@@ -26,15 +26,14 @@ import java.util.List;
 /**
  * Gestion de usuarios. Todas las operaciones exigen rol ADMINISTRADOR.
  *
- * <p>Los bloques {@code try/catch} que repetia cada metodo desaparecieron:
- * {@code GlobalExceptionHandler} traduce ahora las excepciones a respuestas
- * {@link ApiResponse} con el codigo HTTP correcto.</p>
+ * <p>Los metodos no capturan excepciones: {@code GlobalExceptionHandler} las
+ * traduce a respuestas {@link ApiResponse} con el codigo HTTP que corresponda.</p>
  *
- * <p>El cambio de contrasena propia ya no vive aqui. Estaba en
- * {@code PUT /api/v1/admin/usuarios/password}, una ruta de administracion que
- * cualquier usuario debia poder invocar, lo que obligaba a abrir una excepcion
- * en {@code SecurityConfig}. Se traslado a {@code PerfilResource}, bajo
- * {@code /api/v1/perfil}.</p>
+ * <p>Aqui vive solo lo administrativo, es decir lo que un administrador hace
+ * sobre la cuenta de otra persona. Las operaciones que un usuario realiza
+ * sobre la suya propia estan en {@code PerfilResource}, bajo
+ * {@code /api/v1/perfil}, para que no haga falta abrir excepciones dentro del
+ * bloque protegido de {@code SecurityConfig}.</p>
  */
 @RestController
 @RequestMapping("/api/v1/admin/usuarios")

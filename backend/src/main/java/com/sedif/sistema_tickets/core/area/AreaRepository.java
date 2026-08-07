@@ -37,9 +37,9 @@ public interface AreaRepository extends JpaRepository<Area, Long> {
     /**
      * Cuenta los usuarios activos adscritos a un area.
      *
-     * <p>Lo consulta la baja: desactivar un area que todavia tiene personal
-     * deja a esas personas sin area valida, y con ella el filtro de
-     * visibilidad de sus tickets.</p>
+     * <p>Lo consulta la baja del area: desactivar una que todavia tiene
+     * personal dejaria a esas personas sin area valida, y con ella se rompe el
+     * filtro de visibilidad de sus tickets.</p>
      */
     @Query("SELECT COUNT(u) FROM Usuario u WHERE u.area.id = :areaId AND u.activo = true")
     long contarUsuariosActivos(@Param("areaId") Long areaId);

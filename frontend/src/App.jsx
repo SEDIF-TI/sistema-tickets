@@ -1,21 +1,18 @@
 import { useContext } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 
-// --- Material UI y Temas ---
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import theme from './theme/theme.js';
-// Contextos
+
 import { AuthContext, AuthProvider } from './context/AuthContext.jsx';
 import { NotificationProvider } from './context/NotificationContext.jsx';
 import { WebSocketProvider } from './context/WebSocketContext.jsx';
 
-// Layouts y Páginas Base
 import LoginPage from './pages/LoginPage.jsx';
 import MainLayout from './components/MainLayout.jsx';
 import PerfilPage from './pages/PerfilPage.jsx';
 
-// Páginas de Roles
 import FormularioTicket from './pages/empleado/FormularioTicket';
 import TicketsPage from './pages/tickets/TicketsPage';
 import PanelSoporte from './pages/soporte/PanelSoporte.jsx';
@@ -29,8 +26,7 @@ import GestionResguardos from './pages/soporte/GestionResguardos.jsx';
 import HistorialResguardos from './pages/admin/HistorialResguardos.jsx';
 import HistorialPage from './pages/admin/HistorialPage.jsx';
 
-// Componentes Adicionales
-import GeneradorDocumentos from './components/GeneradorDocumentos.jsx'; 
+import GeneradorDocumentos from './components/GeneradorDocumentos.jsx';
 
 import '@fontsource/inter/400.css';
 import '@fontsource/inter/600.css';
@@ -39,6 +35,7 @@ import '@fontsource/inter/700.css';
 function AppContent() {
     const { user } = useContext(AuthContext);
 
+    // Sin sesión solo existe el login: cualquier otra ruta rebota allí.
     if (!user) {
         return (
             <Routes>
@@ -48,6 +45,9 @@ function AppContent() {
         );
     }
 
+    // Con contraseña temporal el único destino es el perfil, donde se cambia.
+    // El árbol de rutas normal ni siquiera se declara, así que no hay forma de
+    // alcanzar el resto de la aplicación escribiendo la URL a mano.
     if (user.passwordTemporal) {
         return (
             <Routes>
@@ -57,7 +57,9 @@ function AppContent() {
         );
     }
 
-    // REDIRECCIÓN DINÁMICA: La ruta inicial por defecto es la primera vista asignada en la BD
+    // La ruta de entrada es la primera vista que el rol tiene concedida en la
+    // base de datos, de modo que cada perfil aterriza en la pantalla que le
+    // corresponde sin rutas fijas por rol en el código.
     const tieneVistas = user.vistasPermitidas && user.vistasPermitidas.length > 0;
     const rutaPorDefecto = tieneVistas ? user.vistasPermitidas[0].ruta : '/perfil';
 
@@ -73,12 +75,11 @@ function AppContent() {
             <Route path="/admin/avisos" element={<MainLayout><AdminAvisosPage /></MainLayout>} />
             <Route path="/admin/equipos" element={<MainLayout><AdminEquiposPage /></MainLayout>} />
 
-            {/* Historial unificado: dictamenes, resguardos y tickets en
-                pestanas, bajo una sola entrada de menu (migracion V10).
+            {/* Historial unificado: dictámenes, resguardos y tickets en
+                pestañas bajo una sola entrada de menú.
 
-                Las dos rutas siguientes ya no aparecen en el menu, pero se
-                mantienen declaradas: un enlace guardado en favoritos debe
-                seguir abriendo la pantalla que abria antes. */}
+                Las dos rutas siguientes no figuran en el menú y se mantienen
+                declaradas para que un enlace guardado siga resolviendo. */}
             <Route path="/historial" element={<MainLayout><HistorialPage /></MainLayout>} />
             <Route path="/admin/bitacora" element={<MainLayout><TicketsPage /></MainLayout>} />
             <Route path="/admin/resguardos" element={<MainLayout><HistorialResguardos /></MainLayout>} />
@@ -109,9 +110,10 @@ export default function App() {
     return (
         <ThemeProvider theme={theme}>
             <CssBaseline />
-            {/* NotificationProvider envuelve al resto para que cualquier
-                pantalla pueda lanzar avisos con useNotification(), en lugar
-                de montar su propio Snackbar o usar alert() nativo. */}
+            {/* El orden de los proveedores importa: NotificationProvider queda
+                por fuera para que cualquier pantalla lance avisos con
+                useNotification(), y WebSocketProvider por dentro de
+                AuthProvider porque la suscripción STOMP necesita la sesión. */}
             <NotificationProvider>
                 <AuthProvider>
                     <WebSocketProvider>

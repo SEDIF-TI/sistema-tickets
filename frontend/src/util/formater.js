@@ -1,9 +1,10 @@
 /**
- * Utilidades de formato compartidas.
+ * Utilidades de formato compartidas por toda la interfaz.
  *
- * Cada pantalla tenía su propia función `formatearFecha`, con formatos
- * ligeramente distintos: la misma fecha se veía diferente según dónde
- * estuvieras. Aquí quedan centralizadas.
+ * Centralizarlas aquí es lo que garantiza que una misma fecha se lea igual en
+ * cualquier pantalla: cada función define un formato con un uso concreto
+ * —tabla, detalle, encabezado— y las pantallas eligen entre ellos en lugar de
+ * componer el suyo.
  */
 
 /** Convierte a mayúsculas si es texto; el resto de valores pasan intactos. */

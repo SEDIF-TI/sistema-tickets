@@ -5,7 +5,8 @@ package com.sedif.sistema_tickets.exception;
  *
  * <p>Centralizarlos evita que el mismo error se redacte distinto en cada
  * controlador y, sobre todo, permite revisar en un solo sitio que ningun
- * mensaje filtre informacion interna.</p>
+ * mensaje filtre informacion interna. Todos estan pensados para mostrarse tal
+ * cual al usuario.</p>
  *
  * <p><b>Regla de seguridad:</b> los mensajes de autenticacion son
  * deliberadamente genericos. Decir "el correo no existe" o "la contrasena es
@@ -27,7 +28,10 @@ public final class MessageConstants {
     public static final String PETICION_MAL_FORMADA = "La solicitud no tiene el formato esperado.";
 
     // --- Autenticacion y autorizacion --------------------------------------
-    /** Unico mensaje para usuario inexistente y contrasena erronea. */
+    /**
+     * Mensaje unico para usuario inexistente y para contrasena erronea: dos
+     * textos distintos revelarian que correos estan dados de alta.
+     */
     public static final String CREDENCIALES_INVALIDAS = "Credenciales invalidas.";
     public static final String AUTENTICACION_REQUERIDA =
             "Debe iniciar sesion para acceder a este recurso.";

@@ -6,12 +6,11 @@ import jakarta.validation.constraints.Size;
 /**
  * Datos de alta y edicion de un equipo del catalogo.
  *
- * <p>Los endpoints recibian la entidad {@link Equipo} directamente. Eso
- * permitia enviar un {@code id} en el cuerpo y, en el alta, apuntar a una fila
- * existente para sobrescribirla (mass assignment); tampoco habia ninguna
- * anotacion de validacion pese al {@code @Valid} de los controladores, asi que
- * una descripcion vacia solo fallaba al llegar a la restriccion NOT NULL de la
- * base de datos, con un 500 sin explicacion.</p>
+ * <p>Los endpoints reciben este record y no la entidad {@link Equipo}: al no
+ * exponer el {@code id}, el cuerpo de la peticion no puede apuntar a una fila
+ * existente para sobrescribirla. Las anotaciones de validacion rechazan una
+ * descripcion vacia en la capa web, antes de que la restriccion NOT NULL de la
+ * base de datos la convierta en un error sin explicacion.</p>
  */
 public record EquipoRequest(
 

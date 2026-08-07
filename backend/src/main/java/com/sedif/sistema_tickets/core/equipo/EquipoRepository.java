@@ -12,11 +12,11 @@ import java.util.List;
 
 @Repository
 public interface EquipoRepository extends JpaRepository<Equipo, Long> {
-    
-    // Buscará coincidencias para el Autocomplete del frontend
+
+    /** Coincidencias parciales para el autocompletado del formulario de dictamen. */
     List<Equipo> findByDescripcionContainingIgnoreCase(String descripcion);
-    
-    // Verifica si ya existe para no duplicarlo al momento de autoguardar
+
+    /** Localiza la entrada exacta: el alta silenciosa la reutiliza en vez de duplicarla. */
     Optional<Equipo> findByDescripcionIgnoreCase(String descripcion);
 
     /** Igual que el anterior, excluyendo un equipo concreto: sirve al editar. */

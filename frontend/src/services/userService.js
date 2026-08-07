@@ -12,8 +12,8 @@ export const userService = {
      * Listado paginado del panel. Recibe el objeto que arma `useTablaPaginada`
      * ({ page, size, sort, busqueda, ...filtros }) y devuelve un `PageResponse`.
      *
-     * Antes traía la tabla completa y el filtrado ocurría en el navegador, de
-     * modo que la búsqueda solo miraba lo ya descargado.
+     * La búsqueda se resuelve en la base y alcanza a todos los usuarios, no
+     * solo a la página descargada.
      */
     getAll: (params = {}) => api.get('/v1/admin/usuarios', { params }),
 

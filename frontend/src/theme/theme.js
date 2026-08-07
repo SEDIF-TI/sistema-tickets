@@ -6,9 +6,8 @@ import { createTheme, alpha } from '@mui/material/styles';
  * ============================================================================
  *
  * Fuente única de verdad para color, tipografía, espaciado y estados.
- * Ningún componente debe escribir colores a mano: si algo falta aquí, se
- * añade aquí. Antes convivían dos identidades (guinda en las páginas y rosa
- * en el tema) y más de 30 valores hex sueltos por el código.
+ * Ningún componente escribe colores a mano: lo que falte se añade aquí y se
+ * consume desde la paleta o desde `theme.brand`.
  *
  * Todos los pares de color están verificados contra WCAG 2.1 AA:
  * texto normal ≥ 4.5:1, componentes de interfaz ≥ 3:1.
@@ -52,11 +51,12 @@ const neutro = {
 };
 
 /**
- * Colores de estado, oscurecidos respecto de los anteriores para que
- * funcionen tanto de texto sobre blanco como de fondo con texto blanco:
- *   success 3.30:1 → 5.02:1    warning 3.19:1 → 5.02:1    error 4.83:1 → 5.62:1
- * El caso que fallaba en producción eran los avisos globales, que usan
- * Alert de severidad warning en variante rellena.
+ * Colores de estado. Cada `main` sirve para los dos usos que les da MUI:
+ * texto sobre blanco y fondo con texto blanco. Ratios sobre blanco:
+ * success 5.02:1, warning 5.02:1, error 5.62:1, info 5.85:1.
+ *
+ * El uso más exigente es `Alert` en variante rellena, donde el `main` pasa a
+ * ser fondo y el texto se pinta con `contrastText`.
  */
 const estado = {
   success: { main: '#15803D', light: '#DCFCE7', dark: '#166534', contrastText: '#FFFFFF' },
@@ -134,8 +134,8 @@ const theme = createTheme({
     fontFamily: '"Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
     fontSize: 16,
 
-    // 700 solo en h1–h2 (display) y 600 en el resto, para que la jerarquía no
-    // dependa únicamente del tamaño. Antes todos los headings pesaban 700.
+    // 700 en h1–h2 y 600 en el resto: la jerarquía se apoya en el peso además
+    // del tamaño.
     h1: { fontSize: '2.5rem',   fontWeight: 700, lineHeight: 1.2,  letterSpacing: '-0.02em' },
     h2: { fontSize: '2rem',     fontWeight: 700, lineHeight: 1.25, letterSpacing: '-0.01em' },
     h3: { fontSize: '1.75rem',  fontWeight: 600, lineHeight: 1.3 },
@@ -295,56 +295,43 @@ const theme = createTheme({
       styleOverrides: {
         root: {
           transition: 'background-color 150ms',
-          // El resaltado al pasar el cursor es solo para las filas de datos.
-          // Aplicado a `root` alcanzaba tambien a la fila de encabezado, que
-          // va sobre fondo guinda: el gris claro encima la lavaba y el texto
-          // blanco quedaba casi ilegible.
+          // Resaltado de fila al pasar el cursor. Solo tiene efecto visible en
+          // las filas de datos: la fila de encabezado lleva fondo guinda
+          // aplicado desde DynamicTable, que gana en especificidad.
           '&:hover': { backgroundColor: neutro[50] },
-          // La fila de encabezado no reacciona en absoluto al cursor.
-          //
-          // `backgroundColor: 'transparent'` era justo lo contrario de lo que
-          // hace falta: en lugar de conservar el guinda, lo BORRABA al pasar
-          // el raton y dejaba ver el fondo de debajo. Con la transicion activa,
-          // ese cambio se veia como un desvanecido del color.
-          //
-          // `inherit` mantiene el fondo que la tabla ya le dio, de modo que no
-          // hay nada que animar.
-          '.MuiTableHead-root &': { transition: 'none' },
-          '.MuiTableHead-root &:hover': { backgroundColor: 'inherit' },
         },
       },
     },
 
-    // Cabeceras de columna ordenables.
+    // Control de ordenacion de las cabeceras de columna.
     //
-    // El encabezado se queda COMPLETAMENTE quieto al pasar el cursor: ni color,
-    // ni fondo, ni transiciones, ni aparicion de la flecha. La unica flecha
-    // visible es la de la columna por la que se esta ordenando, que es
-    // informacion sobre el estado de la tabla, no un efecto del cursor.
-    //
-    // Intentos anteriores solo neutralizaron el color y el fondo, y el
-    // movimiento seguia ahi: lo que se percibia como "animacion" era la flecha
-    // apareciendo por opacidad en cada columna al pasar por encima.
+    // El encabezado no reacciona al cursor: conserva color y fondo, y la flecha
+    // solo se muestra en la columna por la que esta ordenada la tabla
+    // (`.Mui-active`). Por defecto MUI revela la flecha al pasar el raton sobre
+    // cualquier columna ordenable, y anima esa aparicion mediante opacidad.
     MuiTableSortLabel: {
-      // TableSortLabel es un ButtonBase: al pulsarlo dibujaba la onda de
-      // Material. Se desactiva solo aqui; botones y menus la conservan.
+      // TableSortLabel extiende ButtonBase, que dibuja la onda de Material al
+      // pulsar. Se desactiva unicamente en este componente; botones y menus la
+      // conservan.
       defaultProps: { disableRipple: true },
       styleOverrides: {
         root: {
+          // `inherit` toma el color de la celda, que sobre fondo guinda es
+          // blanco. El fondo se deja transparente porque el color lo aporta la
+          // celda contenedora: fijarlo aqui taparia el guinda.
           color: 'inherit',
           transition: 'none',
           '&:hover': { color: 'inherit', backgroundColor: 'transparent' },
           '&.Mui-focusVisible': { color: 'inherit', backgroundColor: 'transparent' },
 
-          // La flecha permanece oculta salvo en la columna activa. Sin esto,
-          // MUI la revela al pasar el cursor y esa aparicion es el movimiento
-          // que se veia en todos los encabezados.
+          // Flecha oculta en reposo y al pasar el cursor.
           '& .MuiTableSortLabel-icon': {
             opacity: 0,
             transition: 'none',
           },
           '&:hover .MuiTableSortLabel-icon': { opacity: 0 },
 
+          // Columna activa: la flecha indica la direccion del orden vigente.
           '&.Mui-active': {
             color: 'inherit',
             '&:hover': { color: 'inherit', backgroundColor: 'transparent' },

@@ -6,27 +6,16 @@ import java.util.Optional;
 /**
  * Ciclo de vida de un ticket de soporte.
  *
- * <p>Sustituye a la tabla {@code estadoticket}, que era un catalogo de tres
- * filas que el codigo trataba de todos modos como constantes: las buscaba con
- * {@code findByNombre("ABIERTO")}, {@code findByNombre("EN PROCESO")} y
- * {@code findByNombre("CERRADO")} escritas literalmente. La tabla no aportaba
- * flexibilidad real —anadir una fila no habria creado ninguna transicion
- * nueva, porque las transiciones estan en el codigo— y en cambio si aportaba
- * dos problemas:</p>
+ * <p>El conjunto de estados vive en el codigo y no en una tabla de catalogo,
+ * porque las transiciones entre ellos tambien estan en el codigo: un estado que
+ * ninguna parte del sistema supiera interpretar dejaria el ticket en una
+ * situacion muerta, invisible para los filtros. Al ser un enum, el compilador
+ * garantiza que solo existen los tres valores contemplados.</p>
  *
- * <ul>
- *   <li>Una base recien migrada arrancaba con el catalogo vacio y el sistema
- *       fallaba al crear el primer ticket, al avisar de que el tecnico va en
- *       camino y al cerrarlo, siempre por un estatus inexistente.</li>
- *   <li>El endpoint de administracion permitia dar de alta estatus nuevos que
- *       ninguna parte del codigo sabia interpretar, dejando tickets en estados
- *       muertos, invisibles para los filtros.</li>
- * </ul>
- *
- * <p>Los nombres de las constantes se guardan tal cual en la columna
- * {@code s_estado} del ticket, y coinciden con los que ya existian en la base
- * de datos salvo por el guion bajo de {@code EN_PROCESO}, que la migracion V4
- * normaliza.</p>
+ * <p>El nombre de la constante se guarda tal cual en la columna
+ * {@code s_estado} del ticket. Cada valor lleva asociada una etiqueta legible,
+ * que es la que se muestra en la interfaz y en los documentos generados:
+ * separar ambas permite cambiar el texto visible sin tocar lo almacenado.</p>
  */
 public enum EstadoTicket {
 
@@ -50,14 +39,15 @@ public enum EstadoTicket {
         return etiqueta;
     }
 
-    /** Indica si el ticket ya termino su ciclo. */
+    /** Indica si el ticket ya termino su ciclo y no admite mas transiciones. */
     public boolean esFinal() {
         return this == CERRADO;
     }
 
     /**
-     * Convierte a enum el texto recibido, tolerando mayusculas, espacios y la
-     * forma antigua con espacio ("EN PROCESO" ademas de "EN_PROCESO").
+     * Convierte a enum el texto recibido. Normaliza mayusculas, espacios
+     * sobrantes y el espacio interior, de modo que admite tanto
+     * {@code "EN PROCESO"} como {@code "EN_PROCESO"}.
      *
      * <p>Devuelve {@link Optional#empty()} si no corresponde a ningun estado
      * conocido: un filtro con un valor invalido no debe romper la consulta de

@@ -15,6 +15,13 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 
+/**
+ * Ciclo de vida del resguardo: entrega, consulta, devolucion y caducidad.
+ *
+ * <p>El plazo se fija en el alta a partir de la duracion solicitada. Una tarea
+ * programada revisa a diario los prestamos vencidos, los pasa a
+ * {@code VENCIDO} y avisa a quien los registro por Telegram y por WebSocket.</p>
+ */
 @Service
 @Slf4j
 @RequiredArgsConstructor
@@ -25,6 +32,12 @@ public class ResguardoService {
     private final SimpMessagingTemplate messagingTemplate;
     private final SedifTelegramBot telegramBot;
 
+    /**
+     * Registra la entrega de un equipo.
+     *
+     * <p>El resguardo nace en estado ENTREGADO y queda vinculado a quien lo
+     * captura, que es el destinatario de los avisos de vencimiento.</p>
+     */
     @Transactional
     public ResguardoResponse crearResguardo(ResguardoRequest request, String correoCreador) {
         Usuario usuario = usuarioRepository.findByCorreo(correoCreador)
@@ -53,16 +66,17 @@ public class ResguardoService {
     }
 
     /**
-     * Calcula la fecha en que vence el prestamo.
+     * Calcula la fecha en que vence el prestamo sumando la cantidad indicada
+     * en la unidad correspondiente (dias, semanas o meses).
      *
-     * <p>Se extrajo a un metodo propio porque la version anterior solo
-     * contemplaba "Dias" y "Semanas": cualquier otro valor caia en el
-     * {@code else} y dejaba el resguardo <b>sin fecha de vencimiento</b>, de
-     * modo que nunca aparecia como vencido y el equipo podia quedarse prestado
-     * indefinidamente sin que nadie lo detectara.</p>
+     * <p>Un resguardo sin fecha de vencimiento nunca lo detecta la revision
+     * programada, de modo que el equipo puede quedarse prestado indefinidamente
+     * sin que nadie lo advierta. Por eso el unico caso que devuelve
+     * {@code null} sin dejar rastro es el prestamo declarado INDEFINIDO;
+     * cualquier unidad no reconocida se registra en el log.</p>
      *
-     * @return la fecha de vencimiento, o {@code null} si el prestamo es
-     *         indefinido de forma deliberada.
+     * @return la fecha de vencimiento, o {@code null} si el prestamo no tiene
+     *         plazo.
      */
     private LocalDateTime calcularVencimiento(String tipo, Integer cantidad) {
         if (tipo == null || cantidad == null || cantidad <= 0) {
@@ -92,10 +106,7 @@ public class ResguardoService {
                 .toList();
     }
 
-    /**
-     * Historial paginado. Con 40 resguardos ya registrados y creciendo, traer
-     * la tabla completa en cada consulta no se sostiene.
-     */
+    /** Historial paginado sin filtros, para cuando solo se navega por paginas. */
     @Transactional(readOnly = true)
     public PageResponse<ResguardoResponse> listarPaginado(Pageable pageable) {
         return listarPaginado(null, null, pageable);
@@ -104,8 +115,9 @@ public class ResguardoService {
     /**
      * Listado paginado con busqueda y filtro de estado resueltos en la base.
      *
-     * <p>La pantalla filtraba sobre la pagina ya descargada, asi que buscar un
-     * numero de serie solo miraba los diez resguardos visibles.</p>
+     * <p>Filtrar en la consulta y no sobre la pagina ya descargada es lo que
+     * permite que buscar un numero de serie recorra todo el historial y no solo
+     * los resguardos visibles.</p>
      */
     @Transactional(readOnly = true)
     public PageResponse<ResguardoResponse> listarPaginado(
@@ -147,10 +159,13 @@ public class ResguardoService {
     }
 
     /**
-     * Resguardos proximos a vencer, para poder avisar al usuario ANTES de que
-     * el prestamo caduque en lugar de reclamarlo despues.
+     * Resguardos que venceran dentro de los proximos dias, para avisar al
+     * usuario antes de que el prestamo caduque en lugar de reclamarlo despues.
      *
-     * @param dias ventana de anticipacion (por defecto 7).
+     * <p>Solo considera los que siguen ENTREGADO: los devueltos y los ya
+     * vencidos quedan fuera de la ventana.</p>
+     *
+     * @param dias ventana de anticipacion, contada desde el momento actual.
      */
     @Transactional(readOnly = true)
     public List<ResguardoResponse> listarPorVencer(int dias) {
@@ -164,14 +179,20 @@ public class ResguardoService {
                 .toList();
     }
 
+    /**
+     * Cierra el resguardo al regresar el equipo.
+     *
+     * <p>Un resguardo VENCIDO tambien puede devolverse: el vencimiento indica
+     * que el plazo expiro, no que el prestamo este cerrado.</p>
+     */
     @Transactional
     public ResguardoResponse devolverEquipo(Long resguardoId) {
         Resguardo resguardo = resguardoRepository.findById(resguardoId)
                 .orElseThrow(() -> new IllegalArgumentException("Resguardo no encontrado."));
 
-        // Un resguardo ya devuelto no puede devolverse dos veces: sin esta
-        // comprobacion, un doble clic reescribia la fecha de modificacion y
-        // falseaba la trazabilidad.
+        // La devolucion es una operacion unica: repetirla reescribiria la fecha
+        // de modificacion del registro y falsearia la trazabilidad de cuando
+        // regreso realmente el equipo. Un doble clic queda cubierto por aqui.
         if (resguardo.getEstado() == EstadoResguardo.DEVUELTO) {
             throw new IllegalStateException("Este resguardo ya fue devuelto.");
         }
@@ -180,11 +201,25 @@ public class ResguardoService {
         return ResguardoResponse.desdeEntidad(resguardoRepository.save(resguardo));
     }
 
+    /**
+     * Revision programada de vencimientos: marca como VENCIDO todo prestamo
+     * cuyo plazo expiro y sigue sin devolverse, y avisa a quien lo registro.
+     *
+     * <p>La hora de ejecucion se toma de
+     * {@code app.resguardos.revision-vencimientos-cron}, con las seis de la
+     * manana por defecto.</p>
+     *
+     * <p>Cada resguardo se procesa dentro de su propio {@code try}: un fallo al
+     * enviar el aviso de Telegram o la notificacion por WebSocket se registra en
+     * el log pero no interrumpe el recorrido, de modo que un destinatario
+     * inaccesible no impide marcar los demas vencimientos.</p>
+     */
     @Transactional
     @Scheduled(cron = "${app.resguardos.revision-vencimientos-cron:0 0 6 * * *}")
     public void verificarVencimientos() {
         LocalDateTime ahora = LocalDateTime.now();
-        // 👈 CORREGIDO: Buscamos resguardos con estado ENTREGADO
+        // Solo los ENTREGADO: los devueltos ya no interesan y los que ya estan
+        // en VENCIDO no deben volver a notificarse cada dia.
         List<Resguardo> vencidos = resguardoRepository.findByFechaVencimientoBeforeAndEstado(ahora, EstadoResguardo.ENTREGADO);
 
         if (vencidos.isEmpty()) {
@@ -197,8 +232,14 @@ public class ResguardoService {
                 r.setEstado(EstadoResguardo.VENCIDO);
                 resguardoRepository.save(r);
 
+                // El aviso por Telegram requiere que quien registro el
+                // resguardo haya vinculado su cuenta desde el perfil: sin chat
+                // id no hay destinatario al que enviar.
                 if (r.getUsuarioCreador() != null && r.getUsuarioCreador().getTelegramChatId() != null) {
                     try {
+                        // Los datos del prestamo pueden venir incompletos, asi
+                        // que cada uno lleva su valor de relleno: el mensaje
+                        // debe salir aunque falte algun campo opcional.
                         String solicitante = r.getSolicitanteNombre() != null ? r.getSolicitanteNombre() : "SIN NOMBRE";
                         String numero = r.getSolicitanteNumero() != null ? r.getSolicitanteNumero() : "N/A";
                         String equipo = r.getEquipoNombre() != null ? r.getEquipoNombre() : "EQUIPO";
@@ -216,6 +257,8 @@ public class ResguardoService {
                     }
                 }
 
+                // Difusion por STOMP: las pantallas suscritas al canal de
+                // alertas muestran el vencimiento sin esperar a recargar.
                 try {
                     ResguardoResponse payload = ResguardoResponse.desdeEntidad(r);
                     messagingTemplate.convertAndSend("/topic/alertas-resguardos", payload);

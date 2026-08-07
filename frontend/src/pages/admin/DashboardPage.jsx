@@ -34,25 +34,27 @@ const REJILLA = { stroke: '#e6e6e3', strokeDasharray: '0' };
 const EJE = { fontSize: 11, fill: '#52514e' };
 
 /**
- * Panel de métricas.
+ * Panel de control del administrador: resumen de la operación de soporte.
  *
- * Cambios respecto a la versión anterior:
- *  - Cada gráfica se dibujaba aunque su lista viniera vacía. Como
- *    `ResponsiveContainer` mide el alto de su padre y el padre colapsaba,
- *    Recharts avisaba en consola ("width(-1) and height(-1)") y la pantalla
- *    mostraba un bloque en blanco sin explicación: era el hueco visible en un
- *    panel recién instalado, cuando todavía no hay tickets.
- *  - Los colores salían de una lista recorrida por índice, así que seguían la
- *    posición y no la categoría: al filtrar, "Abierto" cambiaba de color. Y el
- *    par verde/rojo es justo el que no distingue un daltónico.
- *  - Dos gráficas de pastel, una de ellas para comparar valores cercanos, que
- *    es lo que peor lee el ojo. La de prioridad pasa a barras.
- *  - Una etiqueta numérica sobre cada punto de cada serie. Ahora el valor vive
- *    en el eje, en el tooltip y en la vista de tabla.
- *  - Los totales se mostraban como gráficas de una sola barra; ahora son
- *    cifras, que es lo que son.
- *  - No había forma de leer los datos sin ver los colores; cada tarjeta ofrece
- *    su vista de tabla.
+ * Todo el contenido sale de una sola llamada a `dashboardService.getMetricas()`
+ * que devuelve las series ya agregadas por el backend. Mientras responde se
+ * muestra un indicador de carga, y si falla, un aviso con botón de reintento en
+ * lugar de gráficas vacías.
+ *
+ * La parte superior son cuatro cifras —tickets registrados, tickets abiertos,
+ * usuarios y encuestas respondidas— porque un total no gana nada dibujado como
+ * una barra. Debajo, cada `TarjetaGrafica` recibe su serie en `datos` y solo
+ * dibuja a su hijo cuando hay algo que mostrar; si la serie viene vacía pinta el
+ * texto de `vacio`, lo que además evita que `ResponsiveContainer` mida un padre
+ * colapsado. Con `columnas` la tarjeta ofrece también una vista de tabla, para
+ * leer los valores sin depender del color.
+ *
+ * Los colores de estado, prioridad y calificación se piden por categoría a las
+ * funciones de `paletaGraficas` y `calificacion`, nunca por posición en la
+ * lista: así una misma categoría conserva su color aunque cambie de sitio.
+ *
+ * El botón de imprimir usa `window.print()` sobre la propia página; la cabecera
+ * lleva `ocultar-al-imprimir` para no salir en el papel.
  */
 export default function DashboardPage() {
     const { notificarError } = useNotification();
@@ -110,7 +112,7 @@ export default function DashboardPage() {
     const porCalificacion = datos?.porCalificacion ?? [];
     const calificacionPorTecnico = datos?.calificacionPorTecnico ?? [];
 
-    // Total de encuestas respondidas, para la tarjeta de cifra.
+    // El backend envía las encuestas repartidas por calificación, no el total.
     const totalEncuestas = porCalificacion.reduce((suma, c) => suma + (c.cantidad ?? 0), 0);
 
     const abiertos = porEstatus.find((e) => e.nombre === 'Abierto')?.cantidad ?? 0;
@@ -157,7 +159,6 @@ export default function DashboardPage() {
                 </Stack>
             </Box>
 
-            {/* ------------------------------------------------- cifras ---- */}
             <Box
                 sx={{
                     display: 'grid',
@@ -193,7 +194,6 @@ export default function DashboardPage() {
                 />
             </Box>
 
-            {/* ----------------------------------------------- gráficas ---- */}
             <Box
                 sx={{
                     display: 'grid',
@@ -339,9 +339,10 @@ export default function DashboardPage() {
                                 {calificacionPorTecnico.map((entrada) => (
                                     <Cell key={entrada.nombre} fill={colorPromedio(entrada.promedio)} />
                                 ))}
-                                {/* Se muestra el promedio junto al numero de
-                                    respuestas: una media de 3.0 sobre una sola
-                                    encuesta no dice lo mismo que sobre cuarenta. */}
+                                {/* El tooltip acompaña el promedio con el número
+                                    de respuestas: una media de 3.0 sobre una
+                                    sola encuesta no dice lo mismo que sobre
+                                    cuarenta. */}
                                 <LabelList
                                     dataKey="promedio"
                                     position="right"

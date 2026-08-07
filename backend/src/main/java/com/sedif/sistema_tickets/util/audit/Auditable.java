@@ -10,6 +10,21 @@ import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import java.time.LocalDateTime;
 
+/**
+ * Base de las entidades que llevan rastro de quien las creo y modifico, y
+ * cuando.
+ *
+ * <p>Al ser {@code @MappedSuperclass}, no tiene tabla propia: sus cuatro
+ * columnas se anaden a la de cada entidad que la hereda. El
+ * {@code AuditingEntityListener} las rellena solo, sin que los servicios tengan
+ * que asignarlas: las anotadas con {@code @CreatedDate} y {@code @CreatedBy} en
+ * el alta, y las de {@code @LastModifiedDate} y {@code @LastModifiedBy} en cada
+ * actualizacion. El autor lo aporta {@link AuditorAwareImpl}.</p>
+ *
+ * <p>Las columnas de creacion se declaran {@code updatable = false}, de modo
+ * que quedan fijadas en el alta y ninguna modificacion posterior puede
+ * alterarlas: es lo que mantiene util el rastro.</p>
+ */
 @MappedSuperclass
 @EntityListeners(AuditingEntityListener.class)
 public abstract class Auditable {
@@ -30,7 +45,6 @@ public abstract class Auditable {
     @Column(name = "s_modificado_por", length = 100)
     private String modificadoPor;
 
-    // --- Getters y Setters ---
     public LocalDateTime getFechaCreacion() { return fechaCreacion; }
     public void setFechaCreacion(LocalDateTime fechaCreacion) { this.fechaCreacion = fechaCreacion; }
 

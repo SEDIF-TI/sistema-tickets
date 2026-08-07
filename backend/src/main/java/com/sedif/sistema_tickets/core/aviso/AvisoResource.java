@@ -20,15 +20,12 @@ import java.util.List;
 /**
  * Gestion y consulta de avisos.
  *
- * <p>Antes ninguna operacion comprobaba el rol: al colgar de
- * {@code /api/v1/avisos} quedaba fuera del patron {@code /api/v1/admin/**} y
- * bastaba con estar autenticado, de modo que <b>cualquier empleado podia
- * crear, editar o borrar los avisos globales</b> que ve toda la organizacion.</p>
- *
- * <p>La ruta se mantiene por compatibilidad con el frontend, pero la
- * autorizacion se aplica ahora por metodo: solo la lectura de avisos activos
- * queda abierta a cualquier usuario autenticado, porque la necesitan todos los
- * paneles ({@code MainLayout} y {@code SoporteLayout}).</p>
+ * <p>La ruta queda fuera del patron {@code /api/v1/admin/**}, asi que la
+ * autorizacion se aplica metodo a metodo con {@code @PreAuthorize}. La lectura
+ * de avisos vigentes es la unica operacion abierta a cualquier sesion, porque
+ * la consumen todos los paneles ({@code MainLayout} y {@code SoporteLayout});
+ * crear, editar y dar de baja exigen rol ADMINISTRADOR, ya que un aviso global
+ * lo ve toda la organizacion.</p>
  */
 @RestController
 @RequestMapping("/api/v1/avisos")

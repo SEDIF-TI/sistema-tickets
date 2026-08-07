@@ -8,10 +8,9 @@ import jakarta.validation.constraints.Size;
 /**
  * Datos para dar de alta un usuario desde el panel de administracion.
  *
- * <p>El campo {@code password} que existia antes se elimino: nunca se usaba,
- * porque {@code UsuarioService} genera una contrasena temporal aleatoria.
- * Aceptarlo desde el cliente solo abria la puerta a que alguien fijara una
- * contrasena conocida de antemano.</p>
+ * <p>No incluye contrasena: {@code UsuarioService} genera una temporal
+ * aleatoria en el servidor. Aceptarla desde el cliente permitiria fijar una
+ * clave conocida de antemano.</p>
  */
 public record UsuarioRequest(
 

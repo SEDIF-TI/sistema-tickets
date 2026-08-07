@@ -13,19 +13,15 @@ import java.util.List;
 /**
  * Consulta del catalogo de roles.
  *
- * <p>Endurecido respecto a la version anterior, que tenia dos problemas
- * serios: la ruta {@code /api/roles} quedaba fuera del patron
- * {@code /api/v1/admin/**} y por tanto solo exigia estar autenticado, de modo
- * que <b>cualquier empleado podia crear roles</b>; y el {@code POST} recibia
- * la entidad {@link Rol} completa, permitiendo fijar campos arbitrarios
- * (mass assignment).</p>
- *
- * <p>El {@code POST} se elimino: los roles son un catalogo fijo del sistema
- * ({@code ADMINISTRADOR}, {@code SOPORTE}, {@code EMPLEADO}) ligado a la
- * logica de negocio y a las vistas del menu. Crearlos en caliente por HTTP no
- * responde a ninguna necesidad real y era un vector de escalada de
- * privilegios. Si hiciera falta anadir un rol, corresponde a una migracion
+ * <p>Solo expone lectura. Los roles ({@code ADMINISTRADOR}, {@code SOPORTE},
+ * {@code EMPLEADO}) son un catalogo fijo, ligado a la logica de negocio y a
+ * las vistas del menu: darlos de alta en caliente por HTTP seria un vector de
+ * escalada de privilegios, de modo que anadir uno corresponde a una migracion
  * Flyway revisada.</p>
+ *
+ * <p>La ruta cuelga de {@code /api/v1/admin/**} y ademas exige el rol
+ * ADMINISTRADOR con {@code @PreAuthorize}, que viaja con el propio controlador
+ * aunque cambie el patron de URL.</p>
  */
 @RestController
 @RequestMapping("/api/v1/admin/roles")

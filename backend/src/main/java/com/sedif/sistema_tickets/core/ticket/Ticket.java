@@ -30,7 +30,8 @@ public class Ticket extends Auditable {
     @Column(name = "s_descripcion", nullable = false, columnDefinition = "TEXT")
     private String descripcion;
     
-    // ---> NUEVO CAMPO: Guardará el nombre de quien físicamente tiene la falla
+    // Persona que fisicamente sufre la falla, que no siempre es quien levanta
+    // el ticket: soporte puede reportar en nombre de un tercero.
     @Column(name = "s_solicitante_nombre", length = 100)
     private String solicitanteNombre;
 
@@ -38,12 +39,12 @@ public class Ticket extends Auditable {
     private String justificacion;
 
     /**
-     * Estado del ticket.
+     * Estado del ticket dentro de su ciclo de vida: ABIERTO, EN_PROCESO o
+     * CERRADO.
      *
-     * <p>Antes era un {@code @ManyToOne} contra la tabla catalogo
-     * {@code estadoticket}, retirada en la migracion V4: eran tres filas fijas
-     * que obligaban a un JOIN en cada consulta y dejaban el sistema inservible
-     * si la tabla llegaba vacia a una base nueva.</p>
+     * <p>Vive en el enum {@link EstadoTicket} y no en una tabla catalogo: son
+     * valores fijos, y resolverlos en memoria evita un JOIN en cada consulta y
+     * la dependencia de que esas filas existan en la base.</p>
      *
      * <p>Se guarda como texto ({@code EnumType.STRING}) y no por su posicion:
      * con {@code ORDINAL}, insertar un valor nuevo en medio del enum
@@ -62,11 +63,11 @@ public class Ticket extends Auditable {
     private Usuario usuarioSoporte;
 
     /**
-     * Prioridad de atencion.
+     * Prioridad de atencion, acotada al enum {@link Prioridad}.
      *
-     * <p>Era un {@code String} libre: el enum {@link Prioridad} ya existia pero
-     * nadie lo usaba, asi que la columna admitia cualquier texto y un error de
-     * escritura creaba una categoria nueva en la grafica del panel.</p>
+     * <p>El enum cierra el conjunto de valores admitidos: si la columna
+     * aceptara texto libre, un error de escritura crearia una categoria nueva
+     * en las graficas del panel que agrupan por prioridad.</p>
      */
     @Enumerated(EnumType.STRING)
     @Column(name = "s_prioridad", nullable = false, length = 20)

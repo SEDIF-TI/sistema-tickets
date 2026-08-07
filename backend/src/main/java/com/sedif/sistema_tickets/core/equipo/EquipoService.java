@@ -16,9 +16,9 @@ import java.util.List;
  * <p>Sirve para no volver a teclear marca y modelo en cada dictamen tecnico:
  * el formulario ofrece autocompletado sobre lo ya registrado.</p>
  *
- * <p>Esta capa no existia: {@code EquipoResource} manipulaba el repositorio
- * directamente desde el controlador, sin transacciones y con la logica de
- * negocio mezclada con la capa web.</p>
+ * <p>La descripcion es la clave del catalogo y se normaliza a mayusculas en
+ * toda operacion de escritura, de modo que la restriccion UNIQUE impida
+ * duplicados por diferencias de capitalizacion.</p>
  */
 @Service
 @Slf4j
@@ -72,9 +72,9 @@ public class EquipoService {
      * Alta silenciosa desde el formulario de dictamen: si la descripcion ya
      * existe, actualiza marca y modelo; si no, crea la entrada.
      *
-     * <p>Todo se normaliza a mayusculas para evitar duplicados por diferencias
-     * de capitalizacion ("Laptop Dell" y "LAPTOP DELL" serian dos entradas
-     * distintas en un catalogo pensado justo para reutilizar).</p>
+     * <p>Marca y modelo solo se sobrescriben si vienen informados, para que un
+     * dictamen que los deja en blanco no borre lo que ya constaba en el
+     * catalogo.</p>
      */
     @Transactional
     public Equipo registrarOActualizar(EquipoRequest peticion) {
@@ -104,8 +104,8 @@ public class EquipoService {
 
         String descripcion = peticion.descripcion().trim().toUpperCase();
 
-        // La descripcion tiene restriccion UNIQUE. Sin esta comprobacion, el
-        // choque lo detectaba la base y devolvia un 500 sin explicar la causa.
+        // Adelantar la comprobacion de la restriccion UNIQUE permite explicar
+        // el choque, en lugar del 500 generico que produce el error de la base.
         if (equipoRepository.existsByDescripcionIgnoreCaseAndIdNot(descripcion, id)) {
             throw new IllegalArgumentException(
                     "Ya existe otro equipo con la descripcion " + descripcion + ".");

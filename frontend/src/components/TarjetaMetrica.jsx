@@ -3,12 +3,13 @@ import { Paper, Box, Typography } from '@mui/material';
 /**
  * Cifra destacada del panel.
  *
- * Cuando el dato es un solo número, un número es mejor que una gráfica: una
+ * Cuando el dato es un solo número, un número dice más que una gráfica: una
  * barra única o un pastel de dos porciones ocupan diez veces más espacio para
- * decir lo mismo.
+ * comunicar lo mismo.
  *
- * La cifra usa tipografía proporcional y no `tabular-nums`: a tamaño grande,
- * los dígitos de ancho fijo hacen que un "121" se vea suelto.
+ * La cifra se deja en tipografía proporcional y no en `tabular-nums`: a este
+ * tamaño los dígitos de ancho fijo separan visualmente un "121". El ancho fijo
+ * se reserva para las tablas, donde sí hay cifras que alinear.
  *
  * @param {string} etiqueta  Qué se está contando.
  * @param {number|string} valor  La cifra.

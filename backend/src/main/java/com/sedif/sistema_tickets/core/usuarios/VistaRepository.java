@@ -5,6 +5,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
 public interface VistaRepository extends JpaRepository<Vista, Long> {
-    // Si más adelante queremos buscar vistas activas por nombre, Spring lo hace solo
+    /** Vistas dadas de alta, para armar el menu dinamico. */
     List<Vista> findByActivoTrue();
 }

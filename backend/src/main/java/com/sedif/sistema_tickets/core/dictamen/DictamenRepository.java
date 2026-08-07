@@ -17,7 +17,11 @@ public interface DictamenRepository extends JpaRepository<Dictamen, Long> {
      * <p>El texto llega ya en minusculas y con comodines desde el servicio. El
      * CAST fija el tipo del parametro: PostgreSQL no puede inferirlo cuando es
      * nulo dentro de LOWER(...), y falla con
-     * {@code function lower(bytea) does not exist}.</p>
+     * {@code function lower(bytea) does not exist}. El ESCAPE '!' respeta el
+     * escapado que el servicio aplica a '%', '_' y '!'.</p>
+     *
+     * <p>El EntityGraph trae al tecnico en la misma consulta, de modo que
+     * convertir la pagina a DTO no dispare una consulta por fila.</p>
      */
     @EntityGraph(attributePaths = {"tecnico"})
     @Query("""
@@ -35,11 +39,12 @@ public interface DictamenRepository extends JpaRepository<Dictamen, Long> {
     /**
      * Mayor consecutivo de folio del ano indicado.
      *
-     * <p>Mismo enfoque que en el taller: se toma el maximo del ano en curso en
-     * lugar de {@code count() + 1}, que duplicaria folios si dos tecnicos
-     * emiten a la vez y nunca reiniciaria la numeracion al cambiar de ano. La
-     * restriccion UNIQUE de la columna es la garantia final ante una
-     * colision.</p>
+     * <p>Mismo enfoque que en el taller: SUBSTRING extrae la parte numerica que
+     * sigue al prefijo en folios con formato {@code DIC-2026-N} y se toma su
+     * maximo, acotando la busqueda a los folios de ese ano. Asi la numeracion
+     * arranca de nuevo en cada ejercicio y no depende del total de filas.</p>
+     *
+     * <p>Devuelve vacio cuando el ano no tiene folios todavia.</p>
      *
      * @param patron prefijo con comodin, por ejemplo {@code "DIC-2026-%"}.
      */

@@ -17,12 +17,15 @@ import java.util.List;
  * Carga los datos del usuario para Spring Security a partir del correo o del
  * nombre de usuario.
  *
- * <p>El proyecto autentica emitiendo el JWT directamente en
- * {@code AuthService}, por lo que esta clase no interviene en el login. Se
- * incluye porque el estandar la exige y porque es el punto de integracion
- * necesario si mas adelante se adopta el {@code AuthenticationManager} de
- * Spring, se anaden proveedores adicionales o se usa {@code @PreAuthorize}
- * con expresiones que consulten el {@code UserDetails}.</p>
+ * <p>Traduce un {@code Usuario} del dominio al {@link UserDetails} que Spring
+ * Security entiende: el correo como username, el hash BCrypt como credencial,
+ * una autoridad {@code ROLE_<ROL>} y la cuenta marcada como deshabilitada
+ * cuando el usuario no esta activo.</p>
+ *
+ * <p>Es el punto de integracion que consulta el {@code AuthenticationManager}
+ * de Spring y las expresiones {@code @PreAuthorize} que necesitan resolver un
+ * {@code UserDetails}. El login por JWT no pasa por aqui: {@code AuthService}
+ * verifica las credenciales y emite el token directamente.</p>
  */
 @Service
 @RequiredArgsConstructor
@@ -36,7 +39,8 @@ public class UserDetailsServiceImpl implements UserDetailsService {
         Usuario usuario = usuarioRepository
                 .findByCorreoOrUsername(identificador, identificador)
                 .orElseThrow(() -> new UsernameNotFoundException(
-                        // Mensaje generico a proposito: no revela si la cuenta existe.
+                        // Mensaje generico a proposito: distinguir "no existe"
+                        // de "contrasena incorrecta" permitiria enumerar cuentas.
                         "Credenciales invalidas."));
 
         String rol = usuario.getRol() != null ? usuario.getRol().getNombre() : "SIN_ROL";

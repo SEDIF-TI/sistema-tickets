@@ -7,16 +7,11 @@ import jakarta.validation.constraints.Size;
 /**
  * Registro de una actividad del plan anual de trabajo.
  *
- * <p>Sustituye al {@code Map<String, Object>} sin tipo que recibia el
- * endpoint. Aquel enfoque tenia dos problemas serios:</p>
- * <ul>
- *   <li>Aceptaba un {@code usuarioId} enviado por el cliente, de modo que
- *       cualquiera podia registrar actividades <b>a nombre de otra persona</b>.
- *       Ahora la identidad se toma del token y ese campo desaparece.</li>
- *   <li>Llamaba a {@code payload.get("...").toString()} sin comprobar nulos:
- *       omitir un campo provocaba un {@code NullPointerException} y una
- *       respuesta 500 en lugar de un mensaje de validacion.</li>
- * </ul>
+ * <p>No lleva ningun campo de identidad: quien registra la actividad se
+ * resuelve a partir del token, de modo que nadie pueda anotarla a nombre de
+ * otra persona. Las anotaciones de validacion garantizan que los campos
+ * obligatorios lleguen presentes, y convierten una omision en un mensaje de
+ * error claro en lugar de un fallo al leerlos.</p>
  */
 public record ActividadExtraRequest(
 

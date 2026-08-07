@@ -9,6 +9,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
+/**
+ * Alta, edicion y consulta de los avisos que se muestran en los paneles.
+ *
+ * <p>Un aviso sin area es global y lo ve toda la institucion; con area, solo
+ * el personal adscrito a ella. La baja es siempre logica, de modo que el
+ * historial de auditoria se conserva.</p>
+ */
 @Service
 @RequiredArgsConstructor
 public class AvisoService {
@@ -18,9 +25,7 @@ public class AvisoService {
 
     @Transactional
     public AvisoResponseRecord crearAvisoGlobal(AvisoRequestRecord request) {
-        // El titulo y el mensaje los valida @Valid sobre el DTO: la
-        // comprobacion manual que habia aqui solo cubria el alta, asi que una
-        // edicion podia dejar el aviso en blanco.
+        // El titulo y el mensaje llegan validados por @Valid sobre el DTO.
         verificarAreaExiste(request.areaId());
 
         Aviso nuevoAviso = new Aviso();
@@ -28,8 +33,9 @@ public class AvisoService {
         nuevoAviso.setMensaje(request.mensaje().trim());
         nuevoAviso.setActivo(request.activo() != null ? request.activo() : true);
         nuevoAviso.setAreaId(request.areaId());
-        nuevoAviso.setEliminado(false); // Por defecto al crear no está eliminado
+        nuevoAviso.setEliminado(false);
 
+        // La autoria queda registrada en los campos de Auditable.
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication != null && authentication.isAuthenticated()) {
             String usuarioActual = authentication.getName();
@@ -41,18 +47,18 @@ public class AvisoService {
         return mapear(avisoGuardado);
     }
 
+    /** Avisos vigentes para la barra de los paneles. */
     @Transactional(readOnly = true)
     public List<AvisoResponseRecord> obtenerAvisosActivos() {
-        // Ahora llama al método que excluye a los eliminados
         return avisoRepository.findByActivoTrueAndEliminadoFalseOrderByIdDesc()
                 .stream()
                 .map(this::mapear)
                 .toList();
     }
 
+    /** Listado del panel de administracion: incluye los inactivos. */
     @Transactional(readOnly = true)
     public List<AvisoResponseRecord> obtenerTodos() {
-        // Ahora llama al método que excluye a los eliminados
         return avisoRepository.findByEliminadoFalseOrderByIdDesc()
                 .stream()
                 .map(this::mapear)
@@ -74,23 +80,28 @@ public class AvisoService {
         return AvisoResponseRecord.desdeEntidad(avisoRepository.save(aviso));
     }
 
-    // ---> CORRECCIÓN: Ahora aplica Baja Lógica en lugar de borrado físico
+    /**
+     * Da de baja un aviso.
+     *
+     * <p>Es una baja logica: marca la fila como eliminada y la apaga a la vez,
+     * de modo que no reaparezca si alguien vuelve a activarla.</p>
+     */
     @Transactional
     public void eliminarAvisoFisico(Long id) {
         Aviso aviso = avisoRepository.findById(id)
             .orElseThrow(() -> new IllegalArgumentException("Aviso no encontrado"));
         
         aviso.setEliminado(true);
-        aviso.setActivo(false); // También lo apagamos por seguridad
+        aviso.setActivo(false);
         avisoRepository.save(aviso);
     }
 
     /**
      * Comprueba que el area de destino existe.
      *
-     * <p>Sin esta validacion, un areaId inexistente creaba un aviso que no
-     * veia nadie: no es global (tiene area) pero ningun usuario pertenece a
-     * ella, asi que desaparecia sin error.</p>
+     * <p>Un {@code areaId} inexistente produciria un aviso invisible: al tener
+     * area no es global, pero ningun usuario pertenece a ella, de modo que no
+     * lo veria nadie y tampoco daria error.</p>
      */
     private void verificarAreaExiste(Long areaId) {
         if (areaId != null && !areaRepository.existsById(areaId)) {

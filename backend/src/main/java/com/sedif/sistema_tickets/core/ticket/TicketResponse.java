@@ -19,9 +19,9 @@ import java.time.LocalDateTime;
  *       solo para pintarse en pantalla y en los documentos.</li>
  * </ul>
  *
- * <p>El nombre {@code estatus} se mantiene aunque el enum se llame
- * {@code EstadoTicket}: es el que ya leen las pantallas y renombrarlo obligaria
- * a tocarlas todas sin ganar nada.</p>
+ * <p>El campo se llama {@code estatus} aunque el enum sea {@code EstadoTicket}:
+ * es el nombre por el que lo leen las pantallas y forma parte del contrato de
+ * la API.</p>
  */
 public record TicketResponse(
     Long id,
@@ -43,11 +43,11 @@ public record TicketResponse(
     Long usuarioAreaId,
     Long usuarioSoporteId,
     /**
-     * Nombre del tecnico asignado, ya resuelto.
+     * Nombre del tecnico asignado, ya resuelto en el servidor.
      *
-     * <p>Antes solo viajaba su id, asi que quien levantaba el ticket no tenia
-     * forma de saber quien iba a atenderlo: la pantalla habria tenido que
-     * pedir la lista de usuarios, que un empleado no puede consultar.</p>
+     * <p>Viaja resuelto y no solo por id porque quien levanta el ticket
+     * necesita saber quien lo atiende, y un EMPLEADO no puede consultar el
+     * listado de usuarios para traducir ese id por su cuenta.</p>
      */
     String usuarioSoporteNombre,
     String justificacion,

@@ -26,10 +26,10 @@ import java.util.List;
 /**
  * Administracion del catalogo de areas.
  *
- * <p>La ruta ya estaba bajo {@code /api/v1/admin/**}, protegida por la regla
- * de URL de {@code SecurityConfig}. Se anade {@code @PreAuthorize} a nivel de
- * clase como segunda barrera: si algun dia cambia el patron de URL, la
- * proteccion viaja con el propio controlador.</p>
+ * <p>La ruta cuelga de {@code /api/v1/admin/**} y queda protegida por la regla
+ * de URL de {@code SecurityConfig}. El {@code @PreAuthorize} de clase actua
+ * como segunda barrera: si cambiara el patron de URL, la proteccion viaja con
+ * el propio controlador.</p>
  */
 @RestController
 @RequestMapping("/api/v1/admin/areas")

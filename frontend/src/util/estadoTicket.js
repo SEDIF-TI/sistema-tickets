@@ -1,15 +1,11 @@
 /**
- * Vocabulario de estados del ticket.
+ * Vocabulario de estados del ticket, espejo del enum `EstadoTicket` del
+ * backend y fuente única para todas las pantallas.
  *
- * Espeja el enum `EstadoTicket` del backend, que sustituyó a la tabla catálogo
- * `estadoticket`. Los valores son los nombres de las constantes
- * (`EN_PROCESO`, con guion bajo), no las etiquetas visibles: el backend envía
- * ambos y la lógica debe apoyarse siempre en el código estable, para que
- * cambiar un texto de pantalla no apague un botón.
- *
- * Cada pantalla tenía antes su propia copia de esta lista, y ya diferían entre
- * sí: el panel de soporte contemplaba "RESUELTO" y "ASIGNADO", que el resto
- * desconocía.
+ * Los valores son los nombres de las constantes (`EN_PROCESO`, con guion
+ * bajo), no las etiquetas visibles. El backend envía ambos —`estatus` y
+ * `estatusEtiqueta`— y la lógica se apoya siempre en el primero: así cambiar
+ * un texto de pantalla no altera ninguna condición.
  */
 
 export const ESTADO_TICKET = {

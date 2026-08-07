@@ -35,16 +35,24 @@ const MINIMO_JUSTIFICACION = 10;
 /**
  * Bandeja de trabajo del técnico de soporte.
  *
- * Cambios respecto a la versión anterior:
- *  - Traía el histórico completo con `GET /v1/tickets` sin paginar y lo
- *    troceaba en memoria: la búsqueda solo miraba lo ya descargado. Ahora la
- *    paginación, el orden, la búsqueda y el filtro los resuelve el backend.
- *  - Las doce metas del plan de trabajo estaban escritas a mano en el JSX;
- *    ahora se piden al catálogo del backend.
- *  - Los errores se tragaban en `console.error` y el usuario no se enteraba de
- *    nada; el `alert()` nativo se sustituye por validación en el propio
- *    formulario y avisos por notificación.
- *  - Las acciones eran botones de texto de ancho fijo; ahora son iconos.
+ * Lista los tickets a cargo de quien tiene la sesión abierta —los asignados y
+ * los que él mismo levantó— y permite avanzarlos por el flujo de atención:
+ *
+ *  1. ABIERTO: el ticket espera. El técnico avisa que va en camino con
+ *     `ticketService.atender`, que lo pasa a EN_PROCESO y notifica al
+ *     solicitante.
+ *  2. EN_PROCESO: ya solo cabe resolverlo. `ticketService.resolver` exige la
+ *     actividad de solución y la meta del plan de trabajo, y cierra el ticket.
+ *
+ * El backend comprueba la pertenencia en cada paso, de modo que un técnico no
+ * puede operar sobre el ticket de otro aunque conozca su folio.
+ *
+ * La paginación, el orden, la búsqueda y el filtro por estado los resuelve el
+ * backend a través de `useTablaPaginada`; la pantalla nunca tiene en memoria
+ * más que la página visible.
+ *
+ * Se suscribe a `/topic/tickets-soporte` para que los tickets recién asignados
+ * aparezcan sin recargar.
  */
 export default function PanelSoporte() {
     const { stompClient, isConnected } = useWebSocket();
@@ -89,8 +97,9 @@ export default function PanelSoporte() {
     // se puede usar dentro de efectos sin reengancharlos en cada render.
     const { recargar } = tabla;
 
-    // Mensaje traído desde la pantalla de alta de ticket. Sin esto, un técnico
-    // que levantaba un ticket volvía aquí sin ninguna confirmación.
+    // Confirmación del ticket recién levantado: la pantalla de alta la envía
+    // por `state` al navegar hasta aquí. Se limpia del historial para que no
+    // reaparezca al volver atrás.
     useEffect(() => {
         if (location.state?.mensajeExito) {
             notificarInfo(location.state.mensajeExito);
@@ -98,8 +107,8 @@ export default function PanelSoporte() {
         }
     }, [location, notificarInfo]);
 
-    // --- Catálogo del plan de trabajo -------------------------------------
-    // Se pide una sola vez: es un catálogo fijo, no cambia entre resoluciones.
+    // Metas del plan de trabajo anual a las que se imputa cada resolución. Se
+    // piden una sola vez: es un catálogo fijo.
     useEffect(() => {
         let cancelado = false;
 
@@ -116,10 +125,10 @@ export default function PanelSoporte() {
         return () => { cancelado = true; };
     }, []);
 
-    // --- Actualización en vivo --------------------------------------------
-    // El servidor publica el ticket completo, pero la tabla está paginada y
-    // ordenada en el backend: insertar la fila a mano dejaría la página
-    // descuadrada respecto al total. Se recarga la página actual.
+    // El servidor publica el ticket completo por WebSocket, pero la tabla está
+    // paginada y ordenada en el backend: insertar la fila a mano dejaría la
+    // página descuadrada respecto al total, así que se recarga la página
+    // actual. Solo interesan los tickets asignados a este técnico.
     useEffect(() => {
         if (!isConnected || !stompClient?.connected || !user) return;
 
@@ -137,7 +146,8 @@ export default function PanelSoporte() {
         return () => suscripcion?.unsubscribe();
     }, [isConnected, stompClient, user, recargar]);
 
-    // --- Acciones ----------------------------------------------------------
+    // Primer paso del flujo: el ticket pasa a EN_PROCESO y el solicitante
+    // recibe el aviso de que el técnico va en camino.
     const marcarEnCamino = async (ticket) => {
         if (avisando) return;   // ya hay un aviso en curso
 
@@ -171,6 +181,8 @@ export default function PanelSoporte() {
     const justificacionInvalida = justificacion.trim().length < MINIMO_JUSTIFICACION;
     const planInvalido = !planClave;
 
+    // Paso final: cierra el ticket dejando en la bitácora la actividad de
+    // solución y la meta a la que se imputa.
     const confirmarResolucion = async () => {
         setIntentoEnvio(true);
 
@@ -196,7 +208,6 @@ export default function PanelSoporte() {
         }
     };
 
-    // --- Columnas ----------------------------------------------------------
     const columnas = [
         {
             id: 'id',
@@ -388,7 +399,8 @@ export default function PanelSoporte() {
                 }}
             />
 
-            {/* ------------------------------------------------ detalle ---- */}
+            {/* Ficha de solo lectura: datos del reporte y, si ya se cerró, la
+                resolución que registró el técnico. */}
             <Dialog
                 open={Boolean(ticketDetalle)}
                 onClose={() => setTicketDetalle(null)}
@@ -506,7 +518,8 @@ export default function PanelSoporte() {
                 </DialogActions>
             </Dialog>
 
-            {/* ---------------------------------------------- resolución ---- */}
+            {/* Cierre del ticket. Ambos campos son obligatorios para el
+                backend, así que se validan aquí antes de enviar. */}
             <Dialog
                 open={Boolean(ticketAResolver)}
                 onClose={cerrarResolucion}

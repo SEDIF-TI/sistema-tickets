@@ -66,20 +66,23 @@ const colorEstado = (estado) => {
 };
 
 /**
- * Taller: equipos recibidos para reparación.
+ * Taller: equipos que el personal entrega para diagnóstico y reparación.
  *
- * Cambios respecto a la versión anterior:
- *  - La lista de estados estaba escrita a mano con siete valores, y tres de
- *    ellos —ESPERA_REFACCIONES, DICTAMINADO y LISTO_PARA_ENTREGA— no existen
- *    en el enum `EstadoTaller`: seleccionarlos devolvía un error. Las métricas
- *    de la cabecera contaban precisamente esos estados inexistentes, así que
- *    "Equipos en taller" y "Listos para entrega" mostraban cifras erróneas.
- *  - `tallerService` envolvía los errores en `new Error(...)` leyendo un campo
- *    (`mensaje`) que el backend no envía, así que todos los fallos mostraban
- *    el texto genérico de respaldo en lugar del motivo real.
- *  - El listado no estaba paginado y la búsqueda exigía pulsar un botón.
- *  - El formulario no validaba nada antes de enviar.
- *  - Montaba su propio Snackbar en lugar de usar el del sistema.
+ * Cubre el ciclo completo del equipo dentro del taller:
+ *
+ *  1. Recepción. "Recibir equipo" abre el formulario de alta, donde se anota
+ *     quién lo entrega, la identificación del aparato (tipo, marca, serie,
+ *     inventario), los accesorios que vienen con él y la condición física con
+ *     la que llega. El backend asigna el folio y el estado RECIBIDO.
+ *  2. Diagnóstico y reparación. El mismo formulario, ya en edición, recoge el
+ *     diagnóstico y la solución aplicada conforme el técnico avanza, mientras
+ *     el estado se mueve por EN_DIAGNOSTICO y EN_REPARACION.
+ *  3. Salida. ENTREGADO o IRREPARABLE son terminales: el equipo dejó el taller
+ *     y el registro ya no admite más cambios de estado.
+ *
+ * Los estados seleccionables se piden al catálogo del backend en lugar de
+ * escribirlos aquí, para que coincidan siempre con el enum `EstadoTaller`.
+ * El listado se pagina, ordena y busca en el servidor.
  */
 export default function GestionTaller() {
     const { notificar, notificarError } = useNotification();
@@ -121,7 +124,8 @@ export default function GestionTaller() {
         defaultValues: VALORES_INICIALES,
     });
 
-    // --- Catálogo de estados ----------------------------------------------
+    // Catálogo de estados del taller: alimenta tanto el filtro del listado
+    // como el desplegable del cambio de estado.
     useEffect(() => {
         let cancelado = false;
 
@@ -208,7 +212,6 @@ export default function GestionTaller() {
     const etiquetaDe = (valor) =>
         estados.find((e) => e.valor === valor)?.etiqueta || valor || '—';
 
-    // --- Columnas ---------------------------------------------------------
     const columnas = [
         {
             id: 'folio',
@@ -409,7 +412,8 @@ export default function GestionTaller() {
                 }}
             />
 
-            {/* --------------------------------------- alta y edición ------ */}
+            {/* Un mismo formulario sirve para la recepción y para completar
+                después el diagnóstico y la solución. */}
             <Dialog
                 open={modalAbierto}
                 onClose={() => !isSubmitting && setModalAbierto(false)}
@@ -594,7 +598,7 @@ export default function GestionTaller() {
                 </form>
             </Dialog>
 
-            {/* -------------------------------------- cambio de estado ----- */}
+            {/* Avance del equipo por el ciclo del taller. */}
             <Dialog
                 open={Boolean(equipoCambioEstado)}
                 onClose={() => !procesando && setEquipoCambioEstado(null)}

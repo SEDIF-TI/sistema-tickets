@@ -23,19 +23,21 @@ import org.springframework.web.bind.annotation.RestController;
  * Resguardos de equipo: prestamos temporales que el area de TI entrega al
  * personal (equipos de computo, antenas, cables, cargadores).
  *
- * <p>Correcciones de seguridad respecto a la version anterior:</p>
- * <ul>
- *   <li>El controlador no exigia ningun rol y su ruta quedaba fuera de todo
- *       patron protegido de SecurityConfig: bastaba estar autenticado, de modo
- *       que cualquier EMPLEADO podia consultar y crear resguardos de toda la
- *       institucion.</li>
- *   <li>Se elimino {@code POST /test-alertas}, un endpoint de pruebas expuesto
- *       en produccion que permitia a cualquiera disparar el proceso de
- *       vencimientos y el envio masivo de mensajes por Telegram.</li>
- *   <li>{@code devolverEquipo} capturaba la excepcion y devolvia {@code 400}
- *       con cuerpo {@code null}: el cliente recibia un error sin explicacion.
- *       Ahora la traduce GlobalExceptionHandler conservando su mensaje.</li>
- * </ul>
+ * <p>El {@code @PreAuthorize} de clase restringe todo el controlador a
+ * ADMINISTRADOR y SOPORTE. Es la unica proteccion efectiva de estas rutas: no
+ * encajan en ningun patron de SecurityConfig, que solo exigiria sesion
+ * iniciada, de modo que sin esta anotacion cualquier EMPLEADO podria consultar
+ * y crear resguardos de toda la institucion.</p>
+ *
+ * <p>El proceso de vencimientos no se expone por HTTP: lo dispara la tarea
+ * programada de {@link ResguardoService}, que ademas envia avisos por Telegram.
+ * Un endpoint que lo lanzara a peticion permitiria provocar ese envio masivo
+ * desde fuera.</p>
+ *
+ * <p>Los errores no se capturan aqui: se dejan subir para que
+ * GlobalExceptionHandler los traduzca conservando su mensaje, en lugar de
+ * devolver un {@code 400} con cuerpo vacio que el cliente no puede
+ * interpretar.</p>
  */
 @RestController
 @RequestMapping("/api/v1/resguardos")
@@ -56,7 +58,10 @@ public class ResguardoResource {
                 .body(ApiResponse.ok(creado, "Resguardo registrado correctamente."));
     }
 
-    /** Historial completo de resguardos, paginado y ordenado por fecha. */
+    /**
+     * Historial de resguardos, paginado en la base de datos, con busqueda y
+     * filtro de estado opcionales. Por defecto muestra los mas recientes.
+     */
     @GetMapping
     public ResponseEntity<ApiResponse<PageResponse<ResguardoResponse>>> listarTodos(
             @org.springframework.web.bind.annotation.RequestParam(required = false) String busqueda,
@@ -68,7 +73,10 @@ public class ResguardoResource {
                 resguardoService.listarPaginado(busqueda, estado, pageable)));
     }
 
-    /** Marca el equipo como devuelto y cierra el resguardo. */
+    /**
+     * Marca el equipo como devuelto y cierra el resguardo. El servicio rechaza
+     * el intento si ya estaba devuelto.
+     */
     @PutMapping("/{id}/devolucion")
     public ResponseEntity<ApiResponse<ResguardoResponse>> devolverEquipo(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.ok(

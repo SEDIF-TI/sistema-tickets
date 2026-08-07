@@ -14,15 +14,15 @@ import DynamicTable from '../../components/DynamicTable';
 import AccionesTabla from '../../components/AccionesTabla';
 
 /**
- * Historial de dictámenes técnicos: consulta y reimpresión.
+ * Historial de dictámenes técnicos: consulta y reimpresión del documento.
  *
- * Hasta la migración V10 los dictámenes no se guardaban en ninguna parte: el
- * backend componía el PDF y lo devolvía, así que el único rastro era el archivo
- * que el técnico descargaba. Esta pantalla muestra los emitidos a partir de esa
- * migración; los anteriores no son recuperables porque nunca se escribieron.
+ * La emisión vive en Documentos → Dictamen técnico; aquí solo se consultan los
+ * ya emitidos y se vuelven a imprimir. Las filas llegan paginadas de
+ * `dictamenService.getAll()` a través de useTablaPaginada, con la búsqueda por
+ * folio, persona, equipo, marca o serie resuelta en la base.
  *
- * La emisión sigue estando en Documentos → Dictamen técnico. Aquí solo se
- * consulta y se vuelve a imprimir.
+ * Se monta como pestaña del historial unificado, que ya pone el título, de modo
+ * que la pantalla devuelve la tabla sin cabecera propia.
  */
 export default function HistorialDictamenes() {
     const { notificar, notificarError } = useNotification();
@@ -42,6 +42,10 @@ export default function HistorialDictamenes() {
             // Se reenvía al mismo endpoint que lo emitió. El backend registra un
             // dictamen por cada llamada, así que la reimpresión genera un folio
             // nuevo: es deliberado, cada documento firmado es una emisión.
+            //
+            // El PDF vuelve como blob; se envuelve en un object URL para abrirlo
+            // en otra pestaña y se revoca al minuto, cuando el visor ya lo ha
+            // terminado de leer.
             const respuesta = await api.post('/v1/documentos/dictamen', dictamen, {
                 responseType: 'blob',
             });

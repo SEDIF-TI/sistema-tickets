@@ -7,14 +7,20 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import java.util.List;
 
+/**
+ * Vision AREA: los tickets levantados por personal del area a la que pertenece
+ * el usuario, sea quien sea el tecnico que los atiende.
+ */
+// El nombre del componente debe coincidir exactamente con el nivel de vision
+// guardado en el rol: es la clave con la que TicketService lo localiza.
 @Component("AREA")
 @RequiredArgsConstructor
 public class FiltroAreaStrategy implements TicketFiltroStrategy {
     private final TicketRepository ticketRepository;
 
+   /** Requiere que el usuario tenga area asignada. */
    @Override
     public List<Ticket> obtenerTickets(Usuario usuario) {
-        // CAMBIO: Quita el guion bajo para que coincida con TicketRepository
         return ticketRepository.findByUsuarioAreaAreaId(usuario.getArea().getId());
     }
 }

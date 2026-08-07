@@ -3,17 +3,12 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 /**
  * Detección de conectividad con el servidor.
  *
- * La versión anterior dependía solo de `navigator.onLine`, que informa de si
- * hay interfaz de red activa — no de si el backend responde. Da falsos
- * positivos habituales en la oficina: el equipo sigue conectado al wifi, pero
- * el servidor está caído, el cable del rack se soltó o el túnel VPN cayó.
- * `navigator.onLine` seguiría diciendo "en línea" mientras el usuario ve
- * errores sin entender por qué.
+ * Combina dos señales, porque ninguna basta por sí sola:
  *
- * Ahora se combinan dos señales:
- *
- *  1. Los eventos `online`/`offline` del navegador: inmediatos y gratuitos
- *     cuando el equipo pierde la red por completo.
+ *  1. Los eventos `online`/`offline` del navegador: inmediatos y sin coste,
+ *     pero solo informan de si hay interfaz de red activa. Con el equipo
+ *     conectado al wifi y el servidor caído, `navigator.onLine` sigue
+ *     diciendo "en línea" mientras las peticiones fallan.
  *  2. Un sondeo ligero al backend, que es el único que confirma que el
  *     servidor responde de verdad.
  *

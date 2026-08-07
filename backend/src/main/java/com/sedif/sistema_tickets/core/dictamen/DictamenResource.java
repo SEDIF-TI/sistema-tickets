@@ -17,13 +17,15 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * Consulta del historial de dictamenes tecnicos.
  *
- * <p>La emision sigue estando en {@code /api/v1/documentos/dictamen}, que es
- * donde se compone el PDF y, desde la V10, se registra el documento. Aqui solo
- * se consulta lo ya emitido.</p>
+ * <p>Solo lectura: la emision vive en {@code /api/v1/documentos/dictamen}, que
+ * compone el PDF y registra el documento en la misma operacion.</p>
  *
- * <p>Los dictamenes anteriores a la V10 no aparecen porque nunca se guardaron:
- * hasta esa migracion el sistema componia el PDF y lo devolvia sin persistir
- * nada.</p>
+ * <p>El listado se pagina y se busca en la base, con el orden por fecha de
+ * emision descendente por defecto.</p>
+ *
+ * <p>El {@code @PreAuthorize} de clase restringe el historial a ADMINISTRADOR y
+ * SOPORTE: un dictamen recoge datos del servidor publico y de su equipo que no
+ * corresponden al resto de roles.</p>
  */
 @RestController
 @RequestMapping("/api/v1/dictamenes")

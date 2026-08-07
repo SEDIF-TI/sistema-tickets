@@ -8,6 +8,13 @@ import lombok.Setter;
 import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
+/**
+ * Actividad del plan anual de trabajo registrada a mano.
+ *
+ * <p>Recoge el trabajo que no llega por la via de un ticket. Junto con los
+ * tickets cerrados, alimenta el reporte de actividades del periodo y las
+ * metricas de avance frente a las metas fijadas a inicio de ano.</p>
+ */
 @Entity
 @Table(name = "actividad_extra")
 @Getter @Setter @NoArgsConstructor
@@ -19,28 +26,28 @@ public class ActividadExtra extends Auditable {
     @PrimaryKeyJoinColumn
     private Long id;
 
-    // Relación con el usuario (Desarrollador, Administrativo o Soporte) que realiza la tarea
+    /** Persona que realiza la tarea, tomada del token al registrarla. */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "fn_usuario_id", nullable = false)
     private Usuario usuario;
 
-    // Clave del Plan de Trabajo (del 1 al 12)
+    /** Meta del plan de trabajo a la que se imputa, del 1 al 12. */
     @Column(name = "plan_trabajo_clave", nullable = false)
     private Integer planTrabajoClave;
 
-    // Equivalente a "Actividad Solicitada" (ej: "Desarrollo de módulo de gráficas")
+    /** Encabezado de la actividad. Se imprime en la columna homonima del reporte. */
     @Column(name = "s_actividad_solicitada", nullable = false, length = 255)
     private String actividadSolicitada;
 
-    // Equivalente a "Situación Actual" (ej: "COMPLETADO", "EN PROCESO")
+    /** Estado del avance, por ejemplo "COMPLETADO" o "EN PROCESO". */
     @Column(name = "s_situacion_actual", nullable = false, length = 50)
     private String situacionActual;
 
-    // Equivalente a "Actividad de Solución" / Justificación detallada
+    /** Detalle de lo realizado. Ocupa la columna de actividad de solucion del reporte. */
     @Column(name = "s_justificacion", columnDefinition = "TEXT")
     private String justificacion;
 
-    // Fecha en la que se realizó la actividad para los filtros diarios/semanales
+    /** Momento en que se realizo. Es el campo por el que se acota el periodo del reporte. */
     @Column(name = "d_fecha_actividad", nullable = false)
     private LocalDateTime fechaActividad;
 }

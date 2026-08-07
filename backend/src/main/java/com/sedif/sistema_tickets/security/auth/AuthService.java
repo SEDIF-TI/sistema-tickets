@@ -13,11 +13,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 
 /**
- * Logica de autenticacion.
+ * Logica de autenticacion: verifica credenciales y arma la sesion del usuario.
  *
- * <p>El metodo {@code registrarUsuario} fue eliminado junto con su endpoint
- * publico: permitia crear cuentas eligiendo el rol desde el cuerpo de la
- * peticion, sin autenticacion previa. El alta de usuarios corresponde a
+ * <p>Se limita al inicio de sesion. El alta de usuarios corresponde a
  * {@code UsuarioService}, accesible solo con rol ADMINISTRADOR.</p>
  */
 @Service
@@ -31,6 +29,11 @@ public class AuthService {
     /**
      * Valida las credenciales y emite el access token.
      *
+     * <p>Acepta indistintamente correo o nombre de usuario como identificador.
+     * Junto al token devuelve el rol, las vistas del menu y el area, que es lo
+     * que el frontend necesita para montar la navegacion sin una segunda
+     * llamada.</p>
+     *
      * <p>Tanto si la cuenta no existe como si la contrasena es incorrecta se
      * devuelve el mismo mensaje generico. Distinguir ambos casos permitiria
      * averiguar que correos estan dados de alta.</p>
@@ -38,15 +41,15 @@ public class AuthService {
     @Transactional(readOnly = true)
     public JwtResponse iniciarSesion(LoginRequest request) {
 
-        // Las restricciones de formato ya las aplico Bean Validation en el
-        // controlador (@Valid), asi que aqui solo queda la logica de negocio.
+        // Bean Validation ya comprobo el formato en el controlador (@Valid),
+        // asi que aqui solo queda la logica de negocio.
         Usuario usuario = usuarioRepository
                 .findByCorreoOrUsername(request.identificador(), request.identificador())
                 .orElseThrow(() -> new IllegalArgumentException(MessageConstants.CREDENCIALES_INVALIDAS));
 
-        // La verificacion criptografica va ANTES de comprobar si esta activo:
-        // asi la respuesta no revela la existencia de la cuenta a quien no
-        // conoce la contrasena.
+        // La verificacion criptografica va antes de comprobar si la cuenta esta
+        // activa: asi el aviso de usuario inactivo solo lo recibe quien ya
+        // demostro conocer la contrasena, y no revela cuentas a nadie mas.
         if (!passwordEncoder.matches(request.password(), usuario.getPassword())) {
             throw new IllegalArgumentException(MessageConstants.CREDENCIALES_INVALIDAS);
         }
@@ -71,14 +74,16 @@ public class AuthService {
         );
     }
 
-    /** Vistas activas del menu segun el rol del usuario. */
     /**
-     * Vistas del menu que corresponden al rol del usuario.
+     * Vistas activas del menu que corresponden al rol del usuario.
      *
-     * <p>Publico porque tambien lo consulta {@code PerfilResource}: el menu se
-     * guardaba en el navegador al iniciar sesion y no se refrescaba nunca, de
-     * modo que una vista retirada seguia apareciendo hasta cerrar sesion, y un
-     * permiso recien concedido no llegaba al usuario.</p>
+     * <p>Se descartan las vistas marcadas como inactivas, y un usuario sin rol
+     * o con un rol sin vistas obtiene una lista vacia en lugar de un fallo.</p>
+     *
+     * <p>Es publico porque {@code PerfilResource} lo consulta para refrescar el
+     * menu durante la sesion: el frontend lo conserva en el navegador, de modo
+     * que sin ese refresco los cambios de permisos no llegarian al usuario
+     * hasta que volviera a iniciar sesion.</p>
      */
     public List<VistaDTO> obtenerVistasPermitidas(Usuario usuario) {
         if (usuario.getRol() == null || usuario.getRol().getVistas() == null) {

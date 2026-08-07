@@ -10,7 +10,13 @@ import java.util.Optional;
  *
  * <p>Centraliza el acceso al {@link SecurityContextHolder} para que los
  * servicios no lo consulten directamente y no se repita la comprobacion de
- * nulos por todo el codigo.</p>
+ * nulos por todo el codigo. Todos los metodos devuelven {@link Optional} vacio
+ * o {@code false} en una peticion anonima, de forma que la ausencia de
+ * autenticacion nunca provoca una excepcion.</p>
+ *
+ * <p>Los datos proceden del contexto que dejo {@link JwtAuthFilter}: el
+ * identificador es el correo del usuario y la autoridad, un unico valor con
+ * formato {@code ROLE_<ROL>}.</p>
  */
 public final class SecurityUtil {
 
@@ -31,7 +37,8 @@ public final class SecurityUtil {
         if (auth == null || !auth.isAuthenticated()) {
             return Optional.empty();
         }
-        // "anonymousUser" es el principal que Spring asigna sin autenticacion.
+        // Spring marca como autenticado el token anonimo, cuyo principal es
+        // "anonymousUser": hay que descartarlo aparte del caso nulo.
         if ("anonymousUser".equals(auth.getPrincipal())) {
             return Optional.empty();
         }
@@ -60,7 +67,7 @@ public final class SecurityUtil {
                 .orElse(false);
     }
 
-    /** Atajo para la comprobacion mas frecuente del sistema. */
+    /** Atajo para la comprobacion de rol mas frecuente del sistema. */
     public static boolean esAdministrador() {
         return tieneRol("ADMINISTRADOR");
     }

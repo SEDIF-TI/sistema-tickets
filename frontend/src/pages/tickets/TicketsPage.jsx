@@ -27,12 +27,22 @@ import EncuestaDialog from '../../components/EncuestaDialog';
 /**
  * Historial de tickets del usuario, o bitácora global si es administrador.
  *
- * Cambios respecto a la versión anterior:
- *  - La tabla se construía a mano, sin paginación: traía el historial entero
- *    en cada carga y lo pintaba de golpe.
- *  - Usaba `window.confirm()` y `alert()` nativos, bloqueantes y sin estilo.
- *  - La acción "Finalizar" era un botón de texto que ensanchaba la tabla.
- *  - El color guinda estaba escrito a mano.
+ * `GET /v1/tickets/mis-tickets` devuelve lo que corresponde a cada rol: al
+ * empleado los reportes de su área y al administrador todos los de la
+ * institución. De ahí que una sola pantalla sirva a ambos casos, cambiando
+ * únicamente los textos y las acciones disponibles.
+ *
+ * El solicitante cierra aquí el ciclo de su ticket: "Finalizar" lo marca como
+ * cerrado —se confirma antes, porque es irreversible— y, con el ticket ya
+ * cerrado y sus datos frescos, se le ofrece la encuesta de satisfacción. La
+ * calificación solo puede darse una vez y solo sobre un ticket cerrado, así
+ * que la acción desaparece en cuanto hay respuesta registrada.
+ *
+ * El administrador observa sin intervenir: no cierra tickets ajenos ni tiene
+ * columna de opinión, que es del solicitante sobre su propio reporte.
+ *
+ * `sinCabecera` permite incrustar la tabla como pestaña del historial
+ * unificado, donde el título ya lo pone la página contenedora.
  */
 export default function TicketsPage({ sinCabecera = false }) {
     const { user } = useContext(AuthContext);
@@ -47,8 +57,8 @@ export default function TicketsPage({ sinCabecera = false }) {
     const [ticketAFinalizar, setTicketAFinalizar] = useState(null);
     const [finalizando, setFinalizando] = useState(false);
 
-    // Ticket cuya encuesta se esta mostrando. Se abre justo despues de cerrar
-    // el ticket, que es cuando el servicio esta fresco y la respuesta vale.
+    // Ticket cuya encuesta se está mostrando. Se abre justo después de cerrar
+    // el ticket, que es cuando el servicio está fresco y la respuesta vale.
     const [ticketAEncuestar, setTicketAEncuestar] = useState(null);
     const [enviandoEncuesta, setEnviandoEncuesta] = useState(false);
 
@@ -64,7 +74,8 @@ export default function TicketsPage({ sinCabecera = false }) {
         filtros: { estatus: filtroEstatus || undefined },
     });
 
-    // Mensaje traído desde la pantalla de creación de ticket.
+    // Confirmación del ticket recién levantado, que la pantalla de alta envía
+    // por `state` al navegar. Se limpia para que no reaparezca al volver atrás.
     useEffect(() => {
         if (location.state?.mensajeExito) {
             notificarInfo(location.state.mensajeExito);
@@ -79,7 +90,7 @@ export default function TicketsPage({ sinCabecera = false }) {
             notificar(`Ticket #${ticketAFinalizar.id} finalizado correctamente.`);
 
             // La encuesta se ofrece con el ticket ya cerrado y sus datos
-            // frescos, incluido el nombre del tecnico que lo atendio.
+            // frescos, incluido el nombre del técnico que lo atendió.
             setTicketAEncuestar(respuesta?.data ?? ticketAFinalizar);
             setTicketAFinalizar(null);
             tabla.recargar();
@@ -193,8 +204,8 @@ export default function TicketsPage({ sinCabecera = false }) {
             alineacion: 'center',
             ancho: 120,
             sinOrden: true,
-            // Al administrador no le corresponde: es la bitacora global y esa
-            // valoracion la da cada solicitante sobre su propio ticket.
+            // Al administrador no le corresponde: es la bitácora global y esa
+            // valoración la da cada solicitante sobre su propio ticket.
             oculta: esAdministrador,
             render: (t) => {
                 if (t.calificacion) {
@@ -245,7 +256,7 @@ export default function TicketsPage({ sinCabecera = false }) {
                                 etiqueta: `Calificar el servicio del ticket número ${t.id}`,
                                 color: 'primary',
                                 // Solo tiene sentido en un ticket cerrado y sin
-                                // calificar: quien ya respondio no puede
+                                // calificar: quien ya respondió no puede
                                 // cambiar su respuesta.
                                 oculta: !cerrado || Boolean(t.calificacion),
                                 onClick: () => setTicketAEncuestar(t),
@@ -273,11 +284,7 @@ export default function TicketsPage({ sinCabecera = false }) {
 
     return (
         <Box>
-            {/* Cabecera: en móvil el título y el botón se apilan.
-
-                Se omite cuando la pantalla vive dentro de una pestaña del
-                historial unificado: allí el título ya lo pone la página
-                contenedora y repetirlo dejaba dos encabezados seguidos. */}
+            {/* En móvil el título y el botón se apilan. */}
             {!sinCabecera && (
             <Box
                 sx={{

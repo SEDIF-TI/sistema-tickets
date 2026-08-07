@@ -35,17 +35,22 @@ const OPCIONES_ESTADO = [
 const VALORES_INICIALES = { nombre: '', prioritaria: false };
 
 /**
- * Administración de áreas.
+ * Administración de áreas, dentro del panel del administrador.
  *
- * Cambios respecto a la versión anterior:
- *  - Cargaba los técnicos con `userService.getAll()` y filtraba en memoria.
- *    Ese endpoint ahora devuelve una página, así que el `.filter()` habría
- *    fallado; se usa `getSoporte()`, que además filtra en el servidor.
- *  - "Eliminar" borraba sin preguntar, con un solo clic y sin deshacer.
- *  - No había forma de retirar el soporte fijo una vez asignado.
- *  - El nombre no se validaba: se podía crear un área en blanco, que aparecía
- *    como una fila vacía en todos los selectores del sistema.
- *  - La tabla traía el catálogo completo y filtraba en el navegador.
+ * El catálogo de áreas alimenta los selectores de todo el sistema: usuarios,
+ * avisos y el alcance de los tickets. Desde aquí se dan de alta y se editan,
+ * se marcan como prioritarias, se les asigna un técnico responsable fijo y se
+ * dan de baja o se reactivan.
+ *
+ * Las filas llegan paginadas desde `areaService.getAll()` a través de
+ * `useTablaPaginada`, de modo que la búsqueda, el orden y el filtro de estado
+ * los resuelve la base y no la página ya descargada. Cada columna declara su
+ * `id`, su `etiqueta` y un `render` opcional que DynamicTable usa para pintar
+ * la celda; sin `render` muestra el campo homónimo de la fila.
+ *
+ * El técnico responsable sustituye al balanceador automático para esa área:
+ * si no se elige a nadie, los tickets vuelven a repartirse solos. La baja es
+ * lógica, así que el mismo diálogo sirve para dar de baja y para reactivar.
  */
 export default function AdminAreasPage() {
     const { notificar, notificarError } = useNotification();
@@ -88,7 +93,8 @@ export default function AdminAreasPage() {
         defaultValues: VALORES_INICIALES,
     });
 
-    // --- Técnicos disponibles ---------------------------------------------
+    // Catálogo para el diálogo de técnico responsable. `getSoporte()` acota la
+    // consulta al personal de soporte en el servidor.
     useEffect(() => {
         let cancelado = false;
 
@@ -107,7 +113,6 @@ export default function AdminAreasPage() {
         return () => { cancelado = true; };
     }, []);
 
-    // --- Alta y edición ---------------------------------------------------
     const abrirAlta = () => {
         setAreaEditando(null);
         reset(VALORES_INICIALES);
@@ -141,7 +146,8 @@ export default function AdminAreasPage() {
         }
     };
 
-    // --- Prioridad --------------------------------------------------------
+    // El alta y la edición comparten endpoint de actualización, así que la
+    // prioridad se cambia reenviando el área completa con el campo invertido.
     const alternarPrioridad = async (area) => {
         try {
             await areaService.update(area.id, {
@@ -158,7 +164,6 @@ export default function AdminAreasPage() {
         }
     };
 
-    // --- Soporte fijo -----------------------------------------------------
     const abrirSoporte = (area) => {
         setAreaSoporte(area);
         setTecnicoElegido(
@@ -190,7 +195,6 @@ export default function AdminAreasPage() {
         }
     };
 
-    // --- Baja y reactivación ----------------------------------------------
     const confirmarBaja = async () => {
         setProcesando(true);
         try {
@@ -216,7 +220,6 @@ export default function AdminAreasPage() {
         }
     };
 
-    // --- Columnas ---------------------------------------------------------
     const columnas = [
         {
             id: 'nombre',
@@ -403,7 +406,6 @@ export default function AdminAreasPage() {
                 }}
             />
 
-            {/* ------------------------------------------ alta y edición ---- */}
             <Dialog
                 open={modalAbierto}
                 onClose={() => !isSubmitting && setModalAbierto(false)}
@@ -480,7 +482,6 @@ export default function AdminAreasPage() {
                 </form>
             </Dialog>
 
-            {/* --------------------------------------------- soporte fijo -- */}
             <Dialog
                 open={Boolean(areaSoporte)}
                 onClose={() => !procesando && setAreaSoporte(null)}
@@ -539,7 +540,6 @@ export default function AdminAreasPage() {
                 </DialogActions>
             </Dialog>
 
-            {/* ------------------------------------------ baja / reactivar -- */}
             <ConfirmationDialog
                 abierto={Boolean(areaABaja)}
                 titulo={areaABaja?.activo ? '¿Dar de baja esta área?' : '¿Reactivar esta área?'}

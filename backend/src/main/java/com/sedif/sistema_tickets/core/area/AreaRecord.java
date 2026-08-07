@@ -6,9 +6,8 @@ import jakarta.validation.constraints.Size;
 /**
  * Datos de alta y edicion de un area.
  *
- * <p>Antes no validaba nada: un cuerpo vacio creaba un area sin nombre, que
- * aparecia como una fila en blanco en todos los selectores del sistema y no
- * habia forma de distinguirla ni de corregirla desde la interfaz.</p>
+ * <p>El nombre es obligatorio: identifica al area en todos los selectores del
+ * sistema, de modo que un area sin nombre seria indistinguible del resto.</p>
  */
 public record AreaRecord(
 
@@ -19,8 +18,8 @@ public record AreaRecord(
         Boolean activo,
 
         /**
-         * Un area prioritaria recibe atencion preferente. Al crear, si no se
-         * indica, queda en {@code false}.
+         * Un area prioritaria recibe atencion preferente. Si no se indica en el
+         * alta, queda en {@code false}.
          */
         Boolean prioritaria
 

@@ -10,14 +10,22 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.stream.Collectors;
 
+/**
+ * Calculo de las metricas del panel de administracion.
+ *
+ * <p>Cada grafica se alimenta de una consulta agregada distinta, de modo que
+ * el conteo lo resuelve la base de datos y aqui solo se traducen los pares
+ * (etiqueta, valor) a la forma que espera el frontend.</p>
+ */
 @Service
 @RequiredArgsConstructor
 public class DashboardService {
-    
+
     private final TicketRepository ticketRepository;
     private final UsuarioRepository usuarioRepository;
-    private final AvisoRepository avisoRepository; // ---> NUEVO: Inyectamos el repositorio de Avisos
+    private final AvisoRepository avisoRepository;
 
+    /** Reune de una sola vez todas las series que dibuja el panel. */
     public DashboardResponse obtenerMetricas() {
         return DashboardResponse.builder()
             .totalTickets(ticketRepository.count())
@@ -28,7 +36,6 @@ public class DashboardService {
             .porIngeniero(mapearGenerico(ticketRepository.contarPorIngeniero()))
             .porPrioridad(mapearGenerico(ticketRepository.contarPorPrioridad()))
             .porFecha(mapearFecha(ticketRepository.contarPorFecha())) 
-            // ---> NUEVO: Mapeamos los avisos activos agrupados por área
             .avisosPorArea(mapearGenerico(avisoRepository.contarAvisosActivosPorArea()))
             .porCalificacion(mapearGenerico(ticketRepository.contarPorCalificacion()))
             .calificacionPorTecnico(mapearCalificacion(ticketRepository.calificacionPromedioPorTecnico()))
@@ -39,9 +46,9 @@ public class DashboardService {
      * Convierte los pares (etiqueta, conteo) que devuelven las consultas
      * agregadas.
      *
-     * <p>Los valores que llegan como enum se muestran por su etiqueta legible:
-     * la grafica de estados dibujaria si no "EN_PROCESO", con guion bajo, en
-     * lugar de "En proceso".</p>
+     * <p>Los valores que llegan como enum se muestran por su etiqueta legible,
+     * de modo que la grafica de estados dibuje "En proceso" y no la constante
+     * "EN_PROCESO".</p>
      */
     private List<DashboardResponse.MetricaGenerica> mapearGenerico(List<Object[]> datos) {
         return datos.stream()
@@ -66,9 +73,9 @@ public class DashboardService {
             return calificacion.getEtiqueta();
         }
 
-        // La consulta de prioridades agrupa por la columna y devuelve texto,
-        // no la constante del enum, asi que se traduce aqui: sin esto la
-        // grafica mostraba "URGENTE" en mayusculas junto a estados ya
+        // La consulta de prioridades agrupa por la columna y devuelve texto en
+        // lugar de la constante del enum, asi que la traduccion se hace aqui
+        // para que "URGENTE" no aparezca en mayusculas junto a estados ya
         // capitalizados como "Abierto".
         String texto = valor.toString();
         return Prioridad.desde(texto)

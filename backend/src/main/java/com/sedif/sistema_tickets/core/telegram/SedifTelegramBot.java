@@ -11,6 +11,19 @@ import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
+/**
+ * Bot que atiende la vinculacion de cuentas y entrega las notificaciones.
+ *
+ * <p>Telegram no revela quien esta detras de un chat, asi que la
+ * correspondencia entre persona y conversacion se establece con el parametro
+ * de arranque: el sistema ofrece al tecnico un enlace
+ * {@code /start &lt;idUsuario&gt;} y, cuando lo pulsa, este bot recibe a la vez
+ * ese identificador y el {@code chatId} de la conversacion. Guardar el segundo
+ * en el usuario es lo que permite despues escribirle de forma directa.</p>
+ *
+ * <p>Funciona por long polling: la sesion registrada en {@link BotConfig}
+ * consulta a Telegram e invoca {@link #onUpdateReceived} por cada mensaje.</p>
+ */
 @Component
 @Slf4j
 public class SedifTelegramBot extends TelegramLongPollingBot {
@@ -30,8 +43,15 @@ public class SedifTelegramBot extends TelegramLongPollingBot {
         return botUsername;
     }
 
+    /**
+     * Procesa cada mensaje entrante y atiende el comando de vinculacion.
+     *
+     * <p>El {@code @Transactional} es necesario porque el metodo lo invoca el
+     * hilo de long polling de la libreria, fuera de cualquier peticion web: sin
+     * el no habria transaccion en curso en la que persistir el {@code chatId}.</p>
+     */
     @Override
-    @Transactional // <--- Fuerza a que la base de datos abra y cierre la transacción correctamente
+    @Transactional
     public void onUpdateReceived(Update update) {
         log.debug("Mensaje entrante de Telegram.");
 
@@ -39,14 +59,16 @@ public class SedifTelegramBot extends TelegramLongPollingBot {
             String messageText = update.getMessage().getText();
             Long chatId = update.getMessage().getChatId();
 
-            // El texto y el chat son datos personales: no se registran.
+            // El texto y el identificador del chat son datos personales, asi
+            // que la traza no los incluye.
             log.debug("Procesando comando de Telegram.");
 
             if (messageText.startsWith("/start")) {
                 try {
                     String idString = messageText.replace("/start", "").trim();
-                    
-                    // Si el usuario abre el bot directo sin pasar por el sistema
+
+                    // Sin identificador, la persona abrio el bot por su cuenta
+                    // y no desde el enlace del perfil: no hay a quien vincular.
                     if (idString.isEmpty()) {
                         enviarMensaje(chatId, "Bienvenido. Por favor, vincula tu cuenta dando clic al botón desde el perfil de tu sistema SEDIF.");
                         return;
@@ -61,8 +83,9 @@ public class SedifTelegramBot extends TelegramLongPollingBot {
                         log.debug("Usuario id={} localizado para vinculacion.", usuarioId);
                         
                         tecnico.setTelegramChatId(chatId);
-                        
-                        // Forzamos la escritura inmediata en la BD
+
+                        // La escritura se vuelca de inmediato para que el chat
+                        // quede vinculado antes de confirmarselo al usuario.
                         usuarioRepository.saveAndFlush(tecnico); 
                         
                         log.info("Cuenta de Telegram vinculada al usuario id={}", usuarioId);
@@ -81,13 +104,18 @@ public class SedifTelegramBot extends TelegramLongPollingBot {
         }
     }
 
+    /**
+     * Envia un mensaje a un chat vinculado, interpretando Markdown.
+     *
+     * <p>Propaga la excepcion en lugar de capturarla para que quien notifica
+     * decida como reaccionar ante un fallo de entrega.</p>
+     */
     public void enviarMensaje(Long chatId, String texto) throws TelegramApiException {
         SendMessage message = new SendMessage();
         message.setChatId(String.valueOf(chatId));
         message.setText(texto);
 
-        message.setParseMode("Markdown"); // Permite usar Markdown en el mensaje
-        // Sin try-catch para que TicketService pueda atrapar el error si Telegram falla
+        message.setParseMode("Markdown");
         execute(message);
     }
 }

@@ -6,13 +6,14 @@ import jakarta.validation.constraints.Pattern;
 /**
  * Cambio de estado de un equipo dentro del taller.
  *
- * <p>Sustituye al {@code Map<String, String>} que recibia antes el endpoint:
- * aceptaba cualquier estructura y cualquier texto como estado, de modo que un
- * error de escritura dejaba el equipo en un estado inexistente, invisible para
- * los filtros del listado.</p>
- *
  * <p>El patron admite exactamente los valores de
- * {@code util.enums.EstadoTaller}, sin distinguir mayusculas.</p>
+ * {@code util.enums.EstadoTaller}, sin distinguir mayusculas. Acotarlo aqui
+ * hace que un estado mal escrito se rechace con un 400 antes de llegar al
+ * servicio, en vez de guardarse y dejar el equipo en una situacion inexistente
+ * que ningun filtro del listado encontraria.</p>
+ *
+ * <p>El servicio vuelve a resolver el texto contra el enum: esta validacion
+ * cubre la forma del dato, no sustituye a la conversion.</p>
  */
 public record CambioEstadoRequest(
 

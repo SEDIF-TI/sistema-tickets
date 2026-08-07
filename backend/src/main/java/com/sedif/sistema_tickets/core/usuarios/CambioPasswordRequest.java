@@ -7,14 +7,13 @@ import jakarta.validation.constraints.Size;
 /**
  * Datos para que un usuario cambie su propia contrasena.
  *
- * <p>Antes este record solo llevaba {@code nuevaPassword}: no se pedia la
- * contrasena actual ni se validaba la nueva. Cualquiera que consiguiera un
- * token (mediante XSS, o encontrando una sesion abierta) podia apoderarse de
- * la cuenta de forma permanente cambiando la clave sin conocer la original.</p>
+ * <p>Exigir {@code passwordActual} obliga a demostrar la identidad ante el
+ * cambio: quien consiguiera un token valido sin conocer la clave original no
+ * puede apoderarse de la cuenta de forma permanente.</p>
  *
- * <p>Exigir {@code passwordActual} tambien encaja con el primer acceso: en ese
- * momento el usuario acaba de recibir su contrasena temporal, de modo que
- * puede aportarla igual que cualquier otra.</p>
+ * <p>El requisito encaja tambien con el primer acceso: en ese momento el
+ * usuario acaba de recibir su contrasena temporal, de modo que puede aportarla
+ * igual que cualquier otra.</p>
  */
 public record CambioPasswordRequest(
 

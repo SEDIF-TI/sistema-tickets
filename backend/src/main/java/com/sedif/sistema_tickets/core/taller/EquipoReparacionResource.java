@@ -22,19 +22,17 @@ import java.util.List;
  * Taller de reparaciones: equipos que el area de TI recibe para diagnostico y
  * reparacion, con su historial.
  *
- * <p>Correcciones de seguridad respecto a la version anterior:</p>
- * <ul>
- *   <li><b>{@code @CrossOrigin(origins = "*")} eliminado.</b> Anulaba la
- *       politica CORS del proyecto y permitia que cualquier sitio web
- *       consultara este endpoint desde el navegador de un usuario con sesion
- *       abierta. El origen permitido lo decide WebConfig.</li>
- *   <li>No exigia ningun rol y su ruta {@code /api/taller} quedaba fuera de
- *       todo patron protegido de SecurityConfig: bastaba estar autenticado.</li>
- *   <li>Los {@code try/catch} que devolvian {@code Map.of("mensaje", ...)} con
- *       el texto de la excepcion filtraban detalles internos al cliente
- *       (nombres de clase, mensajes de Hibernate). Ahora la traduccion la hace
- *       GlobalExceptionHandler, que no expone la causa tecnica.</li>
- * </ul>
+ * <p>El {@code @PreAuthorize} de clase restringe todo el controlador a
+ * ADMINISTRADOR y SOPORTE. Es la unica proteccion efectiva de estas rutas: el
+ * prefijo {@code /api/taller} no encaja en ningun patron de SecurityConfig, que
+ * solo exigiria sesion iniciada.</p>
+ *
+ * <p>No se declara {@code @CrossOrigin}: los origenes permitidos los decide
+ * WebConfig para todo el proyecto, y anotarlo aqui anularia esa politica.</p>
+ *
+ * <p>Los errores no se capturan en los metodos. Se dejan subir para que
+ * GlobalExceptionHandler los traduzca a una respuesta uniforme sin filtrar al
+ * cliente detalles internos como nombres de clase o mensajes de Hibernate.</p>
  */
 @RestController
 @RequestMapping("/api/taller")
@@ -44,7 +42,10 @@ public class EquipoReparacionResource {
 
     private final EquipoReparacionService equipoService;
 
-    /** Listado del taller, con filtro opcional por texto. */
+    /**
+     * Listado del taller, paginado en la base de datos, con busqueda y filtro
+     * de estado opcionales. Por defecto muestra los ingresos mas recientes.
+     */
     @GetMapping
     public ResponseEntity<ApiResponse<com.sedif.sistema_tickets.exception.PageResponse<EquipoReparacionDTO>>> obtenerTodos(
             @RequestParam(required = false) String busqueda,
@@ -59,11 +60,12 @@ public class EquipoReparacionResource {
     }
 
     /**
-     * Catalogo de estados del taller.
+     * Catalogo de estados del taller, servido desde el enum
+     * {@code EstadoTaller}.
      *
-     * <p>La pantalla los tenia escritos a mano y tres de los siete que
-     * ofrecia —ESPERA_REFACCIONES, DICTAMINADO y LISTO_PARA_ENTREGA— no
-     * existen en el enum EstadoTaller: elegirlos devolvia un error.</p>
+     * <p>La pantalla llena su desplegable con esta respuesta en lugar de
+     * mantener su propia lista: asi los valores que ofrece son exactamente los
+     * que el endpoint de cambio de estado admite.</p>
      */
     @GetMapping("/estados")
     public ResponseEntity<ApiResponse<List<com.sedif.sistema_tickets.core.ticket.CatalogoResponse>>> obtenerEstados() {

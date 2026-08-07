@@ -8,9 +8,9 @@ import api from './api';
  */
 export const resguardoService = {
     /**
-     * Listado paginado, con búsqueda y filtro de estado resueltos en la base.
-     * Antes el filtrado ocurría sobre la página ya descargada, así que buscar
-     * un número de serie solo miraba los diez resguardos visibles.
+     * Listado paginado. La búsqueda y el filtro de estado viajan como
+     * parámetros y se resuelven en la base, de modo que alcanzan a todos los
+     * resguardos y no solo a la página que el navegador tiene descargada.
      */
     getAll: (params = {}) => api.get('/v1/resguardos', { params }),
 

@@ -5,13 +5,12 @@ package com.sedif.sistema_tickets.util.enums;
  *
  * <p>Los roles viven como filas en la tabla {@code rol}, no como enum
  * persistido: este tipo solo sirve para no escribir los nombres a mano en el
- * codigo (por ejemplo en las expresiones {@code @PreAuthorize} o al comparar
- * {@code rol.getNombre()}).</p>
+ * codigo, por ejemplo al comparar {@code rol.getNombre()} o al redactar las
+ * expresiones {@code @PreAuthorize}. Sus constantes deben coincidir con los
+ * nombres registrados en esa tabla.</p>
  *
- * <p>Se corrigio el valor {@code AREA}, que no corresponde a ningun rol real:
- * el rol del personal general se llama {@code EMPLEADO}. {@code AREA} es un
- * <b>nivel de vision</b> ({@link NivelVision}), no un rol, y tenerlo aqui
- * inducia a error a quien leyera el enum.</p>
+ * <p>El alcance de los tickets que ve cada rol no se decide aqui, sino en
+ * {@link NivelVision}, que es un concepto independiente.</p>
  */
 public enum RolUsuario {
 

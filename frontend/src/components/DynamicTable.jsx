@@ -17,20 +17,21 @@ import TableSkeleton from './TableSkeleton';
 import EmptyState from './EmptyState';
 
 /**
- * Tabla del sistema.
+ * Tabla del sistema: búsqueda, filtros, ordenación, paginación, estado de
+ * carga, estado vacío y adaptación a móvil en un solo componente.
  *
- * Resuelve de forma uniforme lo que cada pantalla venía reimplementando:
- * búsqueda, filtros, ordenación, paginación, estado de carga, estado vacío y
- * comportamiento en móvil.
+ * **La paginación y la ordenación las resuelve el backend.** Aquí solo se
+ * dibujan los controles y se avisa del cambio con `onCambiarPagina`,
+ * `onCambiarTamano` y `onCambiarOrden`; nunca se trocea ni se reordena en
+ * memoria, porque `filas` contiene únicamente la página actual y no el conjunto
+ * completo. Ordenar lo que se tiene a mano daría un orden falso: el primer
+ * registro de la página no es el primero del listado.
  *
- * **La paginación y la ordenación las resuelve el backend.** Este componente
- * solo muestra los controles y avisa del cambio; nunca trocea ni reordena en
- * memoria, porque solo tiene la página actual, no el conjunto completo.
+ * Bajo el punto de corte `md` la tabla se dibuja como una lista de tarjetas:
+ * una fila de ocho columnas resulta ilegible en un teléfono, incluso con scroll
+ * horizontal.
  *
- * En pantallas estrechas la tabla se convierte en tarjetas: una fila de ocho
- * columnas es ilegible en un teléfono, incluso con scroll horizontal.
- *
- * Definición de columnas:
+ * Contrato de una columna:
  *
  *   const columnas = [
  *     { id: 'id',      etiqueta: 'ID',     ancho: '80px', ordenable: true },
@@ -41,8 +42,22 @@ import EmptyState from './EmptyState';
  *       sinOrden: true, render: (fila) => <BotonesAccion fila={fila} /> },
  *   ];
  *
- * `principal: true` marca la columna que hace de título en la vista de
- * tarjetas. Si no se indica, se usa la primera.
+ *  - `id`         clave del dato en la fila y campo que se manda al backend al
+ *                 ordenar. Es también la clave de React de la celda.
+ *  - `etiqueta`   texto del encabezado y del par etiqueta/valor en tarjeta.
+ *  - `render`     dibuja la celda a partir de la fila completa; sin él se
+ *                 muestra `fila[id]`, o un guion largo si no hay valor.
+ *  - `ordenable`  habilita el clic en el encabezado. Requiere además que la
+ *                 pantalla pase `onCambiarOrden`.
+ *  - `sinOrden`   anula la ordenación aunque `ordenable` sea cierto; es lo que
+ *                 lleva la columna de acciones, que no corresponde a un campo.
+ *  - `principal`  marca la columna que hace de título de la tarjeta en móvil.
+ *                 Si ninguna la lleva, se usa la primera.
+ *  - `oculta`     la pantalla descarta la columna, normalmente según el rol.
+ *  - `ancho`, `alineacion` y `sx` ajustan la presentación de la celda.
+ *
+ * La columna cuyo `id` es `acciones` recibe un trato aparte en la vista de
+ * tarjetas: se separa del resto y se dibuja al pie, bajo una línea divisoria.
  */
 export default function DynamicTable({
     columnas = [],
@@ -71,14 +86,14 @@ export default function DynamicTable({
     const theme = useTheme();
     const esMovil = useMediaQuery(theme.breakpoints.down('md'));
 
-    // Columnas ocultas por el usuario (solo en escritorio).
+    // Columnas que el usuario apagó desde el menú, y ancla de ese menú.
     const [ocultas, setOcultas] = useState([]);
     const [anclaColumnas, setAnclaColumnas] = useState(null);
 
-    // Se descartan primero las columnas que la pantalla marca como `oculta`
-    // —normalmente por rol— y luego las que el usuario apago desde el menu.
-    // Sin lo primero, una pantalla no podia esconder una columna que no
-    // corresponde a quien la mira.
+    // El filtrado va en dos pasos. Primero caen las columnas que la pantalla
+    // marca como `oculta` —normalmente por rol—, que no deben aparecer siquiera
+    // en el menú de columnas; luego, sobre las que quedan, las que el usuario
+    // decidió esconder.
     const columnasAplicables = useMemo(
         () => columnas.filter((c) => !c.oculta),
         [columnas]
@@ -93,13 +108,16 @@ export default function DynamicTable({
     const hayPaginacion = Boolean(paginacion) && !sinDatos;
     const hayBarra = Boolean(onBuscar || filtros.length > 0 || onRecargar || titulo || acciones);
 
-    // Filtros con valor distinto del predeterminado, para el contador.
+    // Un filtro cuenta como activo cuando su valor difiere del predeterminado;
+    // es lo que alimenta el distintivo con el número de filtros aplicados.
     const filtrosActivos = filtros.filter((f) => f.valor && f.valor !== f.valorPorDefecto).length;
 
     const alternarColumna = (id) => {
         setOcultas((prev) => (prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]));
     };
 
+    // Clicar la columna ya activa invierte el sentido; clicar otra empieza de
+    // nuevo en ascendente.
     const alOrdenar = (campo) => {
         if (!onCambiarOrden) return;
         const esMismo = orden?.campo === campo;
@@ -107,7 +125,6 @@ export default function DynamicTable({
         onCambiarOrden(campo, direccion);
     };
 
-    // ---------------------------------------------------------------- barra
     const barraHerramientas = hayBarra && (
         <Toolbar
             className="barra-filtros"
@@ -135,16 +152,15 @@ export default function DynamicTable({
                     value={busqueda}
                     onChange={(e) => onBuscar(e.target.value)}
                     sx={{
-                        // Ancho generoso pero acotado: un buscador a todo lo
-                        // ancho desequilibra la barra en pantallas grandes.
+                        // Crece con la barra pero con tope: un buscador a todo
+                        // lo ancho desequilibra la fila en pantallas grandes.
                         flexGrow: 1,
                         minWidth: { xs: '100%', sm: 240 },
                         maxWidth: { sm: 360 },
                         bgcolor: 'background.paper',
                     }}
-                    // `slotProps.input` sustituye a `InputProps`, retirado en
-                    // MUI 9: React no reconocia la prop y la reenviaba al DOM,
-                    // avisando por consola en cada tabla del sistema.
+                    // Los adornos del campo se declaran en `slotProps.input`,
+                    // que es la vía de MUI 9 para llegar al InputBase interno.
                     slotProps={{
                         input: {
                             startAdornment: (
@@ -168,8 +184,9 @@ export default function DynamicTable({
                 />
             )}
 
-            {/* Cada filtro decide su propio ancho según lo que muestra: un
-                estado necesita menos espacio que un nombre de área. */}
+            {/* Cada filtro fija su propio ancho con `ancho`, porque lo que
+                muestran no ocupa lo mismo: un estado necesita menos espacio
+                que un nombre de área. */}
             {filtros.map((filtro) => (
                 <TextField
                     key={filtro.id}
@@ -215,8 +232,9 @@ export default function DynamicTable({
                 </Tooltip>
             )}
 
-            {/* Selector de columnas: útil en tablas anchas, innecesario en
-                móvil, donde ya se muestran como tarjetas. */}
+            {/* El selector de columnas solo aparece cuando hay bastantes como
+                para estorbar, y nunca en móvil: allí las filas ya se dibujan
+                como tarjetas y no hay columnas que esconder. */}
             {!esMovil && columnasAplicables.length > 4 && (
                 <>
                     <Tooltip title="Mostrar u ocultar columnas">
@@ -263,8 +281,9 @@ export default function DynamicTable({
                 rowsPerPageOptions={opciones}
                 onPageChange={(_e, p) => onCambiarPagina?.(p)}
                 onRowsPerPageChange={(e) => {
-                    // Al cambiar el tamaño se vuelve a la primera página: la
-                    // página 7 de un listado de 10 puede no existir con 50.
+                    // Quien recibe el aviso vuelve a la primera página: la
+                    // página 7 de un listado de 10 en 10 puede no existir
+                    // cuando se pasa a 50 filas.
                     onCambiarTamano?.(parseInt(e.target.value, 10));
                 }}
                 labelRowsPerPage="Filas por página"
@@ -276,7 +295,8 @@ export default function DynamicTable({
             />
         );
 
-    // ------------------------------------------------------- vista tarjetas
+    // Vista de tarjetas. La columna principal encabeza cada tarjeta, la de
+    // acciones baja al pie y el resto se dibuja como pares etiqueta/valor.
     if (esMovil && !cargando && !sinDatos) {
         const columnaPrincipal = columnasAplicables.find((c) => c.principal) ?? columnasAplicables[0];
         const columnaAcciones = columnasAplicables.find((c) => c.id === 'acciones');
@@ -354,41 +374,43 @@ export default function DynamicTable({
                     ))}
                 </Stack>
 
-                {/* En móvil se oculta el selector de filas por página: ocupa
-                    más de lo que aporta en una pantalla estrecha. */}
+                {/* Sin opciones de tamaño: el selector de filas por página
+                    ocupa más de lo que aporta en una pantalla estrecha, pero
+                    los botones de avance sí se conservan. */}
                 {controlesPaginacion([])}
             </Paper>
         );
     }
 
-    // ---------------------------------------------------------- vista tabla
     return (
         <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
             {barraHerramientas}
 
             {/* El scroll horizontal vive DENTRO del contenedor: la página nunca
-                se desplaza en horizontal, solo la tabla. */}
+                se desplaza en horizontal, solo la tabla. `anchoMinimo` fuerza
+                ese scroll cuando las columnas no caben. */}
             <TableContainer sx={{ maxWidth: '100%' }}>
                 <Table sx={{ minWidth: sinDatos ? 'auto' : anchoMinimo }} aria-busy={cargando}>
                     <TableHead>
-                        {/* El encabezado no responde al cursor de ninguna forma:
-                            ni color, ni fondo, ni transiciones, ni la flecha de
-                            orden apareciendo. Se repite aqui lo que ya dice el
-                            tema porque este `sx` genera su propia clase, de
-                            mayor especificidad que el selector global.
+                        {/* El encabezado es inerte al cursor: ni cambia de
+                            color ni de fondo, ni anima nada al pasar por
+                            encima. Las reglas se repiten aquí aunque el tema ya
+                            las declare, porque `sx` genera una clase propia con
+                            más especificidad que el selector global y sin ellas
+                            el estilo del tema quedaría anulado.
 
-                            La unica flecha visible es la de la columna activa
-                            (`.Mui-active`), que informa de como esta ordenada
-                            la tabla; no es un efecto del raton. */}
+                            La única flecha visible es la de la columna por la
+                            que se ordena (`.Mui-active`): informa del orden
+                            vigente, no reacciona al ratón. */}
                         <TableRow
                             sx={{
                                 bgcolor: 'primary.main',
                                 transition: 'none',
                                 '&:hover': { bgcolor: 'primary.main' },
-                                // La celda no declara fondo al pasar el cursor:
-                                // el guinda lo pone la fila y la celda solo lo
-                                // deja ver. Poniendola en `transparent` se
-                                // borraba ese fondo en lugar de conservarlo.
+                                // La celda solo anula la transición y no toca
+                                // el fondo: el guinda lo pinta la fila y la
+                                // celda lo deja ver. Fijarla en `transparent`
+                                // taparía ese fondo en lugar de conservarlo.
                                 '& .MuiTableCell-head': {
                                     transition: 'none',
                                 },
@@ -396,9 +418,9 @@ export default function DynamicTable({
                                     transition: 'none',
                                     '&:hover': { bgcolor: 'transparent', color: 'inherit' },
                                 },
-                                // La flecha solo se ve en la columna por la que
-                                // se ordena; en el resto no aparece al pasar por
-                                // encima, que era el movimiento que se percibia.
+                                // La flecha arranca invisible y solo se muestra
+                                // en la columna activa; en las demás tampoco
+                                // asoma al pasar el cursor.
                                 '& .MuiTableSortLabel-icon': {
                                     opacity: 0,
                                     transition: 'none',

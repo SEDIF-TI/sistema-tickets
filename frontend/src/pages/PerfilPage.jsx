@@ -30,18 +30,22 @@ const VALORES_INICIALES = {
 /**
  * Perfil del usuario: cambio de contraseña y vinculación con Telegram.
  *
- * Cambios respecto a la versión anterior:
- *  - Llamaba a `PUT /v1/admin/usuarios/password`, ruta que dejó de existir al
- *    trasladarse el cambio de contraseña a `/v1/perfil`. **Nadie podía cambiar
- *    su contraseña**, ni siquiera en el primer acceso, que es obligatorio: el
- *    usuario quedaba atrapado en esta pantalla.
- *  - No pedía la contraseña actual, que el backend exige desde la auditoría.
- *  - Validaba 6 caracteres cuando el servidor pide 8 con letra y número, así
- *    que daba por buena una clave que el servidor luego rechazaba.
- *  - El usuario del bot de Telegram estaba escrito a mano en el código, con lo
- *    que apuntar a otro bot obligaba a recompilar; ahora sale del entorno.
- *  - El enlace de Telegram leía `user.id`, campo que el backend no envía (es
- *    `usuarioId`), así que la vinculación fallaba con un `alert()`.
+ * El cambio de contraseña va contra `/v1/perfil` y exige la contraseña actual,
+ * que el backend verifica antes de aceptar la nueva; queda registrado en la
+ * auditoría. El esquema `esquemaPassword` valida en el navegador las mismas
+ * reglas que aplica el servidor —ocho caracteres con al menos una letra y un
+ * número— para no enviar una clave que se vaya a rechazar.
+ *
+ * Cuando el usuario entra con una contraseña temporal, el enrutador lo retiene
+ * en esta pantalla: cambiarla es obligatorio. Por eso, tras guardarla con
+ * éxito, se avisa al AuthContext con `marcarPasswordCambiada` y se navega a la
+ * raíz, que ya reparte según el rol.
+ *
+ * La vinculación con Telegram solo se ofrece al personal técnico, que es quien
+ * recibe avisos de asignación. Abre la conversación con el bot pasando el id
+ * de usuario en el parámetro `start`: ese valor es el que el bot usa para
+ * asociar el chat con la cuenta del sistema. El bot se toma del entorno
+ * (`VITE_TELEGRAM_BOT_USERNAME`) para poder apuntar a otro sin recompilar.
  */
 export default function PerfilPage() {
     const { user, marcarPasswordCambiada } = useContext(AuthContext);
@@ -150,7 +154,6 @@ export default function PerfilPage() {
                     alignItems: 'start',
                 }}
             >
-                {/* ------------------------------------------ contraseña ---- */}
                 <Paper variant="outlined" sx={{ p: { xs: 2.5, sm: 3.5 } }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                         <LockResetIcon color="primary" aria-hidden="true" />
@@ -211,7 +214,6 @@ export default function PerfilPage() {
                     </form>
                 </Paper>
 
-                {/* -------------------------------------------- Telegram ---- */}
                 {esTecnico && (
                     <Paper variant="outlined" sx={{ p: { xs: 2.5, sm: 3.5 } }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>

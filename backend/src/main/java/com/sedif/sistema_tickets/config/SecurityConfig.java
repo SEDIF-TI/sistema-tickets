@@ -20,21 +20,31 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfigurationSource;
 
 /**
- * Cadena de seguridad de la aplicacion.
+ * Cadena de filtros de seguridad de la aplicacion.
  *
- * <p>Resumen de las garantias que aplica:</p>
+ * <p>Garantias que aplica:</p>
  * <ul>
- *   <li>API sin estado: CSRF desactivado y ninguna sesion de servidor.</li>
- *   <li>Solo {@code /api/v1/auth/**} y el handshake de WebSocket son publicos;
- *       el resto exige autenticacion.</li>
- *   <li>Autorizacion por rol en las anotaciones {@code @PreAuthorize} de cada
- *       controlador, habilitadas con {@link EnableMethodSecurity}. Las reglas
- *       por URL de aqui son una segunda barrera, no la unica.</li>
- *   <li>Cabeceras de seguridad: anti clickjacking, anti MIME sniffing, HSTS
- *       y CSP.</li>
- *   <li>401 cuando falta autenticacion y 403 cuando faltan permisos.</li>
- *   <li>La configuracion CORS se delega en {@code WebConfig}.</li>
+ *   <li>API sin estado: CSRF desactivado y ninguna sesion de servidor, porque
+ *       la identidad viaja en el JWT de cada peticion.</li>
+ *   <li>Son publicos {@code /api/v1/auth/**}, el handshake {@code /ws-tickets},
+ *       {@code /error}, {@code /api/salud} y las peticiones OPTIONS. Los
+ *       modulos internos de TI (resguardos, taller, correos, equipos y
+ *       actividades) exigen ADMINISTRADOR o SOPORTE, y {@code /api/v1/admin/**}
+ *       exige ADMINISTRADOR. Cualquier otra ruta requiere, como minimo, estar
+ *       autenticado.</li>
+ *   <li>Autorizacion fina por rol en las anotaciones {@code @PreAuthorize} de
+ *       cada controlador, habilitadas con {@link EnableMethodSecurity}. Las
+ *       reglas por URL de aqui son una barrera adicional, no la unica.</li>
+ *   <li>Cabeceras de seguridad: anti clickjacking, anti MIME sniffing, HSTS,
+ *       CSP y politica de referrer.</li>
+ *   <li>401 cuando falta autenticacion y 403 cuando faltan permisos, ambos con
+ *       el envoltorio JSON habitual de la API.</li>
  * </ul>
+ *
+ * <p>El orden de los filtros importa: el limitador de ritmo se ejecuta antes
+ * que el filtro JWT, de modo que un ataque de fuerza bruta se corta sin llegar
+ * siquiera a validar tokens. La configuracion CORS se delega en el bean que
+ * publica {@code WebConfig}.</p>
  */
 @Configuration
 @EnableWebSecurity
@@ -47,8 +57,10 @@ public class SecurityConfig {
     private final CorsConfigurationSource corsConfigurationSource;
 
     /**
-     * BCrypt aplica su propia sal por hash, de modo que dos usuarios con la
-     * misma contrasena obtienen hashes distintos.
+     * Codificador de contrasenas de toda la aplicacion. BCrypt incorpora una
+     * sal distinta en cada hash, de modo que dos usuarios con la misma
+     * contrasena obtienen valores almacenados diferentes, y su coste de calculo
+     * encarece los ataques por diccionario sobre la base de datos.
      */
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -105,7 +117,7 @@ public class SecurityConfig {
                     .requestMatchers("/api/v1/auth/**").permitAll()
                     .requestMatchers("/ws-tickets/**").permitAll()
                     .requestMatchers("/error").permitAll()
-                    // Sondeo de conectividad del frontend. Publico porque la
+                    // Sondeo de conectividad del frontend. Es publico porque la
                     // pantalla de acceso lo consulta antes de que exista
                     // sesion, y no revela nada: responde 204 sin cuerpo.
                     .requestMatchers("/api/salud").permitAll()
@@ -118,13 +130,10 @@ public class SecurityConfig {
 
                     // Modulos operativos de TI: resguardos, taller, correos
                     // institucionales, catalogo de equipos y actividades del
-                    // plan de trabajo. Son herramientas internas del area, no
-                    // del personal general.
-                    //
-                    // Sin esta barrera quedaban fuera de todo patron protegido
-                    // y bastaba con estar autenticado: cualquier EMPLEADO podia
-                    // leer y modificar resguardos, reparaciones y las
-                    // contrasenas de los correos institucionales.
+                    // plan de trabajo. Son herramientas internas del area y
+                    // manejan datos sensibles, entre ellos las contrasenas de
+                    // los correos institucionales, asi que no basta con estar
+                    // autenticado: quedan reservados a SOPORTE y ADMINISTRADOR.
                     .requestMatchers(
                             "/api/v1/resguardos/**",
                             "/api/taller/**",
@@ -138,8 +147,10 @@ public class SecurityConfig {
                     .anyRequest().authenticated()
             )
 
-            // Orden de filtros: primero se limita el ritmo de peticiones, para
-            // que un ataque de fuerza bruta ni siquiera llegue a validar tokens.
+            // Ambos se insertan antes del filtro de login por formulario, que
+            // esta API no usa. El limitador se anade en segundo lugar para que
+            // quede por delante del filtro JWT en la cadena resultante: asi un
+            // ataque de fuerza bruta ni siquiera llega a validar tokens.
             .addFilterBefore(rateLimitingFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 

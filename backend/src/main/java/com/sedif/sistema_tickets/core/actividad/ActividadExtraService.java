@@ -17,10 +17,8 @@ import java.time.LocalDateTime;
  * Actividades del plan anual de trabajo del personal del area.
  *
  * <p>Cada persona registra lo que va realizando frente a las metas fijadas a
- * inicio de ano, de modo que el avance sea medible.</p>
- *
- * <p>Esta capa de servicio no existia: el controlador manipulaba los
- * repositorios directamente, sin transacciones ni validacion.</p>
+ * inicio de ano, de modo que el avance sea medible. Los textos se guardan en
+ * mayusculas porque asi se imprimen en el reporte oficial.</p>
  */
 @Service
 @Slf4j
@@ -34,17 +32,17 @@ public class ActividadExtraService {
      * Registra una actividad a nombre del usuario autenticado.
      *
      * @param identificador correo o username tomado del token, NUNCA del
-     *                      cuerpo de la peticion: antes el cliente enviaba el
-     *                      {@code usuarioId} y podia registrar actividades a
-     *                      nombre de cualquier otra persona.
+     *                      cuerpo de la peticion: de lo contrario cualquiera
+     *                      podria registrar actividades a nombre de otra
+     *                      persona.
      */
     @Transactional
     public ActividadExtra registrar(ActividadExtraRequest request, String identificador) {
         Usuario usuario = usuarioRepository.findByCorreoOrUsername(identificador, identificador)
                 .orElseThrow(() -> new IllegalArgumentException(MessageConstants.USUARIO_NO_ENCONTRADO));
 
-        // La clave debe corresponder a una meta conocida: de lo contrario el
-        // registro no se puede imputar a nada y falsea el avance del plan.
+        // La clave debe corresponder a una meta conocida del plan: de lo
+        // contrario el registro no se puede imputar a nada y falsea el avance.
         if (!PlanTrabajo.esClaveValida(request.planTrabajoClave())) {
             throw new IllegalArgumentException(
                     "La meta del plan de trabajo indicada no existe.");

@@ -9,19 +9,18 @@ import lombok.Setter;
 import lombok.NoArgsConstructor;
 
 /**
- * Entidad que representa a los usuarios del sistema.
+ * Usuario del sistema.
  *
- * <p><b>Ultima linea de defensa contra la fuga de credenciales.</b> Lo
- * correcto es que ningun controlador devuelva esta entidad y use siempre un
- * DTO. Pero basta con que una entidad relacionada la arrastre al serializarse
- * (por ejemplo {@code ActividadExtra.usuario} o
- * {@code EquipoReparacion.tecnicoAsignado}) para que el hash de la contrasena
- * y el chat de Telegram acaben viajando al navegador y siendo visibles en la
- * pestana Network.</p>
+ * <p>El acceso se resuelve por correo o por nombre de usuario, de modo que
+ * ambos identifican de forma unica. El rol determina los permisos y el menu; el
+ * area, la visibilidad de los tickets.</p>
  *
- * <p>Los campos sensibles llevan {@link JsonIgnore}: aunque alguien devuelva
- * la entidad por descuido, esos datos no salen. La anotacion no afecta a la
- * persistencia ni a la lectura desde Java, solo a la serializacion JSON.</p>
+ * <p>Los campos sensibles llevan {@link JsonIgnore} como ultima defensa frente
+ * a la fuga de credenciales. Los controladores devuelven DTOs, pero basta con
+ * que una entidad relacionada arrastre a esta al serializarse (por ejemplo
+ * {@code ActividadExtra.usuario}) para que el hash de la contrasena y el chat
+ * de Telegram viajen al navegador. La anotacion solo afecta a la serializacion
+ * JSON, no a la persistencia ni a la lectura desde Java.</p>
  */
 @Entity
 @Table(name = "usuario")
@@ -47,10 +46,9 @@ public class Usuario extends Auditable {
     @Column(name = "s_correo", nullable = false, unique = true, length = 100)
     private String correo;
 
-    // --- NUEVO CAMPO AGREGADO PARA LOGIN DUAL ---
+    /** Alternativa al correo para iniciar sesion. Es opcional, pero unico si se define. */
     @Column(name = "s_username", unique = true, length = 50)
-    private String username; // Campo para login tradicional con username
-    // --------------------------------------------
+    private String username;
 
     /**
      * Hash BCrypt de la contrasena.
@@ -70,17 +68,24 @@ public class Usuario extends Auditable {
     @Column(name = "b_activo", nullable = false)
     private Boolean activo = true;
 
-    // Control de disponibilidad para usuarios con rol SOPORTE gestionado por el Administrador.
+    /**
+     * Marca si un tecnico entra en el reparto automatico de tickets. Solo tiene
+     * sentido en el rol SOPORTE y lo gestiona el administrador.
+     */
     @Column(name = "b_disponible_soporte", nullable = false)
     private Boolean disponibleSoporte = false;
 
-    // Relación muchos a uno: Múltiples usuarios de rol AREA pueden pertenecer a una misma Área.
+    /** Area de adscripcion, que acota los tickets que esta persona alcanza a ver. */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "fn_area_id")
     private Area area;
 
     /**
-     * Chat de Telegram vinculado, para las notificaciones.
+     * Chat de Telegram vinculado, destino de las notificaciones.
+     *
+     * <p>Lo rellena el bot cuando la persona pulsa el enlace de vinculacion
+     * desde su perfil. Nulo significa que no ha vinculado su cuenta y no
+     * recibe avisos por ese canal.</p>
      *
      * <p>{@code @JsonIgnore}: es un identificador personal de mensajeria. Con
      * el y el token del bot se pueden enviar mensajes directos a esa persona,
@@ -90,7 +95,10 @@ public class Usuario extends Auditable {
     @Column(name = "telegram_chat_id")
     private Long telegramChatId;
 
-    // Agrega este campo a tu Usuario.java
+    /**
+     * Indica que la clave vigente la genero el sistema. Mientras sea cierto, el
+     * frontend obliga a cambiarla antes de dejar usar el resto de pantallas.
+     */
     @Column(name = "b_password_temporal", nullable = false)
-    private Boolean passwordTemporal = true; // true por defecto al crear
+    private Boolean passwordTemporal = true;
 }

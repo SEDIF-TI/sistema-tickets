@@ -2,11 +2,13 @@ import { Box, Typography, Button } from '@mui/material';
 import InboxIcon from '@mui/icons-material/Inbox';
 
 /**
- * Estado vacío reutilizable.
+ * Estado vacío reutilizable, que usan tanto `DynamicTable` como las tarjetas de
+ * gráfica.
  *
- * Una tabla sin datos debe explicar por qué está vacía y ofrecer la acción
- * que la llena. Antes las pantallas mostraban, como mucho, un "No hay datos"
- * suelto sin contexto ni salida.
+ * Un listado sin datos explica por qué está vacío y, cuando existe, ofrece la
+ * acción que lo llena: un "No hay datos" suelto deja al usuario sin saber si
+ * falta cargar algo, si el filtro es demasiado estrecho o si debe crear el
+ * primer registro.
  *
  * @param {React.ElementType} icono   Icono de MUI que ilustra el vacío.
  * @param {string} titulo             Qué falta, en una línea.
@@ -36,8 +38,8 @@ export default function EmptyState({
             }}
         >
             <Icono
-                // Decorativo: el texto que sigue ya comunica el estado, así que
-                // el lector de pantalla no debe anunciar el icono.
+                // Icono decorativo: el texto que sigue ya comunica el
+                // estado, así que anunciarlo solo añadiría ruido.
                 aria-hidden="true"
                 sx={{ fontSize: 64, color: 'grey.300', mb: 2 }}
             />

@@ -26,21 +26,18 @@ import CampoFormulario from '../../components/CampoFormulario';
 const VALORES_INICIALES = { titulo: '', mensaje: '', areaId: '' };
 
 /**
- * Administración de avisos.
+ * Administración de avisos, dentro del panel del administrador.
  *
- * Cambios respecto a la versión anterior:
- *  - El formulario de alta vivía permanentemente sobre la tabla, ocupando un
- *    tercio de la pantalla aunque no se fuera a usar. Ahora es un diálogo.
- *  - No se podía editar un aviso: solo crear, encender/apagar y borrar. Para
- *    corregir una falta de ortografía había que borrarlo y volver a escribirlo.
- *  - "Eliminar" usaba `window.confirm()` con el texto "¿Eliminar
- *    definitivamente?", sin decir cuál ni advertir que no tiene vuelta atrás.
- *  - Montaba su propio Snackbar en lugar de usar el del sistema.
- *  - Cruzaba el `areaId` contra su lista de áreas para mostrar el nombre; si
- *    el área no estaba en esa lista, el aviso decía "Área específica" sin
- *    aclarar cuál. Ahora el backend envía `areaNombre` resuelto.
- *  - `areaService.getAll()` ahora devuelve una página, no un array: la versión
- *    anterior habría dejado el selector de áreas vacío.
+ * Un aviso es el mensaje que aparece en la parte superior del panel de cada
+ * usuario. Desde aquí se publican, se editan, se ocultan sin borrarlos con el
+ * interruptor de visibilidad y se eliminan de forma definitiva.
+ *
+ * El alcance lo decide `areaId`: sin área el aviso lo ve toda la institución;
+ * con área, solo su personal. El nombre a mostrar viene resuelto del backend
+ * en `areaNombre`, sin cruzarlo contra el catálogo local.
+ *
+ * Las columnas siguen el contrato de DynamicTable: `id`, `etiqueta` y un
+ * `render` opcional que dibuja la celda a partir de la fila completa.
  */
 export default function AdminAvisosPage() {
     const { notificar, notificarError } = useNotification();
@@ -71,8 +68,10 @@ export default function AdminAvisosPage() {
         defaultValues: VALORES_INICIALES,
     });
 
-    // El endpoint de avisos no está paginado: son pocos por definición, ya que
-    // todos se muestran a la vez en la barra superior de cada panel.
+    // El endpoint de avisos no está paginado, a diferencia del resto del panel:
+    // son pocos por definición, ya que todos se muestran a la vez en la barra
+    // superior de cada usuario. De ahí que la tabla reciba el array completo en
+    // lugar de apoyarse en useTablaPaginada.
     //
     // `mostrarCarga` permite recargar tras una acción sin vaciar la tabla: el
     // esqueleto de carga en mitad de una edición produce un parpadeo molesto.
@@ -90,8 +89,8 @@ export default function AdminAvisosPage() {
     }, [notificarError]);
 
     useEffect(() => {
-        // La carga inicial se lanza desde el efecto sin tocar el estado de
-        // forma sincrona: `cargando` ya empieza en true.
+        // La carga inicial no pasa `mostrarCarga`: `cargando` ya empieza en
+        // true, así que el esqueleto se pinta sin un cambio de estado extra.
         cargarAvisos();
     }, [cargarAvisos]);
 
@@ -112,7 +111,6 @@ export default function AdminAvisosPage() {
         return () => { cancelado = true; };
     }, []);
 
-    // --- Alta y edición ---------------------------------------------------
     const abrirAlta = () => {
         setAvisoEditando(null);
         reset(VALORES_INICIALES);
@@ -182,7 +180,6 @@ export default function AdminAvisosPage() {
         }
     };
 
-    // --- Columnas ---------------------------------------------------------
     const columnas = [
         {
             id: 'titulo',
@@ -327,7 +324,6 @@ export default function AdminAvisosPage() {
                 }}
             />
 
-            {/* ------------------------------------------ alta y edición ---- */}
             <Dialog
                 open={modalAbierto}
                 onClose={() => !isSubmitting && setModalAbierto(false)}
@@ -405,7 +401,6 @@ export default function AdminAvisosPage() {
                 </form>
             </Dialog>
 
-            {/* ------------------------------------------------ borrado ---- */}
             <ConfirmationDialog
                 abierto={Boolean(avisoABorrar)}
                 titulo="¿Eliminar este aviso?"

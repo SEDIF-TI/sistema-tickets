@@ -11,17 +11,21 @@ import { AuthContext } from '../context/AuthContext';
 import logoPuebla from '../assets/logo-puebla.png';
 
 /**
- * Pantalla de inicio de sesión.
+ * Pantalla de inicio de sesión, única ruta pública del sistema.
  *
- * Correcciones respecto a la versión anterior:
- *  - El botón no tenía estado de carga: se podía pulsar repetidamente. Con el
- *    límite de 5 intentos por minuto del backend, un doble clic nervioso
- *    bastaba para que el usuario se bloqueara a sí mismo.
- *  - El mensaje de error era siempre el mismo ("Credenciales inválidas o
- *    error de conexión"), sin distinguir una contraseña equivocada de un
- *    servidor caído o de un bloqueo por intentos.
- *  - Se añadió el conmutador para ver la contraseña, imprescindible al
- *    teclear a mano una clave temporal de 14 caracteres.
+ * El campo de identificador acepta indistintamente el usuario o el correo. Al
+ * enviar, `login` del AuthContext llama al backend, guarda el JWT devuelto y
+ * deja la sesión disponible para el resto de la aplicación; a partir de ahí
+ * basta con navegar a la raíz.
+ *
+ * El backend limita los intentos a cinco por minuto, así que el botón se
+ * deshabilita mientras la petición viaja: un doble clic bastaría para que el
+ * usuario se bloqueara a sí mismo. Los tres motivos de fallo —bloqueo por
+ * intentos, servidor inalcanzable y credenciales incorrectas— se distinguen en
+ * el mensaje, porque la acción del usuario es distinta en cada caso.
+ *
+ * El conmutador de visibilidad de la contraseña es necesario para teclear a
+ * mano las claves temporales de 14 caracteres que se entregan en el alta.
  */
 export default function LoginPage() {
     const [identificador, setIdentificador] = useState('');
@@ -75,8 +79,8 @@ export default function LoginPage() {
             <Container component="main" maxWidth="sm" sx={{ px: 2 }}>
                 <Paper elevation={2} sx={{ p: { xs: 3, sm: 5 } }}>
 
-                    {/* Identidad institucional. El logotipo original es oscuro,
-                        así que aquí se muestra tal cual sobre fondo blanco. */}
+                    {/* El logotipo institucional es oscuro y se muestra tal
+                        cual sobre el fondo claro del formulario. */}
                     <Box sx={{ display: 'flex', justifyContent: 'center', mb: 4 }}>
                         <Box
                             component="img"
@@ -130,8 +134,8 @@ export default function LoginPage() {
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                             disabled={cargando}
-                            // `slotProps.input` sustituye a `InputProps`, retirado en
-                            // MUI 9: React no reconocia la prop y la reenviaba al DOM.
+                            // El botón de visibilidad va en `slotProps.input`, que es la
+                            // vía de MUI 9 para llegar al componente interno del input.
                             slotProps={{
                                 input: {
                                     endAdornment: (

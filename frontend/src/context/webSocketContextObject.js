@@ -1,14 +1,13 @@
 import { createContext } from 'react';
 
 /**
- * Contexto del canal de tiempo real.
+ * Objeto de contexto del canal de tiempo real. Su valor es
+ * `{ stompClient, isConnected }`, que publica `WebSocketProvider` y consume el
+ * hook `useWebSocket`.
  *
- * Vive separado del proveedor porque Vite solo aplica recarga en caliente a los
- * módulos que exportan únicamente componentes: con el contexto y el proveedor
- * en el mismo archivo, cualquier retoque recargaba la aplicación entera y
- * tiraba la conexión abierta.
- *
- * Valor: `{ stompClient, isConnected }`.
+ * Vive separado del proveedor porque la recarga en caliente de Vite solo
+ * conserva el estado de los módulos que exportan únicamente componentes:
+ * compartiendo archivo, cualquier retoque tiraba la conexión abierta.
  */
 export const WebSocketContext = createContext(null);
 

@@ -8,21 +8,20 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * Comprobacion de que el servidor responde.
  *
- * <p>Lo consume el sondeo de {@code useNetworkStatus} del frontend, que
- * necesita distinguir "no hay internet" de "el servidor no contesta".</p>
+ * <p>Lo consume el sondeo de {@code useNetworkStatus} del frontend, que cada
+ * treinta segundos necesita distinguir "no hay internet" de "el servidor no
+ * contesta".</p>
  *
- * <p>Antes ese sondeo apuntaba a {@code /api} a secas, que no corresponde a
- * ningun controlador: Spring Security lo rechazaba con 403 <b>antes</b> de que
- * el filtro de CORS anadiera sus cabeceras, de modo que el navegador lo
- * reportaba como un error de CORS. La consola se llenaba de
- * "blocked by CORS policy" cada treinta segundos y la aplicacion mostraba
- * "No hay comunicacion con el servidor" aunque el backend estuviera
- * perfectamente en pie.</p>
+ * <p>Acepta GET y HEAD, y no toca la base de datos ni ninguna otra dependencia:
+ * solo confirma que el proceso acepta peticiones. Es publico a proposito, ya
+ * que la pantalla de acceso lo llama antes de que exista sesion, y por eso no
+ * revela nada: ni version, ni estado de dependencias, ni datos de la
+ * aplicacion.</p>
  *
- * <p>Responde a GET y a HEAD, y no toca la base de datos: solo confirma que el
- * proceso acepta peticiones. Es publico a proposito —lo llama tambien la
- * pantalla de acceso, antes de que exista sesion— y no revela nada: ni version,
- * ni estado de dependencias, ni datos.</p>
+ * <p>La ruta debe corresponder a un controlador real. Una URL sin controlador
+ * la rechaza Spring Security con 403 antes de que el filtro de CORS anada sus
+ * cabeceras, y el navegador presenta ese rechazo como un error de CORS que
+ * haria pasar por caido a un backend perfectamente en pie.</p>
  */
 @RestController
 @RequestMapping("/api/salud")
@@ -31,7 +30,7 @@ public class SaludResource {
     @RequestMapping(method = { RequestMethod.GET, RequestMethod.HEAD })
     public ResponseEntity<Void> comprobar() {
         // Cuerpo vacio: al sondeo le basta el codigo de respuesta, y asi la
-        // comprobacion es lo mas barata posible aunque corra cada 30 segundos.
+        // comprobacion es lo mas barata posible pese a repetirse sin descanso.
         return ResponseEntity.noContent().build();
     }
 }

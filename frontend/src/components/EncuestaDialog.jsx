@@ -70,8 +70,9 @@ export default function EncuestaDialog({
     const [elegida, setElegida] = useState(null);
     const [comentario, setComentario] = useState('');
 
-    // Cada ticket estrena su propia encuesta: sin esto, la respuesta anterior
-    // quedaría preseleccionada al calificar el siguiente.
+    // El diálogo no se desmonta entre tickets, así que la respuesta se limpia
+    // al abrirlo: de otro modo la calificación anterior quedaría marcada de
+    // antemano en la siguiente encuesta.
     useEffect(() => {
         if (abierto) {
             setElegida(null);
@@ -132,8 +133,9 @@ export default function EncuestaDialog({
                                     cursor: 'pointer',
                                     borderRadius: 2,
                                     bgcolor: 'background.paper',
-                                    // El borde grueso marca la elección además
-                                    // del color, para que se distinga sin él.
+                                    // La elección se marca con el grosor y el
+                                    // color del borde a la vez: el color solo
+                                    // no bastaría para distinguirla.
                                     border: '2px solid',
                                     borderColor: activa ? `${opcion.color}.main` : 'divider',
                                     color: activa ? `${opcion.color}.main` : 'text.secondary',
@@ -175,8 +177,9 @@ export default function EncuestaDialog({
             <DialogActions
                 sx={{ flexDirection: { xs: 'column-reverse', sm: 'row' }, gap: 1, p: 2 }}
             >
-                {/* Omitir es una salida legítima, no un castigo: una encuesta
-                    obligatoria solo genera respuestas al azar. */}
+                {/* Omitir es una salida legítima y con el mismo peso visual que
+                    el resto: una encuesta obligatoria solo produce respuestas
+                    al azar. */}
                 <Button
                     onClick={onOmitir}
                     color="inherit"

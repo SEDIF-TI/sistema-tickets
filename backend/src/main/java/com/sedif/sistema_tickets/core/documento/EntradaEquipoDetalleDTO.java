@@ -4,6 +4,12 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+/**
+ * Renglon de la tabla de equipos del formato de entrada.
+ *
+ * <p>Los campos son texto libre porque se vuelcan tal cual en la celda del
+ * PDF, incluida la cantidad.</p>
+ */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

@@ -10,8 +10,9 @@ import java.util.Optional;
  * vistazo y evita el punto medio ambiguo de las escalas pares. Quien acaba de
  * recibir una reparacion responde en un segundo, no rellena un cuestionario.</p>
  *
- * <p>El {@code peso} permite promediar: el panel muestra la media por tecnico,
- * y sin un valor numerico no habria forma de ordenarlos ni de comparar
+ * <p>Cada nivel lleva una etiqueta legible para la interfaz y un peso numerico.
+ * El peso es lo que permite promediar: el panel muestra la media por tecnico, y
+ * sin un valor numerico no habria forma de ordenarlos ni de comparar
  * periodos.</p>
  */
 public enum Calificacion {
@@ -39,10 +40,12 @@ public enum Calificacion {
     }
 
     /**
-     * Convierte el texto recibido, tolerando mayusculas y espacios.
+     * Convierte el texto recibido al enum, normalizando mayusculas y espacios
+     * sobrantes.
      *
      * <p>Devuelve {@link Optional#empty()} si no corresponde a ningun valor
-     * conocido, para que un dato historico invalido no rompa una consulta.</p>
+     * conocido, para que un registro con un dato invalido no rompa la consulta
+     * de un listado completo.</p>
      */
     public static Optional<Calificacion> desde(String valor) {
         if (valor == null || valor.isBlank()) {

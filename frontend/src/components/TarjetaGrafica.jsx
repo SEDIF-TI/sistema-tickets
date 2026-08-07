@@ -9,24 +9,25 @@ import TableRowsIcon from '@mui/icons-material/TableRows';
 import EmptyState from './EmptyState';
 
 /**
- * Contenedor de una gráfica del panel.
+ * Contenedor de una gráfica del panel. La gráfica en sí llega como `children`;
+ * esta tarjeta aporta el encabezado, el alto y las dos formas de leer el dato.
  *
- * Resuelve tres cosas que el panel anterior no cubría:
+ * Tres detalles sostienen el componente:
  *
- *  1. **El estado vacío.** `ResponsiveContainer` mide el alto de su padre; con
- *     una lista vacía el contenido colapsaba y Recharts avisaba en consola
- *     ("The width(-1) and height(-1) of chart should be greater than 0"),
- *     dejando un hueco en blanco sin explicación. Aquí, sin datos no se monta
- *     la gráfica: se muestra un mensaje que dice por qué está vacía.
+ *  1. **Sin datos no se monta la gráfica.** El `ResponsiveContainer` de
+ *     Recharts mide el alto de su padre, y con una lista vacía el contenido
+ *     colapsa: la medición da negativa, la biblioteca protesta en consola y
+ *     queda un hueco en blanco. En su lugar se muestra el estado vacío, que
+ *     además explica por qué no hay nada.
  *
- *  2. **La vista de tabla.** Una gráfica no puede ser el único camino al dato:
- *     quien use lector de pantalla, o no distinga los colores, necesita las
- *     cifras. El botón alterna entre ambas y la tabla es el respaldo exigido
- *     cuando el color no alcanza el contraste mínimo.
+ *  2. **Toda gráfica tiene su tabla.** El interruptor del encabezado alterna
+ *     entre ambas vistas. Quien use lector de pantalla, o no distinga los
+ *     colores, llega igualmente a las cifras; el color nunca es el único
+ *     portador de la información.
  *
- *  3. **El alto reservado.** El contenedor fija su altura incluyendo la banda
- *     de las etiquetas del eje, de modo que la tarjeta no genera un scroll
- *     interno diminuto.
+ *  3. **El alto se reserva aquí**, incluyendo la banda de las etiquetas del
+ *     eje, para que el contenedor tenga una altura real que medir y la tarjeta
+ *     no acabe con un scroll interno diminuto.
  *
  * @param {string} titulo  Qué mide la gráfica.
  * @param {React.ElementType} icono  Icono decorativo del encabezado.
@@ -95,8 +96,8 @@ export default function TarjetaGrafica({
                         sx={{ py: 4 }}
                     />
                 ) : vista === 'grafica' ? (
-                    // El alto va aquí y no dentro de ResponsiveContainer: así
-                    // el contenedor tiene una altura real que medir.
+                    // El alto se fija en esta caja y no en el
+                    // ResponsiveContainer, que solo sabe medir el de su padre.
                     <Box sx={{ width: '100%', height: alto }}>{children}</Box>
                 ) : (
                     <TableContainer sx={{ maxHeight: alto }}>
@@ -121,8 +122,10 @@ export default function TarjetaGrafica({
                                             <TableCell
                                                 key={c.id}
                                                 align={c.id === 'nombre' || c.id === 'fecha' ? 'left' : 'right'}
-                                                // Cifras alineadas en columna:
-                                                // aquí sí conviene ancho fijo.
+                                                // Dígitos de ancho fijo solo en
+                                                // las columnas numéricas: las
+                                                // cifras quedan alineadas y se
+                                                // pueden comparar de un vistazo.
                                                 sx={c.id === 'nombre' || c.id === 'fecha'
                                                     ? undefined
                                                     : { fontVariantNumeric: 'tabular-nums' }}

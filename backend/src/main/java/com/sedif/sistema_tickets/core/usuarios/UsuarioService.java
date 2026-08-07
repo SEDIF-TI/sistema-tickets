@@ -19,7 +19,12 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Servicio que contiene la lógica de negocio para la gestión de usuarios.
+ * Gestion de usuarios: altas, edicion, disponibilidad y contrasenas.
+ *
+ * <p>El servidor es el unico que fabrica contrasenas. En el alta y en el
+ * restablecimiento genera una temporal, la guarda cifrada y la devuelve una
+ * sola vez para que el administrador pueda comunicarla; la marca
+ * {@code passwordTemporal} obliga a cambiarla en el primer acceso.</p>
  */
 @Service
 @Slf4j
@@ -34,10 +39,15 @@ public class UsuarioService {
 
     private final UsuarioRepository usuarioRepository;
     private final AreaRepository areaRepository;
-    private final RolRepository rolRepository; // Inyectamos el nuevo repositorio de Rol
-    private final PasswordEncoder passwordEncoder; // Inyectamos el PasswordEncoder para encriptar contraseñas
+    private final RolRepository rolRepository;
+    private final PasswordEncoder passwordEncoder;
+
     /**
-     * Crea un nuevo usuario en el sistema aplicando reglas de validación.
+     * Da de alta un usuario con una contrasena temporal generada en el
+     * servidor.
+     *
+     * <p>La respuesta la incluye en claro por unica vez, ya que solo se
+     * persiste su hash y no habra forma de recuperarla despues.</p>
      */
     @Transactional
     public UsuarioResponse crearUsuario(UsuarioRequest request) {
@@ -46,9 +56,9 @@ public class UsuarioService {
                     "Ya existe un usuario con el correo " + request.correo() + ".");
         }
 
-        // El username es opcional, pero si viene debe ser unico. Sin esta
-        // comprobacion el choque lo detectaba la restriccion UNIQUE de la base
-        // y la respuesta era un 500 generico que no decia que corregir.
+        // El username es opcional, pero si viene debe ser unico. Adelantar la
+        // comprobacion de la restriccion UNIQUE permite decir que corregir, en
+        // lugar del 500 generico que produce el error de la base.
         String username = request.username();
         if (username != null && !username.isBlank()
                 && usuarioRepository.existsByUsername(username.trim())) {
@@ -56,36 +66,29 @@ public class UsuarioService {
                     "El nombre de usuario '" + username.trim() + "' ya esta en uso.");
         }
 
-        // 1. Buscamos el Rol
         Rol rol = rolRepository.findById(request.rolId())
                 .orElseThrow(() -> new IllegalArgumentException("El rol seleccionado no existe."));
 
-        // 2. Generar contraseña temporal segura
         String passwordTemporal = generarPasswordAleatoria();
-        
+
         Usuario nuevoUsuario = new Usuario();
         nuevoUsuario.setNombre(request.nombre());
-        // Los apellidos se guardaban vacios: el formulario los capturaba pero
-        // el DTO no los aceptaba, asi que se descartaban en silencio y los
-        // documentos oficiales salian sin ellos.
         nuevoUsuario.setApellidoPaterno(request.apellidoPaterno());
         nuevoUsuario.setApellidoMaterno(request.apellidoMaterno());
         nuevoUsuario.setCorreo(request.correo());
         nuevoUsuario.setUsername(username != null && !username.isBlank() ? username.trim() : null);
         
-        // 3. Encriptar contraseña y activar bandera de cambio forzoso
+        // Solo se persiste el hash; la bandera fuerza el cambio al entrar.
         nuevoUsuario.setPassword(passwordEncoder.encode(passwordTemporal));
         nuevoUsuario.setPasswordTemporal(true); 
-        
+
         nuevoUsuario.setRol(rol);
         nuevoUsuario.setActivo(true);
 
-        // ¡AQUÍ ESTÁ LA SOLUCIÓN!
-        // Si el request trae el campo nulo, le asignamos false automáticamente.
+        // La columna es NOT NULL, asi que un campo omitido se resuelve a false.
         Boolean disponible = request.disponibleSoporte();
         nuevoUsuario.setDisponibleSoporte(disponible != null ? disponible : false);
 
-        // Si el usuario pertenece a una área, asignarla
         if (request.areaId() != null) {
             Area area = areaRepository.findById(request.areaId())
                     .orElseThrow(() -> new IllegalArgumentException("Área no encontrada."));
@@ -93,22 +96,17 @@ public class UsuarioService {
         }
 
         Usuario usuarioGuardado = usuarioRepository.save(nuevoUsuario);
-        
-        // 4. Retornamos la respuesta incluyendo la contraseña temporal para informarla al administrador
+
         return UsuarioResponse.desdeEntidadConPassword(usuarioGuardado, passwordTemporal);
     }
 
     /**
      * Genera una contrasena temporal criptograficamente segura.
      *
-     * <p>La version anterior usaba {@code UUID.randomUUID().substring(0, 8)}:
-     * ocho caracteres del primer bloque de un UUID, es decir solo digitos
-     * hexadecimales (0-9, a-f). Eso son unos 32 bits de entropia, sin
-     * mayusculas ni simbolos, y resulta atacable por fuerza bruta.</p>
-     *
-     * <p>Ahora se usa {@link SecureRandom} sobre un alfabeto amplio. Se
-     * excluyen los caracteres ambiguos (I, l, 1, O, 0) porque estas claves se
-     * dictan o se copian a mano.</p>
+     * <p>Toma los caracteres de {@link SecureRandom} sobre un alfabeto amplio
+     * que combina ambas cajas, digitos y simbolos. Quedan fuera los caracteres
+     * ambiguos (I, l, 1, O, 0) porque estas claves se dictan o se copian a
+     * mano.</p>
      */
     private String generarPasswordAleatoria() {
         final String alfabeto =
@@ -123,10 +121,10 @@ public class UsuarioService {
     }
 
     /**
-     * Obtiene la lista de todos los usuarios registrados.
+     * Catalogo completo de usuarios, sin paginar.
      *
-     * <p>Se conserva sin paginar para los selectores que necesitan el catalogo
-     * completo. El listado del panel usa {@link #listarUsuariosPaginado}.</p>
+     * <p>Lo consumen los selectores que necesitan todas las opciones de golpe.
+     * El listado del panel usa {@link #listarUsuariosPaginado}.</p>
      */
     public List<UsuarioResponse> listarUsuarios() {
         return usuarioRepository.findAll()
@@ -140,11 +138,8 @@ public class UsuarioService {
             Set.of("id", "nombre", "apellidoPaterno", "correo", "username", "activo");
 
     /**
-     * Listado paginado del panel de administracion.
-     *
-     * <p>La busqueda y los filtros de rol y estado se resuelven en la base de
-     * datos. Antes la pantalla descargaba la tabla completa y filtraba en el
-     * navegador, de modo que buscar solo miraba lo ya cargado.</p>
+     * Listado paginado del panel de administracion, con la busqueda y los
+     * filtros de rol y estado resueltos en la base de datos.
      */
     @Transactional(readOnly = true)
     public PageResponse<UsuarioResponse> listarUsuariosPaginado(
@@ -182,9 +177,9 @@ public class UsuarioService {
     /**
      * Descarta los campos de ordenacion no permitidos.
      *
-     * <p>El {@code Pageable} se arma con lo que llega en la URL: sin esta
-     * lista se podria ordenar por {@code password} y deducir informacion a
-     * partir del orden del resultado.</p>
+     * <p>El {@code Pageable} se arma con lo que llega en la URL. La lista
+     * blanca impide ordenar por {@code password}, ya que el orden del
+     * resultado dejaria deducir informacion sobre los hashes.</p>
      */
     private Pageable sanearOrdenUsuario(Pageable pageable) {
         if (pageable.getSort().isUnsorted()) {
@@ -206,14 +201,16 @@ public class UsuarioService {
     }
 
     /**
-     * Cambia la disponibilidad de un usuario de soporte.
+     * Alterna si un tecnico entra en el reparto automatico de tickets.
+     *
+     * <p>Solo tiene sentido sobre el rol SOPORTE: es el unico que participa en
+     * el balanceo de carga.</p>
      */
     @Transactional
     public UsuarioResponse actualizarDisponibilidad(Long id, DisponibilidadRequest request) {
         Usuario usuario = usuarioRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado con el ID: " + id));
 
-        // Validamos comparando el nombre del rol en la entidad
         if (!"SOPORTE".equals(usuario.getRol().getNombre())) {
             throw new IllegalArgumentException("Solo los usuarios con rol de SOPORTE pueden modificar su disponibilidad.");
         }
@@ -225,7 +222,11 @@ public class UsuarioService {
     }
 
     /**
-     * Realiza la baja lógica de un usuario.
+     * Baja logica de un usuario.
+     *
+     * <p>Conserva la fila y su historial; el usuario deja de poder entrar. Si
+     * era tecnico, se le retira ademas la disponibilidad para que el
+     * balanceador no siga considerandolo.</p>
      */
     @Transactional
     public UsuarioResponse inactivarUsuario(Long id) {
@@ -238,7 +239,6 @@ public class UsuarioService {
 
         usuario.setActivo(false);
 
-        // Validamos comparando el nombre del rol
         if ("SOPORTE".equals(usuario.getRol().getNombre())) {
             usuario.setDisponibleSoporte(false);
         }
@@ -247,35 +247,35 @@ public class UsuarioService {
         return UsuarioResponse.desdeEntidad(usuarioActualizado);
     }
 
-    // Asegúrate de que en UsuarioService.java tengas exactamente esto:
+    /**
+     * Actualiza los datos de un usuario desde el panel de administracion.
+     *
+     * <p>Rol y area solo se tocan si vienen informados, de modo que una
+     * edicion parcial no desvincule al usuario de ninguno de los dos.</p>
+     */
     @Transactional
     public UsuarioResponse actualizarUsuario(Long id, ActualizarUsuarioRequest request) {
-        // 1. Buscar usuario
         Usuario usuario = usuarioRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado con ID: " + id));
 
-        // El correo identifica al usuario en el login: no puede chocar con el
-        // de otra persona. Antes solo se comprobaba al crear, asi que una
-        // edicion podia duplicarlo y romper el acceso de ambos.
+        // El correo identifica al usuario en el acceso: si chocara con el de
+        // otra persona, ambos quedarian sin poder entrar.
         if (usuarioRepository.existsByCorreoAndIdNot(request.correo(), id)) {
             throw new IllegalArgumentException(
                     "Ya existe otro usuario con el correo " + request.correo() + ".");
         }
 
-        // 2. Actualizar campos básicos
         usuario.setNombre(request.nombre());
         usuario.setApellidoPaterno(request.apellidoPaterno());
         usuario.setApellidoMaterno(request.apellidoMaterno());
         usuario.setCorreo(request.correo());
 
-        // 3. Actualizar Rol (buscando la entidad)
         if (request.rolId() != null) {
             Rol rol = rolRepository.findById(request.rolId())
                     .orElseThrow(() -> new IllegalArgumentException("Rol no encontrado."));
             usuario.setRol(rol);
         }
 
-        // 4. Actualizar Área
         if (request.areaId() != null) {
             Area area = areaRepository.findById(request.areaId())
                     .orElseThrow(() -> new IllegalArgumentException("Área no encontrada."));
@@ -285,14 +285,20 @@ public class UsuarioService {
         return UsuarioResponse.desdeEntidad(usuarioRepository.save(usuario));
     }
 
-    // Listar todos (necesitas mapear la lista de entidades a lista de responses)
+    /** Catalogo completo de usuarios mapeado a DTO. */
     public List<UsuarioResponse> obtenerTodosLosUsuarios() {
         return usuarioRepository.findAll().stream()
                 .map(UsuarioResponse::desdeEntidad)
                 .toList();
     }
 
-    // Resetear contraseña
+    /**
+     * Restablece la contrasena de un usuario que perdio la suya.
+     *
+     * <p>Genera una nueva clave temporal y vuelve a marcar la cuenta como tal,
+     * de modo que se exija cambiarla en el siguiente acceso. La devuelve en
+     * claro por unica vez para que el administrador pueda comunicarla.</p>
+     */
     @Transactional
     public UsuarioResponse resetearPassword(Long id) {
         Usuario usuario = usuarioRepository.findById(id)
@@ -306,7 +312,7 @@ public class UsuarioService {
         return UsuarioResponse.desdeEntidadConPassword(guardado, nuevaTemporal);
     }
 
-    // Alternar estado
+    /** Invierte el alta o baja del usuario desde el conmutador del panel. */
     @Transactional
     public UsuarioResponse alternarEstadoUsuario(Long id) {
         Usuario usuario = usuarioRepository.findById(id)
@@ -319,9 +325,9 @@ public class UsuarioService {
     /**
      * Cambia la contrasena del usuario autenticado.
      *
-     * <p>Exige la contrasena actual antes de aceptar la nueva. Sin esa
-     * comprobacion, quien se hiciera con un token valido podia apoderarse de
-     * la cuenta de forma permanente sin conocer la clave original.</p>
+     * <p>Exige la contrasena actual antes de aceptar la nueva: quien se hiciera
+     * con un token valido no puede apoderarse de la cuenta de forma permanente
+     * sin conocer la clave original.</p>
      *
      * <p>Se busca por correo o por username porque no todos los usuarios
      * tienen correo: el principal del token puede ser cualquiera de los dos.</p>
@@ -340,8 +346,8 @@ public class UsuarioService {
             throw new IllegalArgumentException(MessageConstants.PASSWORD_ACTUAL_INCORRECTA);
         }
 
-        // Reutilizar la misma clave dejaria la cuenta con la contrasena
-        // temporal que ya circulo por otros canales.
+        // Repetir la clave dejaria la cuenta con la contrasena temporal, que ya
+        // circulo por otros canales al comunicarsela al usuario.
         if (passwordEncoder.matches(request.nuevaPassword(), usuario.getPassword())) {
             throw new IllegalArgumentException(MessageConstants.PASSWORD_IGUAL_ANTERIOR);
         }
